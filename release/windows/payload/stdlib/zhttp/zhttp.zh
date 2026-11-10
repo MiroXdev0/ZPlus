@@ -1,0 +1,51 @@
+pub fn serverCreate(address: string, port: number) -> number:
+    return __zhttp_serverCreate(address, port)
+end
+
+pub fn serverStart(server: number) -> boolean:
+    return __zhttp_serverStart(server)
+end
+
+pub fn serverRunning(server: number) -> boolean:
+    return __zhttp_serverRunning(server)
+end
+
+pub fn serverPort(server: number) -> number:
+    return __zhttp_serverPort(server)
+end
+
+pub fn serverNext(server: number, timeoutMilliseconds: number) -> string:
+    return __zhttp_serverNext(server, timeoutMilliseconds)
+end
+
+pub fn serverRespond(server: number, requestId: number, status: number, headersJson: string, body: string) -> boolean:
+    return __zhttp_serverRespond(server, requestId, status, headersJson, body)
+end
+
+pub fn serverStop(server: number):
+    __zhttp_serverStop(server)
+end
+
+pub fn serverConfigure(server: number, maximumBodyBytes: number, timeoutMilliseconds: number):
+    __zhttp_serverConfigure(server, maximumBodyBytes, timeoutMilliseconds)
+end
+
+pub fn configureCors(server: number, origin: string, methods: string, headers: string):
+    __zhttp_configureCors(server, origin, methods, headers)
+end
+
+pub fn routeParams(path: string, pattern: string) -> string:
+    return __zhttp_routeParams(path, pattern)
+end
+
+pub fn queryValue(query: string, name: string) -> string:
+    return __zhttp_queryValue(query, name)
+end
+
+pub fn requestHeader(requestJson: string, name: string) -> string:
+    return __zhttp_requestHeader(requestJson, name)
+end
+
+pub fn request(method: string, url: string, headersJson: string, body: string, timeoutMilliseconds: number) -> string:
+    return __zhttp_clientRequest(method, url, headersJson, body, timeoutMilliseconds)
+end

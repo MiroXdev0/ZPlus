@@ -1,0 +1,16 @@
+use zgraphics
+
+start:
+    let first = zgraphics.createWindow("Z+ Window One", 480, 300)
+    let second = zgraphics.createWindow("Z+ Window Two", 480, 300)
+    zgraphics.background(first, "#172554")
+    zgraphics.background(second, "#3F1D2E")
+    zgraphics.text(first, "This is the first window.", 28, 35, "#FFFFFF", 22)
+    zgraphics.text(second, "This is the second window.", 28, 35, "#FFFFFF", 22)
+    zgraphics.text(first, "Close this window to end the application.", 28, 100, "#BFDBFE", 16)
+    zgraphics.text(second, "Each window has its own drawing surface.", 28, 100, "#FBCFE8", 16)
+    zgraphics.show(first)
+    zgraphics.show(second)
+    zgraphics.run(first)
+    zgraphics.close(second)
+stop

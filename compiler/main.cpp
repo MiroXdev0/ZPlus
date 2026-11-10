@@ -28,7 +28,7 @@
 
 namespace zplus {
 
-constexpr const char* VERSION = "0.5.0";
+constexpr const char* VERSION = "1.1.2";
 constexpr const char* COMPILER_NAME = "Z+ Compiler";
 constexpr const char* EXECUTABLE_NAME = "zp";
 

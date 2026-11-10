@@ -451,9 +451,12 @@ TemplateRegistry::TemplateRegistry(std::filesystem::path executablePath)
 #ifdef ZBUILD_BUILTIN_TEMPLATE_DIR
     builtInDirectory_ = ZBUILD_BUILTIN_TEMPLATE_DIR;
 #endif
-    if (!std::filesystem::is_directory(builtInDirectory_) &&
-        !executablePath_.empty()) {
-        builtInDirectory_ = executablePath_.parent_path() / "zbuild-templates";
+    if (!executablePath_.empty()) {
+        const auto adjacentTemplates =
+            executablePath_.parent_path() / "zbuild-templates";
+        if (std::filesystem::is_directory(adjacentTemplates)) {
+            builtInDirectory_ = adjacentTemplates;
+        }
     }
 }
 

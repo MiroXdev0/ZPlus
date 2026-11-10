@@ -2,6 +2,10 @@
 
 Z+ is a small compiled language with a lexer, parser, semantic analyzer, shared intermediate representation, interpreter, and an x86-64 native backend.
 
+The current compiler release is **1.1.2 Stable**. On Windows x64, the verified
+per-user installer and release build instructions are documented in
+[docs/INSTALLER.md](./docs/INSTALLER.md).
+
 ## Build
 
 ```powershell

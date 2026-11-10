@@ -19,6 +19,20 @@ namespace {
 
 constexpr const char* version = "0.1.0";
 
+std::filesystem::path executablePath(const char* argumentZero) {
+#ifdef _WIN32
+    (void)argumentZero;
+    std::vector<wchar_t> path(32768, L'\0');
+    const DWORD length = GetModuleFileNameW(
+        nullptr, path.data(), static_cast<DWORD>(path.size()));
+    if (length == 0 || length >= path.size())
+        throw std::runtime_error("cannot determine the ZBuild executable path");
+    return std::filesystem::path(std::wstring(path.data(), length));
+#else
+    return std::filesystem::absolute(argumentZero);
+#endif
+}
+
 void printHelp() {
     std::cout
         << "ZBuild " << version << " - Z+ project build tool\n\n"
@@ -146,8 +160,7 @@ int main(int argc, char** argv) {
             return 0;
         }
 
-        const auto executablePath = std::filesystem::absolute(argv[0]);
-        zbuild::TemplateRegistry templates(executablePath);
+        zbuild::TemplateRegistry templates(executablePath(argv[0]));
         if (command == "templates") {
             if (argc != 2) throw std::runtime_error("'zbuild templates' takes no arguments");
             templates.printList();
@@ -318,7 +331,7 @@ int main(int argc, char** argv) {
             options.force = true;
             options.cleanFirst = true;
         }
-        const auto compiler = compilerPath(project, executablePath);
+        const auto compiler = compilerPath(project, executablePath(argv[0]));
         zbuild::BuildEngine engine(std::move(project), compiler);
         if (command == "build" || command == "rebuild") {
             engine.build(options);

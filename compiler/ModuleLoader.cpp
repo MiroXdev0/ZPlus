@@ -11,8 +11,29 @@
 #include <system_error>
 #include <utility>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 namespace zplus {
 namespace {
+
+std::filesystem::path executableDirectory() {
+#ifdef _WIN32
+    std::wstring path(32768, L'\0');
+    const DWORD length = GetModuleFileNameW(
+        nullptr, path.data(), static_cast<DWORD>(path.size()));
+    if (length == 0 || length >= path.size()) return {};
+    path.resize(length);
+    return std::filesystem::path(path).parent_path();
+#elif defined(__linux__)
+    std::error_code error;
+    const auto path = std::filesystem::read_symlink("/proc/self/exe", error);
+    return error ? std::filesystem::path{} : path.parent_path();
+#else
+    return {};
+#endif
+}
 
 std::filesystem::path standardLibraryDirectory() {
 #ifdef _MSC_VER
@@ -30,6 +51,15 @@ std::filesystem::path standardLibraryDirectory() {
         return std::filesystem::path(configured);
     }
 #endif
+    const auto executableDir = executableDirectory();
+    if (!executableDir.empty()) {
+        const auto adjacentLibrary = executableDir / "stdlib";
+        std::error_code directoryError;
+        if (std::filesystem::is_directory(adjacentLibrary, directoryError) &&
+            !directoryError) {
+            return adjacentLibrary;
+        }
+    }
 #ifdef ZPLUS_STDLIB_DIR
     return std::filesystem::path(ZPLUS_STDLIB_DIR);
 #else
