@@ -1,0 +1,11 @@
+start:
+    let value: number = 3
+    switch value:
+        case 1:
+            say("switch failed")
+        case 3:
+            say("switch passed")
+        default:
+            say("switch failed")
+    end
+stop

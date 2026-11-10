@@ -1,0 +1,35 @@
+let shared: number = 4
+
+fn readShared() -> number:
+    return shared
+end
+
+fn increment(value: number, amount: number = 1) -> number:
+    return value + amount
+end
+
+fn factorial(value: number) -> number:
+    if value <= 1:
+        return 1
+    else:
+        return value * factorial(value - 1)
+    end
+end
+
+fn callForward() -> number:
+    return later(3)
+end
+
+fn later(value: number) -> number:
+    return value * 2
+end
+
+start:
+    say(readShared())
+    say(increment(5))
+    say(increment(5, 2))
+    say(callForward())
+    say(factorial(5))
+    say(increment(1))
+    say(increment(2))
+stop

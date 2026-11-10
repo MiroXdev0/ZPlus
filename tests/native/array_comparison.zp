@@ -1,0 +1,9 @@
+start:
+    let left: number[] = [1]
+    let right: number[] = [1]
+    if left == right:
+        say("array comparison")
+    else:
+        say("array comparison")
+    end
+stop

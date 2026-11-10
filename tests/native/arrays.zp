@@ -1,0 +1,77 @@
+use zmemory.management
+
+let shared: number[] = [2, 4]
+
+fn mutate(values: number[]) -> number[]:
+    values[0] = values[0] + 40
+    return values
+end
+
+fn readNested(values: number[][]) -> number:
+    return values[1][0]
+end
+
+fn allocateTransient():
+    let discarded: number[][] = [[5], [6]]
+end
+
+start:
+    let empty: number[] = []
+    if length(empty) == 0:
+        say("empty array passed")
+    else:
+        say("empty array failed")
+    end
+
+    let values: number[] = [1, 2, 3]
+    values[1] += 5
+    if length(values) == 3 and values[1] == 7:
+        say("initialized array read and write passed")
+    else:
+        say("initialized array read and write failed")
+    end
+    let alias = mutate(values)
+    if values[0] == 41 and alias[0] == 41:
+        say("array argument mutation passed")
+    else:
+        say("array argument mutation failed")
+    end
+
+    let matrix: number[][] = [[1, 2], [3, 4]]
+    matrix[1][0] = 9
+    if readNested(matrix) == 9:
+        say("nested array mutation passed")
+    else:
+        say("nested array mutation failed")
+    end
+
+    let words: string[] = ["native" + " ", "arrays"]
+    say(words[1])
+    let flags: bool[] = [true, false]
+    if flags[0] and not flags[1]:
+        say("boolean array passed")
+    else:
+        say("boolean array failed")
+    end
+
+    allocateTransient()
+    let objectsBeforeCollection = zmemory.heapObjects()
+    zmemory.collect()
+    let objectsAfterCollection = zmemory.heapObjects()
+    if values[0] == 41 and matrix[1][0] == 9 and shared[1] == 4:
+        say("array references survived collection")
+    else:
+        say("array reference collection failed")
+    end
+    say(words[0])
+    if objectsAfterCollection < objectsBeforeCollection:
+        say("unreachable arrays reclaimed")
+    else:
+        say("unreachable arrays retained")
+    end
+    if zmemory.heapObjects() > 0 and zmemory.collectionCount() > 0:
+        say("managed array collection passed")
+    else:
+        say("managed array collection failed")
+    end
+stop

@@ -1,0 +1,131 @@
+use zmemory.management
+
+let globalValues: number[] = [1]
+
+fn appendAndReturn(values: number[], value: number) -> number[]:
+    push(values, value)
+    return values
+end
+
+fn makeWords() -> string[]:
+    let words: string[] = []
+    push(words, "alpha")
+    push(words, "beta")
+    return words
+end
+
+fn allocateTransient():
+    let discarded: number[][] = [[1], [2], [3]]
+    push(discarded, [4])
+end
+
+start:
+    zmemory.setThreshold(1024)
+    let values: number[] = []
+    push(values, 10)
+    push(values, 20)
+    let alias = values
+    push(alias, 30)
+    if length(values) == 3 and values[2] == 30:
+        say("push and aliases passed")
+    else:
+        say("push and aliases failed")
+    end
+
+    insert(values, 1, 15)
+    let first = remove(values, 0)
+    let last = pop(values)
+    if first == 10 and last == 30 and values[0] == 15:
+        say("insert remove and pop passed")
+    else:
+        say("insert remove and pop failed")
+    end
+    if contains(values, 15) and not contains(values, 99):
+        say("contains passed")
+    else:
+        say("contains failed")
+    end
+    let smallNumbers: number[] = [1, 9]
+    if contains(smallNumbers, 1) and contains(smallNumbers, 9):
+        say("small integer contains passed")
+    else:
+        say("small integer contains failed")
+    end
+
+    let returned = appendAndReturn(values, 40)
+    if length(returned) == 3 and values[2] == 40:
+        say("function mutation and return passed")
+    else:
+        say("function mutation and return failed")
+    end
+    insert(values, length(values), 50)
+    let insertedLast = pop(values)
+    if insertedLast == 50 and values[2] == 40:
+        say("insert at end passed")
+    else:
+        say("insert at end failed")
+    end
+
+    let nested: number[][] = []
+    let child: number[] = [5]
+    push(nested, child)
+    push(nested[0], 6)
+    if nested[0][1] == 6:
+        say("nested array mutation passed")
+    else:
+        say("nested array mutation failed")
+    end
+
+    let words = makeWords()
+    if contains(words, "beta"):
+        say("string array passed")
+    else:
+        say("string array failed")
+    end
+
+    globalValues = appendAndReturn(globalValues, 2)
+    if globalValues[1] == 2:
+        say("global array passed")
+    else:
+        say("global array failed")
+    end
+
+    let bytesBeforeGrowth = zmemory.heapUsed()
+    let stress: number[] = []
+    for (let i: number = 0; i < 128; i++):
+        push(stress, i)
+    end
+    if length(stress) == 128 and stress[127] == 127:
+        say("geometric growth passed")
+    else:
+        say("geometric growth failed")
+    end
+    if zmemory.heapUsed() > bytesBeforeGrowth:
+        say("heap accounting passed")
+    else:
+        say("heap accounting failed")
+    end
+
+    clear(stress)
+    push(stress, 77)
+    if length(stress) == 1 and stress[0] == 77:
+        say("clear and reuse passed")
+    else:
+        say("clear and reuse failed")
+    end
+
+    allocateTransient()
+    let objectsBeforeCollection = zmemory.heapObjects()
+    zmemory.collect()
+    let objectsAfterCollection = zmemory.heapObjects()
+    if values[0] == 15 and nested[0][0] == 5 and contains(words, "beta"):
+        say("reachable arrays and strings survived collection")
+    else:
+        say("reachable references failed collection")
+    end
+    if objectsAfterCollection < objectsBeforeCollection:
+        say("unreachable arrays reclaimed")
+    else:
+        say("unreachable arrays retained")
+    end
+stop

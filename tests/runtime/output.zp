@@ -1,0 +1,6 @@
+start:
+    let values: number[] = [1, 2]
+    printz("value=", 42, true, values, " éЖ🙂")
+    printm("value=", 42, true, values, " éЖ🙂")
+    say("")
+stop

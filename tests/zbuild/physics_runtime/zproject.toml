@@ -1,0 +1,20 @@
+[project]
+name = "physics-runtime"
+version = "0.1.0"
+description = "ZBuild physics runtime integration test"
+entry = "src/main.zp"
+
+[build]
+backend = "native"
+mode = "release"
+output_dir = "build"
+optimization = 0
+jobs = 1
+
+[compiler]
+warnings = true
+debug_symbols = false
+
+[platform]
+windows = true
+linux = true

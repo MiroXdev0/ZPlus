@@ -1,0 +1,4 @@
+start:
+    let values: number[] = []
+    pop(values)
+stop

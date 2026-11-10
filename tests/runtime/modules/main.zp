@@ -1,0 +1,5 @@
+use "bad_module.zh" as bad
+
+fn main():
+    say(bad.readPastEnd())
+end

@@ -1,0 +1,31 @@
+start:
+    let binaryValue: number = 0b1010
+    let secondBinaryValue: number = 0b1111
+    let hexadecimalValue: number = 0x10
+    let decimalValue: number = 25
+    let scientificValue: number = 1e2
+
+    say(binaryValue == 10 ? "binary-first-ok" : "binary-first-fail")
+    say(secondBinaryValue == 15 ? "binary-second-ok" : "binary-second-fail")
+    say(binaryValue + secondBinaryValue == 25 ? "binary-add-ok" : "binary-add-fail")
+    say(hexadecimalValue == 16 ? "hexadecimal-ok" : "hexadecimal-fail")
+    say(decimalValue == 25 ? "decimal-ok" : "decimal-fail")
+    say(scientificValue == 100 ? "scientific-ok" : "scientific-fail")
+
+    if binaryValue > 5:
+        say("if-without-else")
+        if secondBinaryValue > 10:
+            say("nested-if")
+        end
+    end
+
+    if binaryValue < 5:
+    else:
+        say("empty-then-branch")
+    end
+
+    let bitwisePrecedence: number = 1 | 2 + 1
+    let groupedBitwise: number = (1 | 2) ^ 3
+    say(bitwisePrecedence == 3 ? "bitwise-precedence-ok" : "bitwise-precedence-fail")
+    say(groupedBitwise == 0 ? "grouped-bitwise-ok" : "grouped-bitwise-fail")
+stop

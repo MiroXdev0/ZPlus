@@ -1,0 +1,247 @@
+pub fn createWorld(gravityX: number, gravityY: number) -> number:
+    return __zphysics_createWorld(gravityX, gravityY)
+end
+
+pub fn destroyWorld(world: number):
+    __zphysics_destroyWorld(world)
+end
+
+pub fn setGravity(world: number, x: number, y: number):
+    __zphysics_setGravity(world, x, y)
+end
+
+pub fn getGravityX(world: number) -> number:
+    return __zphysics_getGravityX(world)
+end
+
+pub fn getGravityY(world: number) -> number:
+    return __zphysics_getGravityY(world)
+end
+
+pub fn setFixedTimeStep(world: number, seconds: number):
+    __zphysics_setFixedTimeStep(world, seconds)
+end
+
+pub fn setIterations(world: number, count: number):
+    __zphysics_setIterations(world, count)
+end
+
+pub fn setPaused(world: number, paused: boolean):
+    __zphysics_setPaused(world, paused)
+end
+
+pub fn isPaused(world: number) -> boolean:
+    return __zphysics_isPaused(world)
+end
+
+pub fn update(world: number, deltaTime: number):
+    __zphysics_update(world, deltaTime)
+end
+
+pub fn bodyCount(world: number) -> number:
+    return __zphysics_bodyCount(world)
+end
+
+pub fn shapeCount(world: number) -> number:
+    return __zphysics_shapeCount(world)
+end
+
+pub fn contactCount(world: number) -> number:
+    return __zphysics_contactCount(world)
+end
+
+pub fn createBody(world: number, bodyType: string, x: number, y: number) -> number:
+    return __zphysics_createBody(world, bodyType, x, y)
+end
+
+pub fn destroyBody(body: number):
+    __zphysics_destroyBody(body)
+end
+
+pub fn setPosition(body: number, x: number, y: number):
+    __zphysics_setPosition(body, x, y)
+end
+
+pub fn getPositionX(body: number) -> number:
+    return __zphysics_getPositionX(body)
+end
+
+pub fn getPositionY(body: number) -> number:
+    return __zphysics_getPositionY(body)
+end
+
+pub fn setRotation(body: number, angle: number):
+    __zphysics_setRotation(body, angle)
+end
+
+pub fn getRotation(body: number) -> number:
+    return __zphysics_getRotation(body)
+end
+
+pub fn setVelocity(body: number, x: number, y: number):
+    __zphysics_setVelocity(body, x, y)
+end
+
+pub fn getVelocityX(body: number) -> number:
+    return __zphysics_getVelocityX(body)
+end
+
+pub fn getVelocityY(body: number) -> number:
+    return __zphysics_getVelocityY(body)
+end
+
+pub fn setAngularVelocity(body: number, velocity: number):
+    __zphysics_setAngularVelocity(body, velocity)
+end
+
+pub fn getAngularVelocity(body: number) -> number:
+    return __zphysics_getAngularVelocity(body)
+end
+
+pub fn setMass(body: number, mass: number):
+    __zphysics_setMass(body, mass)
+end
+
+pub fn getMass(body: number) -> number:
+    return __zphysics_getMass(body)
+end
+
+pub fn setLinearDamping(body: number, damping: number):
+    __zphysics_setLinearDamping(body, damping)
+end
+
+pub fn setAngularDamping(body: number, damping: number):
+    __zphysics_setAngularDamping(body, damping)
+end
+
+pub fn applyForce(body: number, x: number, y: number):
+    __zphysics_applyForce(body, x, y)
+end
+
+pub fn applyImpulse(body: number, x: number, y: number):
+    __zphysics_applyImpulse(body, x, y)
+end
+
+pub fn applyTorque(body: number, torque: number):
+    __zphysics_applyTorque(body, torque)
+end
+
+pub fn createCircle(world: number, body: number, radius: number) -> number:
+    return __zphysics_createCircle(world, body, radius)
+end
+
+pub fn createBox(world: number, body: number, width: number, height: number) -> number:
+    return __zphysics_createBox(world, body, width, height)
+end
+
+pub fn createPolygon(world: number, body: number, vertices: string) -> number:
+    return __zphysics_createPolygon(world, body, vertices)
+end
+
+pub fn createSegment(world: number, body: number, x1: number, y1: number, x2: number, y2: number) -> number:
+    return __zphysics_createSegment(world, body, x1, y1, x2, y2)
+end
+
+pub fn destroyShape(shape: number):
+    __zphysics_destroyShape(shape)
+end
+
+pub fn setCollisionCategory(shape: number, category: number):
+    __zphysics_setCollisionCategory(shape, category)
+end
+
+pub fn setCollisionMask(shape: number, mask: number):
+    __zphysics_setCollisionMask(shape, mask)
+end
+
+pub fn setSensor(shape: number, sensor: boolean):
+    __zphysics_setSensor(shape, sensor)
+end
+
+pub fn setFriction(shape: number, friction: number):
+    __zphysics_setFriction(shape, friction)
+end
+
+pub fn setRestitution(shape: number, restitution: number):
+    __zphysics_setRestitution(shape, restitution)
+end
+
+pub fn setDensity(shape: number, density: number):
+    __zphysics_setDensity(shape, density)
+end
+
+pub fn isTouching(bodyA: number, bodyB: number) -> boolean:
+    return __zphysics_isTouching(bodyA, bodyB)
+end
+
+pub fn collisionStarted(world: number, bodyA: number, bodyB: number) -> boolean:
+    return __zphysics_collisionStarted(world, bodyA, bodyB)
+end
+
+pub fn collisionEnded(world: number, bodyA: number, bodyB: number) -> boolean:
+    return __zphysics_collisionEnded(world, bodyA, bodyB)
+end
+
+pub fn createDistanceJoint(world: number, bodyA: number, bodyB: number, length: number) -> number:
+    return __zphysics_createDistanceJoint(world, bodyA, bodyB, length)
+end
+
+pub fn createRevoluteJoint(world: number, bodyA: number, bodyB: number, anchorX: number, anchorY: number) -> number:
+    return __zphysics_createRevoluteJoint(world, bodyA, bodyB, anchorX, anchorY)
+end
+
+pub fn createWeldJoint(world: number, bodyA: number, bodyB: number, anchorX: number, anchorY: number) -> number:
+    return __zphysics_createWeldJoint(world, bodyA, bodyB, anchorX, anchorY)
+end
+
+pub fn createMouseJoint(world: number, body: number, targetX: number, targetY: number, maxForce: number) -> number:
+    return __zphysics_createMouseJoint(world, body, targetX, targetY, maxForce)
+end
+
+pub fn setMouseJointTarget(joint: number, x: number, y: number):
+    __zphysics_setMouseJointTarget(joint, x, y)
+end
+
+pub fn destroyJoint(joint: number):
+    __zphysics_destroyJoint(joint)
+end
+
+pub fn raycast(world: number, x1: number, y1: number, x2: number, y2: number) -> number:
+    return __zphysics_raycast(world, x1, y1, x2, y2)
+end
+
+pub fn raycastFraction(world: number) -> number:
+    return __zphysics_raycastFraction(world)
+end
+
+pub fn raycastPointX(world: number) -> number:
+    return __zphysics_raycastPointX(world)
+end
+
+pub fn raycastPointY(world: number) -> number:
+    return __zphysics_raycastPointY(world)
+end
+
+pub fn raycastNormalX(world: number) -> number:
+    return __zphysics_raycastNormalX(world)
+end
+
+pub fn raycastNormalY(world: number) -> number:
+    return __zphysics_raycastNormalY(world)
+end
+
+pub fn pointQuery(world: number, x: number, y: number) -> number:
+    return __zphysics_pointQuery(world, x, y)
+end
+
+pub fn areaQuery(world: number, x1: number, y1: number, x2: number, y2: number) -> number:
+    return __zphysics_areaQuery(world, x1, y1, x2, y2)
+end
+
+pub fn queryBodyAt(world: number, index: number) -> number:
+    return __zphysics_queryBodyAt(world, index)
+end
+
+pub fn setQueryFilter(world: number, category: number, mask: number):
+    __zphysics_setQueryFilter(world, category, mask)
+end

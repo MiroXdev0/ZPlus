@@ -1,0 +1,19 @@
+{
+  "captured_at_utc": "2026-11-08T09:48:38.127607+00:00",
+  "operating_system": "Windows-11-10.0.26300-SP0",
+  "system": "Windows",
+  "release": "11",
+  "machine": "AMD64",
+  "cpu_model": "Intel(R) Xeon(R) CPU           X5660  @ 2.80GHz",
+  "logical_processors": 12,
+  "total_memory_bytes": 17177333760,
+  "total_memory_gib": 15.997638702392578,
+  "available_memory_bytes": 8000999424,
+  "available_memory_gib": 7.451511383056641,
+  "python_version": "3.13.15 (tags/v3.13.15:4061bc4, Aug  5 2026, 13:05:39) [MSC v.1944 64 bit (AMD64)]",
+  "python_executable": "C:\\Users\\miros\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+  "zplus_version": "Z+ Compiler 0.5.0",
+  "zplus_version_returncode": 0,
+  "zplus_compiler_path": "C:\\Users\\miros\\OneDrive\\Desktop\\Projects\\Z+ compiler\\bin\\zp.exe",
+  "compiler_build_configuration": "Release"
+}

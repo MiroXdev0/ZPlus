@@ -1,0 +1,139 @@
+fn shadowParameter(value: number) -> number:
+    if true:
+        let value: number = 9
+        if value == 9:
+            say("parameter inner")
+        else:
+            say("parameter inner failed")
+        end
+    else:
+        say("parameter branch failed")
+    end
+    return value
+end
+
+fn nestedShadow() -> number:
+    let value: number = 10
+    if true:
+        let value: number = 20
+        if true:
+            let value: number = 30
+            if value == 30:
+                say("nested inner")
+            else:
+                say("nested inner failed")
+            end
+        else:
+            say("nested branch failed")
+        end
+        if value == 20:
+            say("nested scope retained")
+        else:
+            say("nested scope failed")
+        end
+        value = 40
+        if value == 40:
+            say("inner assignment")
+        else:
+            say("inner assignment failed")
+        end
+    else:
+        say("outer branch failed")
+    end
+    if value == 10:
+        say("outer retained")
+    else:
+        say("outer overwritten")
+    end
+    return value
+end
+
+start:
+    let result: number = nestedShadow()
+    if result == 10:
+        say("function outer retained")
+    else:
+        say("function outer overwritten")
+    end
+
+    let parameterResult: number = shadowParameter(7)
+    if parameterResult == 7:
+        say("parameter retained")
+    else:
+        say("parameter overwritten")
+    end
+
+    let outer: number = 1
+    if true:
+        outer = 2
+        if outer == 2:
+            say("outer assignment")
+        else:
+            say("outer assignment failed")
+        end
+    else:
+        say("assignment branch failed")
+    end
+
+    let branchValue: number = 100
+    if true:
+        let branchValue: number = 5
+        if branchValue == 5:
+            say("then binding")
+        else:
+            say("then binding failed")
+        end
+    else:
+        let branchValue: number = 6
+        if branchValue == 6:
+            say("else binding")
+        else:
+            say("else binding failed")
+        end
+    end
+    if false:
+        let branchValue: number = 7
+        say("false branch binding failed")
+    else:
+        let branchValue: number = 8
+        if branchValue == 8:
+            say("separate else binding")
+        else:
+            say("separate else binding failed")
+        end
+    end
+    if branchValue == 100:
+        say("branch outer retained")
+    else:
+        say("branch outer overwritten")
+    end
+
+    let loopValue: number = 100
+    for (let i: number = 0; i < 2; i++):
+        let loopValue: number = i + 1
+        if loopValue == i + 1:
+            say("loop binding")
+        else:
+            say("loop binding failed")
+        end
+        if i == 0:
+            let i: number = 8
+            if i == 8:
+                say("loop shadow")
+            else:
+                say("loop shadow failed")
+            end
+        else:
+            if i == 1:
+                say("loop variable retained")
+            else:
+                say("loop variable overwritten")
+            end
+        end
+    end
+    if loopValue == 100:
+        say("loop outer retained")
+    else:
+        say("loop outer overwritten")
+    end
+stop

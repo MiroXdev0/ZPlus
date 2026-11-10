@@ -1,0 +1,226 @@
+{
+    "scopeName": "source.zplus",
+    "patterns": [
+        { "include": "#comments" },
+        { "include": "#strings" },
+        { "include": "#characters" },
+        { "include": "#function-declaration" },
+        { "include": "#declarations" },
+        { "include": "#aggregate-declaration" },
+        { "include": "#builtins" },
+        { "include": "#numbers" },
+        { "include": "#constants" },
+        { "include": "#keywords" },
+        { "include": "#types" },
+        { "include": "#function-calls" },
+        { "include": "#operators" },
+        { "include": "#punctuation" },
+        { "include": "#identifiers" }
+    ],
+    "repository": {
+        "comments": {
+            "patterns": [
+                {
+                    "name": "comment.line.double-slash.zplus",
+                    "match": "//.*$"
+                },
+                {
+                    "name": "comment.block.zplus",
+                    "begin": "/\\*",
+                    "end": "\\*/"
+                }
+            ]
+        },
+        "strings": {
+            "name": "string.quoted.double.zplus",
+            "begin": "\"",
+            "end": "\"",
+            "patterns": [
+                {
+                    "name": "constant.character.escape.zplus",
+                    "match": "\\\\(?:n|r|t|b|f|v|a|0|\"|'|\\\\)"
+                }
+            ]
+        },
+        "characters": {
+            "name": "string.quoted.single.zplus",
+            "begin": "'",
+            "end": "'",
+            "patterns": [
+                {
+                    "name": "constant.character.escape.zplus",
+                    "match": "\\\\(?:n|r|t|b|f|v|a|0|\"|'|\\\\)"
+                }
+            ]
+        },
+        "function-declaration": {
+            "name": "meta.function.zplus",
+            "match": "\\b(fn)\\s+([A-Za-z_]\\w*)",
+            "captures": {
+                "1": { "name": "storage.type.function.zplus" },
+                "2": { "name": "entity.name.function.zplus" }
+            }
+        },
+        "declarations": {
+            "patterns": [
+                {
+                    "match": "\\b(let|const)\\s+([A-Za-z_]\\w*)",
+                    "captures": {
+                        "1": { "name": "storage.type.variable.zplus" },
+                        "2": { "name": "variable.other.zplus" }
+                    }
+                },
+                {
+                    "match": "\\b(import)\\s+([A-Za-z_]\\w*)",
+                    "captures": {
+                        "1": { "name": "keyword.control.import.zplus" },
+                        "2": { "name": "entity.name.module.zplus" }
+                    }
+                }
+            ]
+        },
+        "aggregate-declaration": {
+            "match": "\\b(struct|class|enum|namespace)\\s+([A-Za-z_]\\w*)",
+            "captures": {
+                "1": { "name": "storage.type.zplus" },
+                "2": { "name": "entity.name.type.zplus" }
+            }
+        },
+        "builtins": {
+            "patterns": [
+                {
+                    "name": "support.function.builtin.zplus",
+                    "match": "\\b(?:say|printz)\\b(?=\\s*\\()"
+                },
+                {
+                    "name": "support.function.builtin.deprecated.zplus",
+                    "match": "\\bprintm\\b(?=\\s*\\()"
+                }
+            ]
+        },
+        "function-calls": {
+            "name": "entity.name.function.call.zplus",
+            "match": "\\b[A-Za-z_]\\w*(?=\\s*\\()"
+        },
+        "numbers": {
+            "patterns": [
+                {
+                    "name": "constant.numeric.hexadecimal.zplus",
+                    "match": "\\b0[xX][0-9A-Fa-f]+\\b"
+                },
+                {
+                    "name": "constant.numeric.binary.zplus",
+                    "match": "\\b0[bB][01]+\\b"
+                },
+                {
+                    "name": "constant.numeric.zplus",
+                    "match": "\\b[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\\b"
+                }
+            ]
+        },
+        "constants": {
+            "patterns": [
+                {
+                    "name": "constant.language.boolean.zplus",
+                    "match": "\\b(?:true|false)\\b"
+                },
+                {
+                    "name": "constant.language.null.zplus",
+                    "match": "\\b(?:null|nullptr)\\b"
+                }
+            ]
+        },
+        "keywords": {
+            "patterns": [
+                {
+                    "name": "keyword.control.zplus",
+                    "match": "\\b(?:start|stop|end|if|else|while|for|repeat|switch|case|default|break|continue|return|use)\\b"
+                },
+                {
+                    "name": "storage.type.function.zplus",
+                    "match": "\\b(?:fn|let|const)\\b"
+                },
+                {
+                    "name": "keyword.other.zplus",
+                    "match": "\\b(?:import|export|pub|as|struct|class|enum|namespace|public|private|protected|this)\\b"
+                },
+                {
+                    "name": "keyword.operator.word.zplus",
+                    "match": "\\b(?:and|or|not|is)\\b"
+                },
+                {
+                    "name": "invalid.deprecated.zplus",
+                    "match": "\\bprintz\\b"
+                }
+            ]
+        },
+        "types": {
+            "name": "storage.type.zplus",
+            "match": "\\b(?:number|string|char|character|boolean|bool|void)\\b"
+        },
+        "operators": {
+            "patterns": [
+                {
+                    "name": "keyword.operator.assignment.compound.zplus",
+                    "match": "(?:<<=|>>=|\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=)"
+                },
+                {
+                    "name": "keyword.operator.assignment.zplus",
+                    "match": "="
+                },
+                {
+                    "name": "keyword.operator.comparison.zplus",
+                    "match": "(?:==|!=|<=|>=|<|>)"
+                },
+                {
+                    "name": "keyword.operator.logical.zplus",
+                    "match": "(?:&&|\\|\\||!)"
+                },
+                {
+                    "name": "keyword.operator.bitwise.zplus",
+                    "match": "(?:<<|>>|&|\\||\\^|~)"
+                },
+                {
+                    "name": "keyword.operator.arithmetic.zplus",
+                    "match": "(?:\\+\\+|--|\\+|-|\\*|/|%)"
+                },
+                {
+                    "name": "keyword.operator.pointer.zplus",
+                    "match": "->"
+                },
+                {
+                    "name": "keyword.operator.conditional.zplus",
+                    "match": "\\?"
+                }
+            ]
+        },
+        "punctuation": {
+            "patterns": [
+                {
+                    "name": "punctuation.separator.zplus",
+                    "match": "[,:;]"
+                },
+                {
+                    "name": "punctuation.accessor.zplus",
+                    "match": "\\."
+                },
+                {
+                    "name": "punctuation.section.parens.zplus",
+                    "match": "[()]"
+                },
+                {
+                    "name": "punctuation.section.brackets.zplus",
+                    "match": "[\\[\\]]"
+                },
+                {
+                    "name": "punctuation.section.braces.zplus",
+                    "match": "[{}]"
+                }
+            ]
+        },
+        "identifiers": {
+            "name": "variable.other.zplus",
+            "match": "\\b[A-Za-z_]\\w*\\b"
+        }
+    }
+}

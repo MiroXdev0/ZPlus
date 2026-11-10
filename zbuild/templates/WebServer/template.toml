@@ -1,0 +1,12 @@
+name = "WebServer"
+description = "Unavailable: Z+ currently has no HTTP server API; client-only or placeholder code would not host requests."
+version = "1.0.0"
+required_zplus_version = "0.5.0"
+default_target_type = "executable"
+platforms = []
+required_modules = []
+aliases = ["server", "web"]
+files = []
+directories = []
+available = false
+unavailable_reason = "The current Z+ runtime exposes no HTTP server/listener API. No project is generated until server support exists."

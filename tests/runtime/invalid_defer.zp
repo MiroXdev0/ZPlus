@@ -1,0 +1,6 @@
+start:
+    defer:
+        say("first")
+        say("second")
+    end
+stop

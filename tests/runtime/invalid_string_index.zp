@@ -1,0 +1,4 @@
+start:
+    let text: string = "not an array"
+    say(text[0])
+stop

@@ -1,0 +1,44 @@
+use zmemory.management
+
+struct Player:
+    name: string
+    score: number = 4
+end
+
+struct Session:
+    player: Player
+    players: Player[]
+end
+
+fn preserve(player: Player) -> Player:
+    return player
+end
+
+start:
+    let player = Player("native")
+    let alias = preserve(player)
+    if player is Player:
+        say("struct type check passed")
+    end
+    if player == alias:
+        say("struct reference identity passed")
+    end
+    alias.score = 11
+    say(player.score)
+
+    let other = Player("other")
+    let session = Session(player, [alias, other])
+    say(session.player.name)
+    session.players[1].score = 19
+    say(session.players[1].score)
+
+    zmemory.setThreshold(1024)
+    for (let i: number = 0; i < 2000; i++):
+        let transient = Player("temporary")
+    end
+    say(session.player.name)
+    say(session.players[1].score)
+    if zmemory.collectionCount() > 0:
+        say("struct references survived collection")
+    end
+stop

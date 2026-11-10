@@ -1,0 +1,15 @@
+{
+  "warmups": 3,
+  "measured_runs": 10,
+  "allocations_per_run": 30000,
+  "checksum": 449985000,
+  "median_process_ms": 105.026,
+  "mean_process_ms": 104.985,
+  "sample_stdev_ms": 1.2,
+  "estimated_allocations_per_second": 285644.0,
+  "automatic_collections": 54,
+  "heap_used_before_manual_collect_bytes": "61920",
+  "objects_before_manual_collect": "516",
+  "heap_used_after_manual_collect_bytes": "0",
+  "objects_after_manual_collect": "0"
+}

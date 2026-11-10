@@ -1,0 +1,16 @@
+use zphysics
+
+start:
+    let world = zphysics.createWorld(0, 0)
+    zphysics.setGravity(world, 0.25, -0.5)
+    let body = zphysics.createBody(world, "static", 10, 10)
+    zphysics.createBox(world, body, 4, 4)
+    let hits = zphysics.pointQuery(world, 10, 10)
+    let rayBody = zphysics.raycast(world, 0, 10, 20, 10)
+    if hits == 1 and rayBody == body and zphysics.bodyCount(world) == 1 and zphysics.getGravityX(world) == 0.25 and zphysics.getGravityY(world) == -0.5:
+        say("ZPhysics native integration passed")
+    else:
+        say("ZPhysics native integration failed")
+    end
+    zphysics.destroyWorld(world)
+stop

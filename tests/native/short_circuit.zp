@@ -1,0 +1,42 @@
+fn sideEffect() -> boolean:
+    say("unexpected side effect")
+    return true
+end
+
+start:
+    if false and sideEffect():
+        say("and failed")
+    else:
+        say("and short-circuited")
+    end
+
+    if true or sideEffect():
+        say("or short-circuited")
+    else:
+        say("or failed")
+    end
+
+    if false && sideEffect():
+        say("and symbol failed")
+    else:
+        say("and symbol short-circuited")
+    end
+
+    if true || sideEffect():
+        say("or symbol short-circuited")
+    else:
+        say("or symbol failed")
+    end
+
+    if true and sideEffect():
+        say("and evaluated right operand")
+    else:
+        say("and skipped required operand")
+    end
+
+    if false or sideEffect():
+        say("or evaluated right operand")
+    else:
+        say("or skipped required operand")
+    end
+stop

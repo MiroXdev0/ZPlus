@@ -1,0 +1,602 @@
+
+cmake_minimum_required(VERSION 3.20)
+
+project(ZPlus
+    VERSION 0.5.0
+    LANGUAGES CXX
+)
+
+include(CTest)
+
+set(ZPLUS_RELEASE_BIN_DIR "${CMAKE_SOURCE_DIR}/bin" CACHE PATH
+    "Destination for the Release compiler executable and runtime")
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
+include(FetchContent)
+# Only fetch headers/source; the runtime builds its configured miniaudio TU itself.
+cmake_policy(PUSH)
+if(POLICY CMP0169)
+    cmake_policy(SET CMP0169 OLD)
+endif()
+FetchContent_Declare(miniaudio
+    GIT_REPOSITORY https://github.com/mackron/miniaudio.git
+    GIT_TAG 0.11.26
+    GIT_SHALLOW TRUE
+)
+FetchContent_Declare(box2d
+    GIT_REPOSITORY https://github.com/erincatto/box2d.git
+    GIT_TAG v3.1.1
+    GIT_SHALLOW TRUE
+)
+FetchContent_GetProperties(miniaudio)
+if(NOT miniaudio_POPULATED)
+    FetchContent_Populate(miniaudio)
+endif()
+cmake_policy(POP)
+FetchContent_MakeAvailable(box2d)
+
+add_library(zbuild_engine STATIC
+    zbuild/Build.cpp
+    zbuild/Config.cpp
+    zbuild/Hash.cpp
+    zbuild/Process.cpp
+    zbuild/Template.cpp
+)
+target_include_directories(zbuild_engine PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/zbuild
+)
+target_compile_definitions(zbuild_engine PRIVATE
+    ZBUILD_STDLIB_DIR="${CMAKE_CURRENT_SOURCE_DIR}/stdlib"
+    ZBUILD_BUILTIN_TEMPLATE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/zbuild/templates"
+)
+
+add_executable(zbuild zbuild/main.cpp)
+target_link_libraries(zbuild PRIVATE zbuild_engine)
+add_custom_command(TARGET zbuild POST_BUILD
+    COMMAND ${CMAKE_COMMAND}
+        "-DCONFIG=$<CONFIG>"
+        "-DSOURCE_FILE=$<TARGET_FILE:zbuild>"
+        "-DDESTINATION_DIR=${ZPLUS_RELEASE_BIN_DIR}"
+        "-DTEMPLATE_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/zbuild/templates"
+        -P "${CMAKE_SOURCE_DIR}/cmake/CopyReleaseZBuild.cmake"
+    VERBATIM
+    COMMENT "Installing the Release zbuild executable into bin/"
+)
+
+add_executable(zp
+    compiler/main.cpp
+    compiler/ModuleLoader.cpp
+
+    compiler/lexer/Lexer.cpp
+    compiler/lexer/Token.cpp
+
+    compiler/parser/Parser.cpp
+    compiler/parser/AST.cpp
+
+    compiler/semantic/Analyzer.cpp
+    compiler/semantic/Type.cpp
+
+    compiler/ir/IR.cpp
+    compiler/ir/IRBuilder.cpp
+
+    runtime/Runtime.cpp
+    runtime/Json.cpp
+    runtime/Http.cpp
+    runtime/SQLite.cpp
+    runtime/StandardLibrary.cpp
+)
+
+add_library(zplus_graphics STATIC
+    ZGraphics/Core/Window.cpp
+    ZGraphics/Rendering/Color.cpp
+)
+
+if(WIN32)
+    target_sources(zplus_graphics PRIVATE
+        ZGraphics/Platform/WindowsWindow.cpp
+    )
+    target_link_libraries(zplus_graphics PUBLIC user32 gdi32)
+else()
+    find_package(X11 REQUIRED)
+    target_sources(zplus_graphics PRIVATE
+        ZGraphics/Platform/X11Window.cpp
+    )
+    target_include_directories(zplus_graphics PRIVATE ${X11_INCLUDE_DIR})
+    target_link_libraries(zplus_graphics PUBLIC ${X11_LIBRARIES})
+endif()
+
+target_include_directories(zplus_graphics PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/ZGraphics
+)
+target_link_libraries(zp PRIVATE zplus_graphics)
+find_package(Threads REQUIRED)
+target_link_libraries(zp PRIVATE Threads::Threads)
+add_library(zaudio_engine STATIC
+    runtime/audio/AudioEngine.cpp
+    runtime/audio/AudioError.cpp
+    runtime/audio/AudioDevice.cpp
+    runtime/audio/AudioResource.cpp
+    runtime/audio/AudioFormat.cpp
+    runtime/audio/AudioPlayback.cpp
+    runtime/audio/AudioProperties.cpp
+    runtime/audio/AudioControl.cpp
+    runtime/audio/StbVorbis.cpp
+    runtime/audio/Miniaudio.cpp
+)
+set_target_properties(zaudio_engine PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(zaudio_engine PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/runtime/audio
+    ${miniaudio_SOURCE_DIR}
+)
+target_include_directories(zaudio_engine PRIVATE
+    ${miniaudio_SOURCE_DIR}/extras
+)
+target_link_libraries(zaudio_engine PUBLIC Threads::Threads)
+if(CMAKE_DL_LIBS)
+    target_link_libraries(zaudio_engine PUBLIC ${CMAKE_DL_LIBS})
+endif()
+if(WIN32)
+    target_link_libraries(zaudio_engine PUBLIC ole32 winmm avrt)
+endif()
+target_link_libraries(zp PRIVATE zaudio_engine)
+
+add_library(zaudio_runtime SHARED runtime/audio/RuntimeApi.cpp)
+target_include_directories(zaudio_runtime PRIVATE runtime/audio)
+target_link_libraries(zaudio_runtime PRIVATE zaudio_engine)
+target_compile_definitions(zaudio_runtime PRIVATE ZAUDIO_RUNTIME_EXPORTS)
+set_target_properties(zaudio_runtime PROPERTIES OUTPUT_NAME zaudio_runtime)
+add_dependencies(zp zaudio_runtime)
+
+set(ZPLUS_AUDIO_RUNTIME_ARGUMENT
+    "-DAUDIO_RUNTIME_FILE=$<TARGET_FILE:zaudio_runtime>"
+)
+
+add_library(zphysics_engine STATIC
+    runtime/physics/PhysicsWorld.cpp
+    runtime/physics/PhysicsBody.cpp
+    runtime/physics/PhysicsShape.cpp
+    runtime/physics/PhysicsJoint.cpp
+    runtime/physics/PhysicsQuery.cpp
+)
+set_target_properties(zphysics_engine PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(zphysics_engine PUBLIC runtime/physics)
+target_link_libraries(zphysics_engine PUBLIC box2d Threads::Threads)
+target_link_libraries(zp PRIVATE zphysics_engine)
+
+add_library(zphysics_runtime SHARED runtime/physics/RuntimeApi.cpp)
+target_include_directories(zphysics_runtime PRIVATE runtime/physics)
+target_link_libraries(zphysics_runtime PRIVATE zphysics_engine)
+target_compile_definitions(zphysics_runtime PRIVATE ZPHYSICS_RUNTIME_EXPORTS)
+set_target_properties(zphysics_runtime PROPERTIES OUTPUT_NAME zphysics_runtime)
+add_dependencies(zp zphysics_runtime)
+
+set(ZPLUS_PHYSICS_RUNTIME_ARGUMENT
+    "-DPHYSICS_RUNTIME_FILE=$<TARGET_FILE:zphysics_runtime>"
+)
+
+if(CMAKE_DL_LIBS)
+    target_link_libraries(zp PRIVATE ${CMAKE_DL_LIBS})
+endif()
+if(WIN32)
+    target_link_libraries(zp PRIVATE ws2_32)
+endif()
+target_compile_definitions(zp PRIVATE
+    ZPLUS_STDLIB_DIR="${CMAKE_CURRENT_SOURCE_DIR}/stdlib"
+)
+
+target_include_directories(zp PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    compiler
+    runtime
+)
+
+add_library(zp_native_backend STATIC
+    compiler/backend/native/MachineCode.cpp
+    compiler/backend/native/X64CodeGenerator.cpp
+    compiler/backend/native/NativeCodeGenerator.cpp
+    compiler/backend/native/PEWriter.cpp
+    compiler/backend/native/ELFWriter.cpp
+)
+target_include_directories(zp_native_backend PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    compiler
+)
+target_link_libraries(zp PRIVATE zp_native_backend)
+
+if(WIN32)
+    set(ZPLUS_SQLITE_RUNTIME_ARGUMENT)
+    add_library(zplus_graphics_runtime SHARED
+        runtime/graphics/NativeApi.cpp
+        runtime/Json.cpp
+        runtime/Http.cpp
+        runtime/SQLite.cpp
+        runtime/StandardLibrary.cpp
+    )
+    target_compile_definitions(zplus_graphics_runtime PRIVATE ZPLUS_GRAPHICS_RUNTIME_EXPORTS)
+    target_include_directories(zplus_graphics_runtime PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        runtime
+    )
+    target_link_libraries(zplus_graphics_runtime PRIVATE zplus_graphics shell32)
+    target_link_libraries(zplus_graphics_runtime PRIVATE Threads::Threads ws2_32)
+    find_file(ZPLUS_SQLITE_RUNTIME_FILE
+        NAMES sqlite3.dll libsqlite3-0.dll
+        HINTS
+            "$ENV{VCPKG_ROOT}/installed/x64-windows/bin"
+            "$ENV{MSYS2_ROOT}/ucrt64/bin"
+            "C:/msys64/ucrt64/bin"
+    )
+    if(ZPLUS_SQLITE_RUNTIME_FILE)
+        add_custom_command(TARGET zplus_graphics_runtime POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${ZPLUS_SQLITE_RUNTIME_FILE}"
+                "$<TARGET_FILE_DIR:zplus_graphics_runtime>/sqlite3.dll"
+            VERBATIM
+            COMMENT "Packaging the SQLite runtime beside the native runtime"
+        )
+        set(ZPLUS_SQLITE_RUNTIME_ARGUMENT
+            "-DSQLITE_RUNTIME_FILE=${ZPLUS_SQLITE_RUNTIME_FILE}"
+        )
+    endif()
+    set_target_properties(zplus_graphics_runtime PROPERTIES
+        OUTPUT_NAME zgraphics_runtime
+    )
+    add_dependencies(zp zplus_graphics_runtime zaudio_runtime zphysics_runtime)
+    set(ZPLUS_GRAPHICS_RUNTIME_ARGUMENT
+        "-DRUNTIME_FILE=$<TARGET_FILE:zplus_graphics_runtime>"
+        "-DGRAPHICS_RUNTIME=$<TARGET_FILE:zplus_graphics_runtime>"
+    )
+    add_custom_command(TARGET zp POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:zplus_graphics_runtime>"
+            "$<TARGET_FILE_DIR:zp>"
+        VERBATIM
+        COMMENT "Packaging the ZGraphics native runtime beside zp"
+    )
+    if(ZPLUS_SQLITE_RUNTIME_FILE)
+        add_custom_command(TARGET zp POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${ZPLUS_SQLITE_RUNTIME_FILE}"
+                "$<TARGET_FILE_DIR:zp>/sqlite3.dll"
+            VERBATIM
+            COMMENT "Packaging the SQLite runtime beside zp"
+        )
+    endif()
+endif()
+
+add_custom_command(TARGET zp POST_BUILD
+    COMMAND ${CMAKE_COMMAND}
+        "-DCONFIG=$<CONFIG>"
+        "-DSOURCE_FILE=$<TARGET_FILE:zp>"
+        "-DDESTINATION_DIR=${ZPLUS_RELEASE_BIN_DIR}"
+        ${ZPLUS_GRAPHICS_RUNTIME_ARGUMENT}
+        ${ZPLUS_SQLITE_RUNTIME_ARGUMENT}
+        ${ZPLUS_AUDIO_RUNTIME_ARGUMENT}
+        ${ZPLUS_PHYSICS_RUNTIME_ARGUMENT}
+        -P "${CMAKE_SOURCE_DIR}/cmake/CopyReleaseCompiler.cmake"
+    VERBATIM
+    COMMENT "Installing the Release zp executable into bin/"
+)
+
+add_custom_target(zp_release_bin_copy ALL
+    COMMAND ${CMAKE_COMMAND}
+        "-DCONFIG=$<CONFIG>"
+        "-DSOURCE_FILE=$<TARGET_FILE:zp>"
+        "-DDESTINATION_DIR=${ZPLUS_RELEASE_BIN_DIR}"
+        ${ZPLUS_GRAPHICS_RUNTIME_ARGUMENT}
+        ${ZPLUS_SQLITE_RUNTIME_ARGUMENT}
+        ${ZPLUS_AUDIO_RUNTIME_ARGUMENT}
+        ${ZPLUS_PHYSICS_RUNTIME_ARGUMENT}
+        -P "${CMAKE_SOURCE_DIR}/cmake/CopyReleaseCompiler.cmake"
+    DEPENDS zp
+    VERBATIM
+    COMMENT "Verifying the Release zp executable in bin/"
+)
+
+if(MSVC)
+    target_compile_options(zp PRIVATE /W4)
+    target_compile_options(zbuild_engine PRIVATE /W4)
+    target_compile_options(zbuild PRIVATE /W4)
+    target_compile_options(zplus_graphics PRIVATE /W4)
+    target_compile_options(zp_native_backend PRIVATE /W4)
+    if(WIN32)
+        target_compile_options(zplus_graphics_runtime PRIVATE /W4)
+    endif()
+else()
+    target_compile_options(zp PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(zbuild_engine PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(zbuild PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(zplus_graphics PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(zp_native_backend PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+if(BUILD_TESTING)
+    add_executable(zbuild_unit_tests
+        tests/zbuild/unit_tests.cpp
+    )
+    target_link_libraries(zbuild_unit_tests PRIVATE zbuild_engine)
+    add_test(NAME zbuild_unit COMMAND zbuild_unit_tests)
+    add_test(
+        NAME zbuild_integration
+        COMMAND ${CMAKE_COMMAND}
+            "-DZBUILD=$<TARGET_FILE:zbuild>"
+            "-DZP=$<TARGET_FILE:zp>"
+            "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/zbuild-test-output"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/zbuild/run_integration.cmake"
+    )
+    set_tests_properties(zbuild_integration PROPERTIES DEPENDS zbuild_unit)
+    add_test(
+        NAME zbuild_templates
+        COMMAND ${CMAKE_COMMAND}
+            "-DZBUILD=$<TARGET_FILE:zbuild>"
+            "-DZP=$<TARGET_FILE:zp>"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/zbuild-template-test-output"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/zbuild/run_template_tests.cmake"
+    )
+    set_tests_properties(zbuild_templates PROPERTIES DEPENDS zbuild_unit)
+    add_test(
+        NAME zbuild_backend_runtime
+        COMMAND ${CMAKE_COMMAND}
+            "-DZBUILD=$<TARGET_FILE:zbuild>"
+            "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/zbuild-backend-test-output"
+            "-DHOST_WINDOWS=$<BOOL:${WIN32}>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/zbuild/run_backend_integration.cmake"
+    )
+    if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        add_test(
+            NAME zbuild_audio_integration
+            COMMAND ${CMAKE_COMMAND}
+                "-DZBUILD=$<TARGET_FILE:zbuild>"
+                "-DZP=$<TARGET_FILE:zp>"
+                "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+                "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/zbuild-audio-test-output"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/zbuild/run_audio_integration.cmake"
+        )
+        set_tests_properties(zbuild_audio_integration PROPERTIES TIMEOUT 180)
+    endif()
+
+    add_executable(zp_standard_library_unit_tests
+        tests/stdlib/standard_library_unit_tests.cpp
+        runtime/StandardLibrary.cpp
+    )
+    target_include_directories(zp_standard_library_unit_tests PRIVATE
+        runtime
+    )
+    add_test(
+        NAME standard_library_unicode
+        COMMAND zp_standard_library_unit_tests
+    )
+    add_executable(zaudio_unit_tests tests/audio/audio_tests.cpp)
+    target_include_directories(zaudio_unit_tests PRIVATE runtime)
+    target_compile_definitions(zaudio_unit_tests PRIVATE
+        "ZAUDIO_TEST_ASSET_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test_program/audio/assets\""
+    )
+    target_link_libraries(zaudio_unit_tests PRIVATE zaudio_engine)
+    add_test(NAME zaudio_api_headless COMMAND zaudio_unit_tests)
+    add_test(
+        NAME zaudio_interpreter_integration
+        COMMAND ${CMAKE_COMMAND}
+            "-DZP=$<TARGET_FILE:zp>"
+            "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/audio-interpreter-test-output"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/audio/run_interpreter.cmake"
+    )
+    if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        add_test(
+            NAME zaudio_native_integration
+            COMMAND ${CMAKE_COMMAND}
+                "-DZP=$<TARGET_FILE:zp>"
+                "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+                "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/audio-native-test-output"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/audio/run_native.cmake"
+        )
+        set_tests_properties(zaudio_native_integration PROPERTIES TIMEOUT 120)
+    endif()
+    add_executable(zphysics_unit_tests tests/physics/physics_tests.cpp)
+    target_include_directories(zphysics_unit_tests PRIVATE runtime/physics)
+    target_link_libraries(zphysics_unit_tests PRIVATE zphysics_engine)
+    add_test(NAME zphysics_api_headless COMMAND zphysics_unit_tests)
+    add_executable(zphysics_benchmark tests/physics/physics_benchmark.cpp)
+    target_include_directories(zphysics_benchmark PRIVATE runtime/physics)
+    target_link_libraries(zphysics_benchmark PRIVATE zphysics_engine)
+    add_test(
+        NAME zphysics_interpreter_integration
+        COMMAND ${CMAKE_COMMAND}
+            "-DZP=$<TARGET_FILE:zp>"
+            "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/physics-interpreter-test-output"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/physics/run_interpreter.cmake"
+    )
+    if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        add_test(
+            NAME zphysics_native_integration
+            COMMAND ${CMAKE_COMMAND}
+                "-DZP=$<TARGET_FILE:zp>"
+                "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+                "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/physics-native-test-output"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/physics/run_native.cmake"
+        )
+        set_tests_properties(zphysics_native_integration PROPERTIES TIMEOUT 120)
+        add_test(
+            NAME zbuild_physics_integration
+            COMMAND ${CMAKE_COMMAND}
+                "-DZBUILD=$<TARGET_FILE:zbuild>"
+                "-DZP=$<TARGET_FILE:zp>"
+                "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+                "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/zbuild-physics-test-output"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/zbuild/run_physics_integration.cmake"
+        )
+        set_tests_properties(zbuild_physics_integration PROPERTIES TIMEOUT 180)
+    endif()
+    add_executable(zp_json_unit_tests
+        tests/stdlib/json_tests.cpp
+        runtime/Json.cpp
+    )
+    target_include_directories(zp_json_unit_tests PRIVATE runtime)
+    add_test(NAME json_standard_library COMMAND zp_json_unit_tests)
+    add_executable(zp_sqlite_unit_tests
+        tests/stdlib/sqlite_tests.cpp
+        runtime/SQLite.cpp
+        runtime/Json.cpp
+    )
+    target_include_directories(zp_sqlite_unit_tests PRIVATE runtime)
+    if(CMAKE_DL_LIBS)
+        target_link_libraries(zp_sqlite_unit_tests PRIVATE ${CMAKE_DL_LIBS})
+    endif()
+    add_test(
+        NAME sqlite_runtime
+        COMMAND ${CMAKE_COMMAND}
+            "-DSQLITE_TEST=$<TARGET_FILE:zp_sqlite_unit_tests>"
+            "-DSQLITE_RUNTIME_DIR=$<TARGET_FILE_DIR:zp>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/stdlib/run_sqlite_tests.cmake"
+    )
+    add_test(
+        NAME sqlite_zplus_integration
+        COMMAND ${CMAKE_COMMAND}
+            "-DZP=$<TARGET_FILE:zp>"
+            "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/sqlite-test-output"
+            "-DHOST_WINDOWS=$<BOOL:${WIN32}>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/stdlib/run_sqlite_integration.cmake"
+    )
+    add_executable(zp_http_server_tests
+        tests/http/http_server_tests.cpp
+        runtime/Http.cpp
+        runtime/Json.cpp
+    )
+    target_include_directories(zp_http_server_tests PRIVATE runtime)
+    target_link_libraries(zp_http_server_tests PRIVATE Threads::Threads)
+    if(WIN32)
+        target_link_libraries(zp_http_server_tests PRIVATE ws2_32)
+    endif()
+    add_test(NAME http_server_runtime COMMAND zp_http_server_tests)
+    add_test(
+        NAME http_zplus_integration
+        COMMAND ${CMAKE_COMMAND}
+            "-DZP=$<TARGET_FILE:zp>"
+            "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/http-test-output"
+            "-DHOST_WINDOWS=$<BOOL:${WIN32}>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/http/run_http_smoke.cmake"
+    )
+    if(WIN32)
+        add_test(
+            NAME http_live_program_integration
+            COMMAND ${CMAKE_COMMAND}
+                "-DZP=$<TARGET_FILE:zp>"
+                "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+                "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/http-live-test-output"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/http/run_live_program_tests.cmake"
+        )
+        set_tests_properties(http_live_program_integration PROPERTIES TIMEOUT 150)
+    endif()
+    add_test(
+        NAME json_interpreter_integration
+        COMMAND ${CMAKE_COMMAND}
+            "-DZP=$<TARGET_FILE:zp>"
+            "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/json-test-output"
+            "-DHOST_WINDOWS=$<BOOL:${WIN32}>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/stdlib/run_json_tests.cmake"
+    )
+
+    add_executable(zp_native_ir_tests
+        tests/native/unsupported_ir.cpp
+    )
+    target_include_directories(zp_native_ir_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        compiler
+    )
+    target_link_libraries(zp_native_ir_tests PRIVATE zp_native_backend)
+    add_test(
+        NAME native_unsupported_ir
+        COMMAND zp_native_ir_tests ${CMAKE_CURRENT_BINARY_DIR}/format-test.elf
+    )
+    add_test(
+        NAME native_executable_integration
+        COMMAND ${CMAKE_COMMAND}
+            -DZP=$<TARGET_FILE:zp>
+            -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-test-output
+            -DHOST_WINDOWS=$<BOOL:${WIN32}>
+            ${ZPLUS_GRAPHICS_RUNTIME_ARGUMENT}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/native/run_native_tests.cmake
+    )
+    add_test(
+        NAME module_system_integration
+        COMMAND ${CMAKE_COMMAND}
+            -DZP=$<TARGET_FILE:zp>
+            -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/module-test-output
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/modules/run_module_tests.cmake
+    )
+    add_test(
+        NAME runtime_arrays_and_diagnostics
+        COMMAND ${CMAKE_COMMAND}
+            -DZP=$<TARGET_FILE:zp>
+            -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/runtime-test-output
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime/run_runtime_tests.cmake
+    )
+    add_test(
+        NAME runtime_error_handling
+        COMMAND ${CMAKE_COMMAND}
+            "-DZP=$<TARGET_FILE:zp>"
+            "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/error-handling-test-output"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime/run_error_handling.cmake"
+    )
+    add_test(
+        NAME parser_semantics_parity
+        COMMAND ${CMAKE_COMMAND}
+            "-DZP=$<TARGET_FILE:zp>"
+            "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/parser-semantics-test-output"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/parser/run_semantics.cmake"
+    )
+    add_test(
+        NAME standard_library_integration
+        COMMAND ${CMAKE_COMMAND}
+            -DZP=$<TARGET_FILE:zp>
+            -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/stdlib-test-output
+            -DHOST_WINDOWS=$<BOOL:${WIN32}>
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/stdlib/run_stdlib_tests.cmake
+    )
+    add_executable(zgraphics_core_tests
+        tests/graphics/core_tests.cpp
+    )
+    target_link_libraries(zgraphics_core_tests PRIVATE zplus_graphics)
+    add_test(NAME zgraphics_core COMMAND zgraphics_core_tests)
+    add_test(
+        NAME zgraphics_module_check
+        COMMAND $<TARGET_FILE:zp> check
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/graphics/interpreter_smoke.zp
+    )
+    if(WIN32)
+        add_test(
+            NAME zgraphics_interpreter
+            COMMAND $<TARGET_FILE:zp> run
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/graphics/interpreter_smoke.zp
+        )
+        set_tests_properties(zgraphics_interpreter PROPERTIES
+            PASS_REGULAR_EXPRESSION "ZGraphics interpreter integration passed"
+        )
+        add_test(
+            NAME zgraphics_interpreter_rendering
+            COMMAND $<TARGET_FILE:zp> run
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/graphics/rendering_smoke.zp
+        )
+        set_tests_properties(zgraphics_interpreter_rendering PROPERTIES
+            PASS_REGULAR_EXPRESSION "ZGraphics buffered rendering smoke passed"
+        )
+    endif()
+endif()

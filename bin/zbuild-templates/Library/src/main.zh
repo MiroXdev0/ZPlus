@@ -1,0 +1,9 @@
+use "utilities.zh" as utilities
+
+pub fn greeting(name: string) -> string:
+    return "Hello, " + name + "!"
+end
+
+pub fn bounded(value: number, lower: number, upper: number) -> number:
+    return utilities.clamp(value, lower, upper)
+end

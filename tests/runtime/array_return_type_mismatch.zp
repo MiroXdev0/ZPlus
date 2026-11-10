@@ -1,0 +1,7 @@
+fn invalidArray() -> number[]:
+    return ["not a number"]
+end
+
+start:
+    say(length(invalidArray()))
+stop

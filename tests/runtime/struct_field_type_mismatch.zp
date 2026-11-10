@@ -1,0 +1,8 @@
+struct Player:
+    health: number = 100
+end
+
+start:
+    let player = Player()
+    player.health = "low"
+stop

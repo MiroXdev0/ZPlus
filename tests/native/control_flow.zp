@@ -1,0 +1,14 @@
+start:
+    let total: number = 0
+    let index: number = 0
+    while index < 10:
+        total += index
+        index++
+    end
+
+    if total == 45:
+        say("control flow passed")
+    else:
+        say("control flow failed")
+    end
+stop

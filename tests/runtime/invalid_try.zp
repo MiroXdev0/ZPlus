@@ -1,0 +1,5 @@
+start:
+    try:
+        throw "missing catch"
+    end
+stop

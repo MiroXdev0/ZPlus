@@ -1,0 +1,19 @@
+fn arithmetic(value: number) -> number:
+    return (value * 7 + 3) % 101
+end
+
+start:
+    let iterations: number = 50000 // BENCH_ITERATIONS
+    let expected: number = 2492250 // BENCH_EXPECTED
+    let checksum: number = 0
+
+    for (let i: number = 0; i < iterations; i++):
+        checksum += arithmetic(i % 1000)
+    end
+
+    if checksum == expected:
+        say("CHECKSUM functions 2492250")
+    else:
+        say("CHECKSUM_ERROR functions")
+    end
+stop

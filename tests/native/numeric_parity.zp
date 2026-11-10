@@ -1,0 +1,98 @@
+use zcollections as collections
+
+let globalValue: number = 2.5
+
+fn fractional(value: number, offset: number = 0.25) -> number:
+    return value * 1.5 + offset
+end
+
+fn sumFive(a: number, b: number, c: number, d: number, e: number) -> number:
+    return a + b + c + d + e
+end
+
+fn mixed(first: number, label: string, second: number) -> number:
+    return first + second
+end
+
+start:
+    globalValue += 0.25
+    say(globalValue)
+    let arithmetic: number = fractional(2.0)
+    say(arithmetic)
+    say(sumFive(0.25, 0.5, 0.75, 1.25, 1.5))
+    say(mixed(0.5, "mixed", 1.25))
+    let decimals: number[] = [1.25, 2.5]
+    say(decimals[0])
+    say(collections.sum(decimals))
+    let value: number = 7
+    value &= 3
+    say(value)
+    value ^= 1
+    say(value)
+    value <<= 2
+    say(value)
+    value >>= 1
+    say(value)
+    value |= 1
+    say(value)
+    value -= 1
+    say(value)
+    value *= 3
+    say(value)
+    value /= 2
+    say(value)
+    value %= 5
+    say(value)
+    ++value
+    say(value)
+    --value
+    say(value)
+    let inverse: number = ~0
+    let positive: number = +value
+    let negative: number = -3
+    if value == 1:
+        say("eq")
+    else:
+        say("eq-fail")
+    end
+    if value != 2:
+        say("ne")
+    else:
+        say("ne-fail")
+    end
+    if value < 2:
+        say("lt")
+    else:
+        say("lt-fail")
+    end
+    if value <= 1:
+        say("le")
+    else:
+        say("le-fail")
+    end
+    if value > 0:
+        say("gt")
+    else:
+        say("gt-fail")
+    end
+    if value >= 1:
+        say("ge")
+    else:
+        say("ge-fail")
+    end
+    if inverse == -1:
+        say("inverse")
+    else:
+        say("inverse-fail")
+    end
+    if positive == 1:
+        say("positive")
+    else:
+        say("positive-fail")
+    end
+    if negative == -3 && negative < 0 && !false:
+        say("negative")
+    else:
+        say("negative-fail")
+    end
+stop

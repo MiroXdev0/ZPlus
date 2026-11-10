@@ -1,0 +1,37 @@
+fn total(base: number, increment: number = base + 2, multiplier: number = increment * 2) -> number:
+    return base + increment + multiplier
+end
+
+fn callLater() -> number:
+    return later(4)
+end
+
+fn later(base: number, offset: number = base + 3) -> number:
+    return base + offset
+end
+
+start:
+    if total(3) == 18:
+        say("default arguments passed")
+    else:
+        say("default arguments failed")
+    end
+
+    if total(3, 5) == 18:
+        say("partial defaults passed")
+    else:
+        say("partial defaults failed")
+    end
+
+    if total(3, 5, 7) == 15:
+        say("explicit arguments passed")
+    else:
+        say("explicit arguments failed")
+    end
+
+    if callLater() == 11:
+        say("forward default call passed")
+    else:
+        say("forward default call failed")
+    end
+stop

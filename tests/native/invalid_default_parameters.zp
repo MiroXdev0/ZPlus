@@ -1,0 +1,7 @@
+fn invalid(first: number = 1, second: number) -> number:
+    return first + second
+end
+
+start:
+    say(invalid())
+stop

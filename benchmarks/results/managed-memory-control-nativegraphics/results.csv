@@ -1,0 +1,345 @@
+workload,mode,run_type,run_index,duration_ns,status,checksum,expected_checksum,detail,stdout,stderr
+arithmetic,native,compile,1,29036000,success,,2399670,,"built: C:\Users\miros\OneDrive\Desktop\Projects\Z+ compiler\benchmarks\results\managed-memory-control-nativegraphics\native\arithmetic.exe
+",
+arithmetic,interpreter,preflight,0,193838200,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,preflight,0,59954800,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,preflight,0,80318500,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,interpreter,warmup,1,169657000,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,interpreter,warmup,2,170620400,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,interpreter,warmup,3,170572100,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,interpreter,measurement,1,169057700,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,interpreter,measurement,2,169442000,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,interpreter,measurement,3,179990200,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,interpreter,measurement,4,169642800,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,interpreter,measurement,5,169860900,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,interpreter,measurement,6,168660200,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,interpreter,measurement,7,169438100,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,interpreter,measurement,8,166925200,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,interpreter,measurement,9,163527000,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,interpreter,measurement,10,164505400,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,warmup,1,15805300,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,warmup,2,15722500,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,warmup,3,15627300,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,measurement,1,15504100,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,measurement,2,15769000,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,measurement,3,15591600,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,measurement,4,15819700,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,measurement,5,16018400,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,measurement,6,16030700,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,measurement,7,16188800,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,measurement,8,15596800,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,measurement,9,15292600,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,measurement,10,15005000,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,warmup,1,73398700,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,warmup,2,71073600,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,warmup,3,71090300,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,measurement,1,74726000,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,measurement,2,69452700,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,measurement,3,70160500,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,measurement,4,69726700,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,measurement,5,72899100,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,measurement,6,70625600,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,measurement,7,69062300,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,measurement,8,69178800,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,measurement,9,67854700,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,measurement,10,68376200,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+functions,native,compile,1,27379400,success,,2492250,,"built: C:\Users\miros\OneDrive\Desktop\Projects\Z+ compiler\benchmarks\results\managed-memory-control-nativegraphics\native\functions.exe
+",
+functions,interpreter,preflight,0,605711300,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,preflight,0,88296000,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,preflight,0,85161500,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,interpreter,warmup,1,569000600,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,interpreter,warmup,2,565705300,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,interpreter,warmup,3,569521700,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,interpreter,measurement,1,549820000,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,interpreter,measurement,2,554560400,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,interpreter,measurement,3,545230800,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,interpreter,measurement,4,549848100,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,interpreter,measurement,5,544099600,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,interpreter,measurement,6,593709000,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,interpreter,measurement,7,593518800,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,interpreter,measurement,8,544357500,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,interpreter,measurement,9,548500300,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,interpreter,measurement,10,546564400,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,warmup,1,16933500,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,warmup,2,16211100,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,warmup,3,16741100,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,measurement,1,16453600,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,measurement,2,16768000,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,measurement,3,16464300,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,measurement,4,16145000,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,measurement,5,16373000,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,measurement,6,15987300,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,measurement,7,15820400,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,measurement,8,15961500,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,measurement,9,15870800,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,measurement,10,15681000,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,warmup,1,70242500,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,warmup,2,70855400,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,warmup,3,70913500,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,measurement,1,71080000,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,measurement,2,70703400,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,measurement,3,72920200,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,measurement,4,71273200,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,measurement,5,71779300,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,measurement,6,71812000,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,measurement,7,72054600,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,measurement,8,79664000,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,measurement,9,72138700,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,measurement,10,71583300,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+branching,native,compile,1,27931200,success,,3124925000,,"built: C:\Users\miros\OneDrive\Desktop\Projects\Z+ compiler\benchmarks\results\managed-memory-control-nativegraphics\native\branching.exe
+",
+branching,interpreter,preflight,0,237597600,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,preflight,0,79660600,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,preflight,0,82414200,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,interpreter,warmup,1,229747700,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,interpreter,warmup,2,222604900,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,interpreter,warmup,3,220607200,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,interpreter,measurement,1,219359200,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,interpreter,measurement,2,219272400,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,interpreter,measurement,3,217737400,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,interpreter,measurement,4,220662900,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,interpreter,measurement,5,218835500,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,interpreter,measurement,6,214455800,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,interpreter,measurement,7,211528900,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,interpreter,measurement,8,210335700,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,interpreter,measurement,9,212726900,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,interpreter,measurement,10,213613800,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,warmup,1,16035300,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,warmup,2,15969600,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,warmup,3,15617500,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,measurement,1,15890400,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,measurement,2,15862000,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,measurement,3,15625400,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,measurement,4,15427700,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,measurement,5,15775000,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,measurement,6,15895200,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,measurement,7,15471100,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,measurement,8,15546500,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,measurement,9,15121000,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,measurement,10,15410900,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,warmup,1,72285000,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,warmup,2,68445000,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,warmup,3,69830600,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,measurement,1,68122900,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,measurement,2,70806100,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,measurement,3,70492000,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,measurement,4,71622200,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,measurement,5,68804500,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,measurement,6,67582600,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,measurement,7,73900500,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,measurement,8,68290500,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,measurement,9,68248000,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,measurement,10,69384200,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+combined,native,compile,1,30099500,success,,3034241,,"built: C:\Users\miros\OneDrive\Desktop\Projects\Z+ compiler\benchmarks\results\managed-memory-control-nativegraphics\native\combined.exe
+",
+combined,interpreter,preflight,0,742354400,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,preflight,0,76362500,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,preflight,0,97265700,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,interpreter,warmup,1,696139300,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,interpreter,warmup,2,711902700,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,interpreter,warmup,3,1159105200,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,interpreter,measurement,1,669820400,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,interpreter,measurement,2,667123800,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,interpreter,measurement,3,671608000,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,interpreter,measurement,4,668071600,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,interpreter,measurement,5,671707100,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,interpreter,measurement,6,665253900,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,interpreter,measurement,7,669159900,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,interpreter,measurement,8,667486200,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,interpreter,measurement,9,666193800,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,interpreter,measurement,10,669916200,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,warmup,1,18478500,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,warmup,2,17878100,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,warmup,3,17919500,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,measurement,1,17962100,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,measurement,2,17681900,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,measurement,3,17584200,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,measurement,4,17573100,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,measurement,5,17764600,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,measurement,6,17519300,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,measurement,7,17303500,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,measurement,8,17170400,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,measurement,9,18579000,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,measurement,10,18560900,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,warmup,1,83483500,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,warmup,2,91217200,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,warmup,3,85047200,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,measurement,1,86474600,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,measurement,2,83212300,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,measurement,3,85238200,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,measurement,4,88741800,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,measurement,5,87642300,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,measurement,6,83963800,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,measurement,7,84494000,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,measurement,8,86181400,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,measurement,9,86883900,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,measurement,10,84256000,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",

@@ -1,0 +1,12 @@
+fn combine(first: number, second: number, third: number, fourth: number, fifth: number, sixth: number) -> number:
+    return first + second + third + fourth + fifth + sixth
+end
+
+start:
+    let result: number = combine(1, 2, 3, 4, 5, 27)
+    if result == 42:
+        say("six arguments passed")
+    else:
+        say("six arguments failed")
+    end
+stop

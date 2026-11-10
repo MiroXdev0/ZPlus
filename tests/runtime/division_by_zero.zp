@@ -1,0 +1,7 @@
+fn divide() -> number:
+    return 8 / 0
+end
+
+fn main():
+    say(divide())
+end

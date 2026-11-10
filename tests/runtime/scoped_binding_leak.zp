@@ -1,0 +1,8 @@
+start:
+    if true:
+        let hidden: number = 1
+    else:
+        let hidden: number = 2
+    end
+    say(hidden)
+stop

@@ -1,0 +1,10 @@
+{
+  "warmups": 3,
+  "measured_runs": 10,
+  "allocation_loops_per_run": 5000,
+  "median_process_ms": 24.192,
+  "mean_process_ms": 25.468,
+  "sample_stdev_ms": 3.405,
+  "estimated_allocation_loops_per_second": 206683.0,
+  "checksum_or_output": "all expected native memory lines matched"
+}

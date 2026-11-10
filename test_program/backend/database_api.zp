@@ -1,0 +1,19 @@
+use zsqlite as sqlite
+use zjson as json
+
+start:
+    let database = sqlite.open("backend_api.sqlite")
+    sqlite.execute(database, "CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY, title TEXT NOT NULL)", "[]")
+    sqlite.begin(database)
+    sqlite.execute(database, "INSERT INTO notes (title) VALUES (?)", "[\"parameterized note\"]")
+    sqlite.commit(database)
+
+    let rows = sqlite.query(database, "SELECT id, title FROM notes ORDER BY id DESC LIMIT 1", "[]")
+    if json.getString(rows, "/0/title") == "parameterized note":
+        printz("Database API inserted and queried one note\n")
+    else:
+        printz("Database API query failed\n")
+    end
+
+    sqlite.close(database)
+stop

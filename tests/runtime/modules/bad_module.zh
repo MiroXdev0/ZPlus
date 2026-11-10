@@ -1,0 +1,4 @@
+pub fn readPastEnd() -> number:
+    let values: number[] = [7]
+    return values[2]
+end

@@ -1,0 +1,121 @@
+use zmath as math
+use zstring as text
+use zrandom as random
+use zcollections as collections
+use zpath as path
+use zfile as file
+use zenv as env
+use ztime as time
+use zargs as args
+use zlog as log
+use zmemory.management as memory
+
+start:
+    let root: string = args.get(0)
+    let settingsPath: string = path.join(root, "settings.txt")
+    let logPath: string = path.join(root, "run.log")
+
+    say(math.sqrt(144) == 12 ? "sqrt-ok" : "sqrt-fail")
+    say(math.pow(3, 2) == 9 ? "pow-ok" : "pow-fail")
+    say(math.abs(-3) == 3 ? "abs-ok" : "abs-fail")
+    say(math.min(1, 2) == 1 and math.max(1, 2) == 2 ? "min-max-ok" : "min-max-fail")
+    say(math.round(3) == 3 and math.floor(3) == 3 and math.ceil(3) == 3 ? "rounding-ok" : "rounding-fail")
+    say(math.sin(0) == 0 and math.cos(0) == 1 and math.tan(0) == 0 ? "trig-ok" : "trig-fail")
+    say(math.asin(0) == 0 and math.acos(1) == 0 and math.atan(0) == 0 ? "inverse-trig-ok" : "inverse-trig-fail")
+    say(math.log(1) == 0 and math.log10(1) == 0 and math.exp(0) == 1 ? "log-exp-ok" : "log-exp-fail")
+    say(text.upper(text.trim("  alice  ")))
+    say(text.join(text.split("alpha|beta", "|"), ","))
+    say(text.substring("abcdef", 1, 3))
+    say(text.repeat("x", 3))
+    say(text.contains(text.lower("ALICE"), "alice") ? "lower-ok" : "lower-fail")
+    say(text.contains(text.replace("a-b", "-", "/"), "a/b") ? "replace-ok" : "replace-fail")
+    say(text.startsWith("alpha", "al") and text.endsWith("alpha", "ha") ? "prefix-suffix-ok" : "prefix-suffix-fail")
+    say(text.contains(text.reverse("abc"), "cba") ? "string-reverse-ok" : "string-reverse-fail")
+    say(text.length("abc") == 3 ? "string-length-ok" : "string-length-fail")
+    say(text.length(text.repeat("x", 0)) == 0 ? "repeat-zero-ok" : "repeat-zero-fail")
+    say(text.length(text.substring("abc", 3, 0)) == 0 ? "substring-end-ok" : "substring-end-fail")
+    let unicodeText: string = "éЖ🙂"
+    say(text.length(unicodeText) == 3 ? "unicode-length-ok" : "unicode-length-fail")
+    say(text.substring(unicodeText, 1, 1))
+    say(text.reverse(unicodeText))
+    say(text.upper("éж"))
+    say(text.lower("ÉЖ"))
+    say(text.trim("  é "))
+    say(text.join(text.split("é|Ж", "|"), "🙂"))
+    say(text.replace("éЖ", "Ж", "я"))
+
+    let values: number[] = [1, 2, 2, 3]
+    let reversed: number[] = collections.reverse(values)
+    let ordered: number[] = collections.sort([3, 1, 2])
+    say(reversed[0] == 3 ? "reverse-ok" : "reverse-fail")
+    say(ordered[0] == 1 ? "sort-ok" : "sort-fail")
+    say(values[0] == 1 ? "collections-copy-ok" : "collections-mutated")
+    say(collections.sum(values) == 8 ? "sum-ok" : "sum-fail")
+    say(collections.average([2, 4, 6]) == 4 ? "average-ok" : "average-fail")
+    say(collections.min(values) == 1 and collections.max(values) == 3 ? "collection-min-max-ok" : "collection-min-max-fail")
+    say(length(collections.unique(values)) == 3 ? "unique-ok" : "unique-fail")
+    say(collections.contains(values, 2) and collections.count(values, 2) == 2 ? "collection-search-ok" : "collection-search-fail")
+    say(collections.first(values) == 1 and collections.last(values) == 3 ? "first-last-ok" : "first-last-fail")
+    let emptyNumbers: number[] = []
+    say(collections.isEmpty(emptyNumbers) ? "empty-ok" : "empty-fail")
+
+    random.seed(7)
+    say(random.integer(1, 1) == 1 ? "random-ok" : "random-fail")
+    random.seed(123)
+    let firstDraw: number = random.integer(1, 100)
+    random.seed(123)
+    say(firstDraw == random.integer(1, 100) ? "random-seed-ok" : "random-seed-fail")
+    say(random.choice([7]) == 7 ? "choice-ok" : "choice-fail")
+    let randomBoolean: boolean = random.boolean()
+    say(randomBoolean or not randomBoolean ? "random-boolean-ok" : "random-boolean-fail")
+    let shuffled: number[] = random.shuffle([1, 2, 3])
+    say(length(shuffled) == 3 ? "shuffle-ok" : "shuffle-fail")
+
+    say(path.filename(path.join("one", "report.txt")))
+    say(text.contains(path.normalize("one/../two"), "two") ? "normalize-ok" : "normalize-fail")
+    say(text.contains(path.extension("report.txt"), ".txt") ? "extension-ok" : "extension-fail")
+    say(text.contains(path.directory("folder/report.txt"), "folder") ? "directory-ok" : "directory-fail")
+    say(path.isAbsolute(path.absolute(root)) ? "absolute-ok" : "absolute-fail")
+    env.set("ZPLUS_STDLIB_TEST", "visible")
+    say(env.get("ZPLUS_STDLIB_TEST"))
+    say(env.exists("ZPLUS_STDLIB_TEST") ? "env-exists" : "env-missing")
+
+    let timestamp: number = time.parse("2000-01-02", "%Y-%m-%d")
+    say(text.contains(time.format(timestamp, "%Y-%m-%d"), "2000-01-02") ? "time-ok" : "time-fail")
+    say(time.year(timestamp) == 2000 and time.month(timestamp) == 1 and time.day(timestamp) == 2 ? "date-parts-ok" : "date-parts-fail")
+    say(time.hour(timestamp) >= 0 and time.minute(timestamp) >= 0 and time.second(timestamp) >= 0 ? "clock-parts-ok" : "clock-parts-fail")
+    time.sleep(0)
+
+    file.write(settingsPath, "name=alice")
+    say(file.read(settingsPath))
+    say(file.exists(settingsPath) ? "file-exists-ok" : "file-exists-fail")
+    say(file.size(settingsPath) == 10 ? "file-size-ok" : "file-size-fail")
+    file.append(settingsPath, "\nmode=test")
+    say(text.contains(file.read(settingsPath), "mode=test") ? "file-append-ok" : "file-append-fail")
+    say(length(file.listDirectory(root)) >= 1 ? "directory-list-ok" : "directory-list-fail")
+    let nestedPath: string = path.join(root, "nested")
+    file.createDirectory(nestedPath)
+    say(file.isDirectory(nestedPath) ? "nested-dir-ok" : "nested-dir-fail")
+    say(file.isDirectory(root) ? "root-dir-ok" : "root-dir-fail")
+    say(args.count() == 2 ? "args-count-ok" : "args-count-fail")
+    say(args.has("test-flag") ? "args-has-ok" : "args-has-fail")
+    let passedArguments: string[] = args.all()
+    say(length(passedArguments) == 2 ? "args-all-ok" : "args-all-fail")
+    say(length(env.arguments()) == args.count() ? "env-args-ok" : "env-args-fail")
+    say(text.length(env.homeDirectory()) > 0 ? "home-dir-ok" : "home-dir-fail")
+    say(text.length(env.currentDirectory()) > 0 ? "current-dir-ok" : "current-dir-fail")
+
+    let protectedText: string = text.upper("collection")
+    let protectedPieces: string[] = text.split("one,two", ",")
+    memory.collect()
+    say(text.contains(protectedText, "COLLECTION") ? "stdlib-gc-string-ok" : "stdlib-gc-string-fail")
+    say(length(protectedPieces) == 2 ? "stdlib-gc-array-ok" : "stdlib-gc-array-fail")
+
+    log.setOutput(logPath)
+    log.setLevel("warning")
+    log.info("filtered")
+    log.warning("visible")
+    log.setOutput("")
+    say(text.contains(file.read(logPath), "warning: visible") ? "log-ok" : "log-fail")
+    say(file.delete(settingsPath) ? "file-delete-ok" : "file-delete-fail")
+stop

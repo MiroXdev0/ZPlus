@@ -1,0 +1,5 @@
+use zmath as math
+
+start:
+    let result: number = math.sqrt(-1)
+stop

@@ -1,0 +1,13 @@
+use zgraphics
+use "ui/layout.zh" as layout
+
+pub fn create(title: string) -> number:
+    let window = zgraphics.createWindow(title, 720, 440)
+    zgraphics.background(window, "#111827")
+    zgraphics.setTargetFPS(window, 60)
+    return window
+end
+
+pub fn drawFrame(window: number, clicks: number):
+    layout.draw(window, clicks)
+end

@@ -1,0 +1,16 @@
+fn twice(value: number) -> number:
+    return value * 2
+end
+
+fn combine(first: number, second: number, third: number, fourth: number) -> number:
+    return first + second + third + fourth
+end
+
+start:
+    let result: number = combine(twice(10), 8, 1, 13)
+    if result == 42:
+        say("function calls passed")
+    else:
+        say("function calls failed")
+    end
+stop

@@ -1,0 +1,25 @@
+start:
+    let value: number = 7
+    value &= 3
+    value ^= 1
+    value <<= 2
+    value >>= 1
+    value |= 1
+    value -= 1
+    value *= 3
+    value /= 2
+    value %= 5
+
+    ++value
+    --value
+
+    let inverse: number = ~0
+    let positive: number = +value
+    let negative: number = -3
+
+    if value == 1 && value != 2 && value < 2 && value <= 1 && value > 0 && value >= 1 && inverse == -1 && positive == 1 && negative == -3 && negative < 0 && !false:
+        say("operators passed")
+    else:
+        say("operators failed")
+    end
+stop

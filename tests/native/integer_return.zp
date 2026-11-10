@@ -1,0 +1,7 @@
+start:
+    if 42 == 42:
+        say("integer constant passed")
+    else:
+        say("integer constant failed")
+    end
+stop

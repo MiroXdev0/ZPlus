@@ -1,0 +1,16 @@
+[project]
+name = "backend-runtime"
+version = "0.1.0"
+description = "ZBuild backend module integration test"
+entry = "src/main.zp"
+
+[build]
+backend = "native"
+mode = "release"
+output_dir = "build"
+optimization = 0
+jobs = 1
+
+[platform]
+windows = true
+linux = true

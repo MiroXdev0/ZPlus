@@ -1,0 +1,3 @@
+pub fn unused() -> number:
+    return 7
+end

@@ -1,0 +1,41 @@
+fn replaceFirst(values: number[], replacement: number) -> number[]:
+    values[0] = replacement
+    return values
+end
+
+fn makeWords() -> string[]:
+    return ["z+", "works"]
+end
+
+fn nestedValue(values: number[][]) -> number:
+    return values[1][0]
+end
+
+start:
+    let empty: number[] = []
+    say(length(empty))
+
+    let numbers: number[] = [10, 20, 30]
+    say(numbers[0])
+    numbers[1] = 99
+    numbers[1] += 1
+    say(numbers[1])
+
+    let matrix: number[][] = [[1, 2], [3, 4]]
+    matrix[0][1] = 7
+    say(matrix[0][1])
+    say(nestedValue(matrix))
+
+    let words: string[] = ["alpha", "beta"]
+    say(words[1])
+    let flags: bool[] = [true, false]
+    say(flags[0])
+    let letters: char[] = ['a', 'b']
+    say(letters[1])
+
+    let changed = replaceFirst(numbers, 5)
+    say(numbers[0])
+    say(changed[0])
+    say(makeWords()[0])
+    say(length(makeWords()))
+stop

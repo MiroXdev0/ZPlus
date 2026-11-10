@@ -1,0 +1,24 @@
+[project]
+name = "audio-runtime"
+version = "0.1.0"
+description = "ZBuild audio runtime integration test"
+entry = "src/main.zp"
+
+[build]
+backend = "native"
+mode = "release"
+output_dir = "build"
+optimization = 0
+jobs = 1
+
+[compiler]
+warnings = true
+debug_symbols = false
+
+[platform]
+windows = true
+linux = true
+
+[assets]
+directories = ["assets"]
+preserve_structure = true

@@ -1,0 +1,15 @@
+use zsqlite as sqlite
+use zjson as json
+
+start:
+    let database = sqlite.open(":memory:")
+    sqlite.execute(database, "CREATE TABLE events (message TEXT)", "[]")
+    sqlite.execute(database, "INSERT INTO events VALUES (?)", "[\"zbuild-native\"]")
+    let rows = sqlite.query(database, "SELECT message FROM events", "[]")
+    if json.getString(rows, "/0/message") == "zbuild-native":
+        printz("zbuild-backend-runtime-passed\n")
+    else:
+        printz("zbuild-backend-runtime-failed\n")
+    end
+    sqlite.close(database)
+stop

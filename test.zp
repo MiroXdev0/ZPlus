@@ -1,0 +1,18 @@
+use zgraphics
+use zmemory.management
+
+start:
+    let app = zgraphics.createWindow("Z+ Graphics Test", 640, 480)
+    zgraphics.background(app, "#0B1020")
+    zgraphics.setTargetFPS(app, 60)
+    zgraphics.show(app)
+
+    while zgraphics.isOpen(app):
+        zgraphics.square(app, 100, 100, 200, 200, "#FF0000")
+        zgraphics.text(app, "Presi e gey", 20, 20, "#FFFFFF", 24)
+        zgraphics.update(app)
+        if zgraphics.keyDown(app, 27):
+            zgraphics.close(app)
+        end
+    end
+stop

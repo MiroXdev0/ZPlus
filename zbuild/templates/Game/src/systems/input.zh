@@ -1,0 +1,25 @@
+use zgraphics
+
+pub fn horizontal(window: number) -> number:
+    if zgraphics.keyDown(window, 65) or zgraphics.keyDown(window, 97):
+        return -1
+    else:
+    end
+    if zgraphics.keyDown(window, 68) or zgraphics.keyDown(window, 100):
+        return 1
+    else:
+    end
+    return 0
+end
+
+pub fn vertical(window: number) -> number:
+    if zgraphics.keyDown(window, 87) or zgraphics.keyDown(window, 119):
+        return -1
+    else:
+    end
+    if zgraphics.keyDown(window, 83) or zgraphics.keyDown(window, 115):
+        return 1
+    else:
+    end
+    return 0
+end

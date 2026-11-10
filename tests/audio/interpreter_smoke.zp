@@ -1,0 +1,22 @@
+use zaudio
+
+if zaudio.deviceCount() > 0:
+    zaudio.initialize()
+    let music = zaudio.loadMusic("tone.ogg")
+    let effect = zaudio.loadSound("tone.wav")
+    zaudio.setVolume(music, 0.7)
+    zaudio.setLooping(music, true)
+    zaudio.setPlaybackPosition(music, 0.1)
+    zaudio.play(music)
+    zaudio.pause(music)
+    zaudio.resume(music)
+    zaudio.play(effect)
+    zaudio.play(effect)
+    zaudio.stop(effect)
+    zaudio.stop(music)
+    zaudio.unloadAll()
+    zaudio.shutdown()
+    say("Audio interpreter integration passed")
+else:
+    say("Audio interpreter integration skipped: no playback device")
+end

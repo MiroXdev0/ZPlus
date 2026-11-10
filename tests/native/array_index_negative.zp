@@ -1,0 +1,9 @@
+start:
+    let values: number[] = [1, 2]
+    let invalid = values[-1]
+    if invalid == 0:
+        say("unexpected array read")
+    else:
+        say("unexpected array read")
+    end
+stop

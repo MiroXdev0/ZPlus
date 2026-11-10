@@ -1,0 +1,50 @@
+struct Player:
+    name: string
+    health: number = 100
+    score: number = 0
+end
+
+struct Inventory:
+    items: number[]
+end
+
+struct Session:
+    player: Player
+end
+
+fn updatePlayer(player: Player) -> Player:
+    player.health -= 10
+    return player
+end
+
+start:
+    let player = Player("Alex")
+    let aliasByAssignment = player
+    let differentInstance = Player("Alex")
+    say(aliasByAssignment == player)
+    say(differentInstance == player)
+    if player is Player:
+        say("is player")
+    else:
+        say("wrong type")
+    end
+    say(player.name)
+    say(player.health)
+    say(player.score)
+
+    player.score = 50
+    let alias = updatePlayer(player)
+    say(alias.health)
+    say(player.score)
+
+    let inventory = Inventory([2, 4, 8])
+    say(inventory.items[1])
+
+    let session = Session(player)
+    say(session.player.name)
+
+    let players: Player[] = [player, alias]
+    players[0].health += 5
+    say(players[1].health)
+    say(player.health)
+stop

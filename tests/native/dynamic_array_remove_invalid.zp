@@ -1,0 +1,4 @@
+start:
+    let values: number[] = [1]
+    remove(values, 1)
+stop

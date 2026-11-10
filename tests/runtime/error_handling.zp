@@ -1,0 +1,51 @@
+fn fail():
+    throw "boom"
+end
+
+fn returnWithCleanup() -> number:
+    let message: string = "returned"
+    defer:
+        say(message)
+    end
+    message = "changed"
+    defer:
+        say("last")
+    end
+    return 7
+end
+
+start:
+    defer:
+        say("outer")
+    end
+
+    try:
+        try:
+            defer:
+                say("try cleanup")
+            end
+            fail()
+        catch (inner):
+            say("inner: " + inner.message)
+            throw "raised again"
+        end
+    catch (outer):
+        say(outer.message)
+    end
+
+    if true:
+        defer:
+            say("nested")
+        end
+    end
+
+    let value = returnWithCleanup()
+    say(value)
+
+    try:
+        let empty: number[] = []
+        pop(empty)
+    catch (runtime):
+        say("runtime: " + runtime.message)
+    end
+stop

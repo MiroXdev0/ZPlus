@@ -1,0 +1,161 @@
+{
+    "name": "zplus-language",
+    "displayName": "Z+ Language Support",
+    "description": "Official VS Code language support for the Z+ programming language.",
+    "version": "0.6.0",
+    "publisher": "zplus",
+    "license": "MIT",
+    "main": "./extension.js",
+    "icon": "icons/zplus.icon.png",
+    "scripts": {
+        "test": "node --test"
+    },
+
+    "engines": {
+        "vscode": "^1.80.0"
+    },
+
+    "categories": [
+        "Programming Languages"
+    ],
+
+    "keywords": [
+        "zplus",
+        "z+",
+        "programming language",
+        "language support",
+        "compiler"
+    ],
+
+    "activationEvents": [
+        "onLanguage:zplus"
+    ],
+
+    "contributes": {
+
+        "languages": [
+            {
+                "id": "zplus",
+                "aliases": [
+                    "Z+",
+                    "zplus"
+                ],
+                "extensions": [
+                    ".zp",
+                    ".zh"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+
+        "grammars": [
+            {
+                "language": "zplus",
+                "scopeName": "source.zplus",
+                "path": "./syntaxes/zplusLanguage.json"
+            }
+        ],
+
+        "iconThemes": [
+            {
+                "id": "zplus-icon-theme",
+                "label": "Z+ File Icons",
+                "path": "./icons/zplus-icon-theme.json"
+            }
+        ],
+
+        "snippets": [
+            {
+                "language": "zplus",
+                "path": "./snippets/zplus.json"
+            }
+        ],
+
+        "commands": [
+            {
+                "command": "zplus.checkFile",
+                "title": "Z+: Check Current File",
+                "category": "Z+"
+            },
+            {
+                "command": "zplus.runFile",
+                "title": "Z+: Run Current File",
+                "category": "Z+"
+            },
+            {
+                "command": "zplus.buildFile",
+                "title": "Z+: Build Current File",
+                "category": "Z+"
+            },
+            {
+                "command": "zplus.selectCompiler",
+                "title": "Z+: Select Compiler",
+                "category": "Z+"
+            },
+            {
+                "command": "zplus.showCompilerVersion",
+                "title": "Z+: Show Compiler Version",
+                "category": "Z+"
+            },
+            {
+                "command": "zplus.zbuildBuildProject",
+                "title": "Z+: ZBuild Build Project",
+                "category": "Z+"
+            },
+            {
+                "command": "zplus.zbuildRunProject",
+                "title": "Z+: ZBuild Run Project",
+                "category": "Z+"
+            },
+            {
+                "command": "zplus.zbuildTestProject",
+                "title": "Z+: ZBuild Test Project",
+                "category": "Z+"
+            }
+        ],
+
+        "configuration": {
+            "title": "Z+",
+
+            "properties": {
+
+                "zplus.compilerPath": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Path to the Z+ compiler executable. Leave empty to find zp (or zp.exe) on PATH."
+                },
+
+                "zplus.zbuildPath": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Path to zbuild. Leave empty to find zbuild (or zbuild.exe) on PATH."
+                },
+
+                "zplus.outputPath": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Optional output path for Z+: Build Current File. Supports ${file}, ${fileDirname}, ${fileBasename}, ${fileBasenameNoExtension}, and ${workspaceFolder}."
+                },
+
+                "zplus.checkOnSave": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Automatically check Z+ files when they are saved."
+                },
+
+                "zplus.checkWhileTyping": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Automatically check Z+ files while editing."
+                },
+
+                "zplus.checkDelay": {
+                    "type": "number",
+                    "default": 500,
+                    "minimum": 0,
+                    "description": "Delay in milliseconds before checking a Z+ file after editing."
+                }
+            }
+        }
+    }
+}

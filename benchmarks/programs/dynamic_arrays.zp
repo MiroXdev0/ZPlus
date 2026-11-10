@@ -1,0 +1,59 @@
+use zmemory.management
+use zgraphics
+
+start:
+    zmemory.setThreshold(1024)
+    let values: number[] = []
+    for (let i: number = 0; i < 20000; i++):
+        push(values, i)
+    end
+
+    let checksum: number = 0
+    for (let i: number = 0; i < length(values); i++):
+        checksum += values[i]
+    end
+    if checksum == 199990000 and values[12345] == 12345:
+        say("append, indexed access, and iteration passed")
+    else:
+        say("append workload failed")
+    end
+
+    let randomAccessChecksum: number = 0
+    for (let i: number = 0; i < length(values); i += 97):
+        randomAccessChecksum += values[i]
+    end
+    if randomAccessChecksum > 0:
+        say("strided indexed access passed")
+    else:
+        say("indexed access workload failed")
+    end
+
+    let removed: number = 0
+    for (let i: number = 0; i < 5000; i++):
+        removed += pop(values)
+    end
+    if removed == 87497500 and length(values) == 15000:
+        say("repeated removal passed")
+    else:
+        say("removal workload failed")
+    end
+
+    let nested: number[][] = []
+    for (let i: number = 0; i < 200; i++):
+        let child: number[] = [i]
+        push(nested, child)
+    end
+    zmemory.collect()
+    if nested[199][0] == 199 and values[14999] == 14999:
+        say("nested references survived collection")
+    else:
+        say("collection workload failed")
+    end
+
+    let heapBytes = zmemory.heapUsed()
+    let liveObjects = zmemory.heapObjects()
+    let completedCollections = zmemory.collectionCount()
+    say("heap bytes: " + zgraphics.numberText(heapBytes))
+    say("live objects: " + zgraphics.numberText(liveObjects))
+    say("collections: " + zgraphics.numberText(completedCollections))
+stop

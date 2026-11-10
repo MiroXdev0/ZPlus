@@ -1,0 +1,22 @@
+{
+    "iconDefinitions": {
+        "zplus-file": {
+            "iconPath": "./zplus-file.png"
+        },
+        "zplus-file-dark": {
+            "iconPath": "./zplus-file-dark.png"
+        }
+    },
+
+    "fileExtensions": {
+        "zp": "zplus-file-dark",
+        "zh": "zplus-file-dark"
+    },
+
+    "light": {
+        "fileExtensions": {
+            "zp": "zplus-file",
+            "zh": "zplus-file"
+        }
+    }
+}

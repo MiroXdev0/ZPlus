@@ -1,0 +1,17 @@
+use zmemory.management
+
+struct Player:
+    name: string
+    score: number
+end
+
+start:
+    let players: Player[] = []
+    for (let i: number = 0; i < 1500; i++):
+        let player = Player("kept", i)
+        push(players, player)
+    end
+    zmemory.collect()
+    say(players[0].name)
+    say(players[1499].score)
+stop

@@ -1,0 +1,22 @@
+use zmemory.management
+
+fn allocateArrays(count: number) -> number:
+    let checksum: number = 0
+    for (let i: number = 0; i < count; i++):
+        let temporary: number[] = [i, i + 1]
+        checksum += temporary[0]
+    end
+    return checksum
+end
+
+start:
+    let checksum: number = allocateArrays(30000)
+    say(checksum)
+    say(zmemory.heapUsed())
+    say(zmemory.heapObjects())
+    say(zmemory.collectionCount())
+    zmemory.collect()
+    say(zmemory.heapUsed())
+    say(zmemory.heapObjects())
+    say(zmemory.collectionCount())
+stop

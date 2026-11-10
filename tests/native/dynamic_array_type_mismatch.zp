@@ -1,0 +1,4 @@
+start:
+    let values: number[] = []
+    push(values, "not a number")
+stop

@@ -1,0 +1,5 @@
+use zstring as text
+
+start:
+    let parts: string[] = text.split("a,b", "")
+stop
