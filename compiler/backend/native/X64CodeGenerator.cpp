@@ -617,6 +617,23 @@ private:
             if (name == "write" || name == "append") return "void";
             return "bool";
         }
+        if (operation.rfind("crypto_", 0) == 0 ||
+            operation == "process_run" ||
+            operation == "registry_read" ||
+            operation == "registry_valueKind" ||
+            operation == "system_platform" ||
+            operation == "system_architecture" ||
+            operation == "system_osVersion" ||
+            operation == "system_executablePath" ||
+            operation == "system_selectFolder" ||
+            operation == "system_shortcutTarget" ||
+            operation == "system_shortcutArguments") {
+            return "string";
+        }
+        if (operation == "system_availableSpace" ||
+            operation == "system_messageBox") return "number";
+        if (operation.rfind("system_", 0) == 0 ||
+            operation.rfind("registry_", 0) == 0) return "bool";
         if (operation.rfind("env_", 0) == 0) {
             const std::string name = operation.substr(4);
             if (name == "get" || name == "homeDirectory" ||
@@ -1077,8 +1094,20 @@ private:
         }
         if (op == "try_push" || op == "try_pop" || op == "throw" ||
             op == "defer_push") {
-            throw std::runtime_error(
-                "native backend: try/catch/throw/defer is not supported");
+            std::string message =
+                "native backend: exception handling and deferred cleanup are "
+                "not supported";
+            if (!instruction.location.sourceFile.empty()) {
+                message += " at " + instruction.location.sourceFile;
+                if (instruction.location.line > 0) {
+                    message += ":" + std::to_string(instruction.location.line);
+                    if (instruction.location.column > 0) {
+                        message += ":" + std::to_string(instruction.location.column);
+                    }
+                }
+            }
+            message += " in function '" + functionName + "'";
+            throw std::runtime_error(std::move(message));
         }
         if (op == "struct_new") {
             requireOperands(instruction, 1);

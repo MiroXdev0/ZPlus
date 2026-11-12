@@ -1,6 +1,6 @@
-start:
+start {
     let prefix: string = "native "
     printz(prefix, "backend éЖ🙂 ")
     printm("legacy ")
     say("output")
-stop
+} stop

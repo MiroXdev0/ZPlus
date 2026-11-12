@@ -1,27 +1,27 @@
 use zjson as json
 
-start:
+start {
     let method = "POST"
-    if method == "POST":
+    if method == "POST" {
         printz("string equality passed\n")
-    else:
+    } else {
         printz("string equality failed\n")
-    end
-    if "same" != "different":
+    } end if
+    if "same" != "different" {
         printz("string inequality passed\n")
-    else:
+    } else {
         printz("string inequality failed\n")
-    end
+    } end if
     let dynamic = json.getString("{\"path\":\"/__stop\"}", "/path")
-    if dynamic == "/__stop":
+    if dynamic == "/__stop" {
         printz("dynamic string equality passed\n")
-    end
-    if dynamic != "/users":
+    } end if
+    if dynamic != "/users" {
         printz("dynamic string inequality passed\n")
-    end
-    if dynamic == "/__stop" and dynamic == "/users":
+    } end if
+    if dynamic == "/__stop" and dynamic == "/users" {
         printz("dynamic conjunction failed\n")
-    else:
+    } else {
         printz("dynamic conjunction passed\n")
-    end
-stop
+    } end if
+} stop

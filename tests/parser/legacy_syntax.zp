@@ -1,0 +1,9 @@
+fn legacyAdd(left: number, right: number) -> number:
+    return left + right
+end
+
+start:
+    if legacyAdd(2, 3) == 5:
+        say("legacy compatibility")
+    end
+stop

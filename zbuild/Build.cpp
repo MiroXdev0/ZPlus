@@ -21,10 +21,34 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 namespace zbuild {
 namespace {
 
 std::mutex graphicsRuntimeStagingMutex;
+
+std::filesystem::path executableDirectory() {
+#ifdef _WIN32
+    std::wstring path(32768, L'\0');
+    const DWORD length = GetModuleFileNameW(
+        nullptr, path.data(), static_cast<DWORD>(path.size()));
+    if (length == 0 || length >= path.size()) return {};
+    path.resize(length);
+    return std::filesystem::path(path).parent_path();
+#elif defined(__linux__)
+    std::error_code error;
+    const auto path = std::filesystem::read_symlink("/proc/self/exe", error);
+    return error ? std::filesystem::path{} : path.parent_path();
+#else
+    return {};
+#endif
+}
 
 std::string trim(std::string value) {
     const auto notSpace = [](unsigned char ch) { return !std::isspace(ch); };
@@ -214,6 +238,18 @@ std::vector<std::filesystem::path> importedModules(
                     standardRoot = configured;
                 }
 #endif
+                if (standardRoot.empty()) {
+                    const auto executableDir = executableDirectory();
+                    if (!executableDir.empty()) {
+                        const auto adjacentLibrary = executableDir / "stdlib";
+                        std::error_code directoryError;
+                        if (std::filesystem::is_directory(
+                                adjacentLibrary, directoryError) &&
+                            !directoryError) {
+                            standardRoot = adjacentLibrary;
+                        }
+                    }
+                }
 #ifdef ZBUILD_STDLIB_DIR
                 if (standardRoot.empty()) standardRoot = ZBUILD_STDLIB_DIR;
 #endif
@@ -481,6 +517,14 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
     if (!project_.windows && !project_.linux) {
         throw std::runtime_error("project disables every supported target platform");
     }
+#ifndef _WIN32
+    if (project_.windowsGui) {
+        throw std::runtime_error("a Windows GUI subsystem executable requires a Windows build");
+    }
+#endif
+    if (project_.windowsGui && backend != "native") {
+        throw std::runtime_error("a Windows GUI subsystem executable requires the native backend");
+    }
 #ifdef _WIN32
     if (!project_.windows) throw std::runtime_error("this project disables Windows builds");
 #else
@@ -568,6 +612,10 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                 tasks.push_back(std::async(std::launch::async, [&, target] {
                     const std::string targetBackend =
                         target->backend.empty() ? backend : target->backend;
+                    if (project_.windowsGui && targetBackend != "native") {
+                        throw std::runtime_error(
+                            "project build.windows_gui cannot be used with interpreter targets");
+                    }
                     const std::string targetMode =
                         target->mode.empty() ? mode : target->mode;
                     if (targetBackend != "native" && targetBackend != "interpreter") {
@@ -582,6 +630,9 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                         << target->name << '\n' << target->type << '\n'
                         << targetBackend << '\n' << targetMode << '\n'
                         << project_.optimization << '\n'
+                        << (project_.windowsGui && targetBackend == "native"
+                                ? "windows-gui\n"
+                                : "console\n")
                         << compilerVersion.at("value") << '\n'
                         << sha256File(compiler_) << '\n';
 #ifdef _WIN32
@@ -750,6 +801,7 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                         if (targetBackend == "native") {
                             command.push_back("-o");
                             command.push_back(temporaryOutput);
+                            if (project_.windowsGui) command.push_back("--windows-gui");
                         }
                         const auto logFile = cacheDirectory / (targetComponent(target->name) + ".log");
                         const ProcessResult built = runProcess(command, project_.root, logFile);

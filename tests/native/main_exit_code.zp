@@ -1,5 +1,5 @@
-fn main() -> number:
+fn main(): number {
     let result: number = 6 * 7
     say("native main returned 42")
     return result
-end
+} end fn

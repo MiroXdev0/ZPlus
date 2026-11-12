@@ -1,6 +1,6 @@
 use zphysics
 
-start:
+start {
     let world = zphysics.createWorld(0, 980)
     let floor = zphysics.createBody(world, "static", 320, 420)
     zphysics.createBox(world, floor, 600, 20)
@@ -11,9 +11,9 @@ start:
     let third = zphysics.createBody(world, "dynamic", 460, 40)
     zphysics.createCircle(world, third, 24)
 
-    for (let frame: number = 0; frame < 300; frame++):
+    for (let frame: number = 0; frame < 300; frame++) {
         zphysics.update(world, 1 / 60)
-    end
+    } end for
 
     say("Final center Y values:")
     say(zphysics.getPositionY(first))
@@ -22,4 +22,4 @@ start:
     say("Floor contacts:")
     say(zphysics.contactCount(world))
     zphysics.destroyWorld(world)
-stop
+} stop

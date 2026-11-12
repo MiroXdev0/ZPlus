@@ -1,6 +1,6 @@
 use zphysics
 
-start:
+start {
     let world = zphysics.createWorld(0, 420)
     let floor = zphysics.createBody(world, "static", 320, 440)
     let floorShape = zphysics.createBox(world, floor, 640, 20)
@@ -12,13 +12,13 @@ start:
     zphysics.setAngularDamping(puck, 0.12)
     zphysics.applyImpulse(puck, 120, -40)
 
-    for (let frame: number = 0; frame < 240; frame++):
-        if frame == 30:
+    for (let frame: number = 0; frame < 240; frame++) {
+        if frame == 30 {
             zphysics.applyForce(puck, 80, 0)
-        else:
-        end
+        } else {
+        } end if
         zphysics.update(world, 1 / 60)
-    end
+    } end for
 
     say("Puck position and velocity:")
     say(zphysics.getPositionX(puck))
@@ -26,4 +26,4 @@ start:
     say(zphysics.getVelocityX(puck))
     say(zphysics.getVelocityY(puck))
     zphysics.destroyWorld(world)
-stop
+} stop

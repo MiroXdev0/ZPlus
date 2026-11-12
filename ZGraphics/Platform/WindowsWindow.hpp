@@ -29,6 +29,7 @@ public:
     void close(int);
     bool isOpen(int);
     void drawText(int, const std::string&, int, int, Color, int);
+    void drawImage(int, const std::string&, int, int, int, int);
     void drawLine(int, int, int, int, int, Color, int);
     void drawRectangle(int, int, int, int, int, Color, bool, int);
     void drawCircle(int, int, int, int, Color, bool, int);
@@ -50,6 +51,7 @@ private:
     static void releaseFonts(Window&);
     static bool paintCompletedFrame(Window&, HDC);
     std::vector<std::unique_ptr<Window>> windows_;
+    ULONG_PTR gdiplusToken_ = 0;
 };
 
 } // namespace zplus::graphics

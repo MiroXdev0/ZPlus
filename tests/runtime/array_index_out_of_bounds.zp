@@ -1,8 +1,8 @@
-fn readPastEnd() -> number:
+fn readPastEnd(): number {
     let values: number[] = [1, 2]
     return values[4]
-end
+} end fn
 
-fn main():
+fn main() {
     say(readPastEnd())
-end
+} end fn

@@ -1,0 +1,6 @@
+start {
+    if true {
+        while true {
+            say("nested")
+        } end if
+    } stop

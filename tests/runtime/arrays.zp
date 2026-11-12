@@ -1,17 +1,17 @@
-fn replaceFirst(values: number[], replacement: number) -> number[]:
+fn replaceFirst(values: number[], replacement: number): number[] {
     values[0] = replacement
     return values
-end
+} end fn
 
-fn makeWords() -> string[]:
+fn makeWords(): string[] {
     return ["z+", "works"]
-end
+} end fn
 
-fn nestedValue(values: number[][]) -> number:
+fn nestedValue(values: number[][]): number {
     return values[1][0]
-end
+} end fn
 
-start:
+start {
     let empty: number[] = []
     say(length(empty))
 
@@ -38,4 +38,4 @@ start:
     say(changed[0])
     say(makeWords()[0])
     say(length(makeWords()))
-stop
+} stop

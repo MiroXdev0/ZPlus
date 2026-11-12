@@ -1,6 +1,6 @@
 use zgraphics
 
-start:
+start {
     let app = zgraphics.createWindow("ZGraphics runtime test", 320, 240)
     zgraphics.background(app, "#152030")
     zgraphics.text(app, "Interpreter smoke test", 12, 12, "#FFFFFF", 18)
@@ -12,11 +12,11 @@ start:
     zgraphics.resize(app, 320, 240)
     zgraphics.setTargetFPS(app, 0)
     zgraphics.update(app)
-    if zgraphics.isOpen(app) and zgraphics.deltaTimeMs(app) >= 0 and not zgraphics.keyDown(app, 65):
+    if zgraphics.isOpen(app) and zgraphics.deltaTimeMs(app) >= 0 and not zgraphics.keyDown(app, 65) {
         say("ZGraphics input and frame APIs passed")
-    else:
+    } else {
         say("ZGraphics input and frame APIs failed")
-    end
+    } end if
     zgraphics.close(app)
     say("ZGraphics interpreter integration passed")
-stop
+} stop

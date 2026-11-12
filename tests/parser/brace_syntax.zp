@@ -1,0 +1,48 @@
+fn calculate(a: number, b: number): number {
+    return a + b
+} end fn
+
+fn announce(name: string) {
+    say("hello " + name)
+} end fn
+
+fn report(values: number[]) {
+    for value in values {
+        if value > 7 {
+            say(value)
+        } end if
+    } end for
+} end fn
+
+start {
+    announce("Z+")
+    let score = calculate(10, 20)
+    if score >= 90 {
+        say("excellent")
+    } else if score >= 70 {
+        say("good")
+    } else {
+        say("needs improvement")
+    } end if
+
+    let running = true
+    while running {
+        running = false
+    } end while
+
+    for index in 0..3 {
+        say(index)
+    } end for
+
+    let values = [7, 8]
+    report(values)
+
+    switch score {
+        case 30 {
+            say("switch passed")
+        }
+        default {
+            say("switch failed")
+        }
+    } end switch
+} stop

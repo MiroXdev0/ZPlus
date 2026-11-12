@@ -1,8 +1,8 @@
-start:
-    if true:
+start {
+    if true {
         let hidden: number = 1
-    else:
+    } else {
         let hidden: number = 2
-    end
+    } end if
     say(hidden)
-stop
+} stop

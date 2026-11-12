@@ -1,4 +1,4 @@
-start:
+start {
     let value: number = 7
     value &= 3
     value ^= 1
@@ -17,9 +17,9 @@ start:
     let positive: number = +value
     let negative: number = -3
 
-    if value == 1 && value != 2 && value < 2 && value <= 1 && value > 0 && value >= 1 && inverse == -1 && positive == 1 && negative == -3 && negative < 0 && !false:
+    if value == 1 && value != 2 && value < 2 && value <= 1 && value > 0 && value >= 1 && inverse == -1 && positive == 1 && negative == -3 && negative < 0 && !false {
         say("operators passed")
-    else:
+    } else {
         say("operators failed")
-    end
-stop
+    } end if
+} stop

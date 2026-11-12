@@ -36,7 +36,8 @@ bool isStatementBoundary(TokenType type) {
         type == TokenType::End ||
         type == TokenType::Else ||
         type == TokenType::Catch ||
-        type == TokenType::Stop;
+        type == TokenType::Stop ||
+        type == TokenType::RightBrace;
 }
 
 bool isBlockTerminator(TokenType type) {
@@ -46,6 +47,25 @@ bool isBlockTerminator(TokenType type) {
         type == TokenType::Else ||
         type == TokenType::Stop ||
         type == TokenType::EndOfFile;
+}
+
+std::string blockName(TokenType type) {
+    switch (type) {
+        case TokenType::Fn: return "fn";
+        case TokenType::If: return "if";
+        case TokenType::While: return "while";
+        case TokenType::For: return "for";
+        case TokenType::Repeat: return "repeat";
+        case TokenType::Switch: return "switch";
+        case TokenType::Stop: return "stop";
+        case TokenType::Try: return "try";
+        case TokenType::Defer: return "defer";
+        case TokenType::Struct: return "struct";
+        case TokenType::Class: return "class";
+        case TokenType::Enum: return "enum";
+        case TokenType::Namespace: return "namespace";
+        default: return zplus::tokenTypeName(type);
+    }
 }
 
 std::string describeToken(const Token& token) {
@@ -389,6 +409,17 @@ Parser::parseStatement() {
         case TokenType::End:
             error("unexpected 'end'");
             advance();
+            if (current().type != TokenType::Newline &&
+                current().type != TokenType::EndOfFile) {
+                errorAt(current(), "unexpected block terminator 'end " +
+                    blockName(current().type) + "'");
+                advance();
+            }
+            return nullptr;
+
+        case TokenType::RightBrace:
+            error("unexpected closing brace '}'");
+            advance();
             return nullptr;
 
         case TokenType::Else:
@@ -537,50 +568,31 @@ Parser::parseStartBlock() {
         token
     );
 
-    consume(
-        TokenType::Colon,
-        "expected ':' after 'start'"
-    );
+    if (match(TokenType::LeftBrace)) {
+        const Token opening = previous();
+        statement->body = parseBracedBody(opening, "start");
+        consumeExplicitTerminator(TokenType::Stop, "start", opening);
+        return statement;
+    }
 
+    validateBlockSyntax(BlockSyntax::Legacy, token);
+    consume(TokenType::Colon, "expected '{' after 'start' (or ':' for legacy syntax)");
     skipNewlines();
-
-    while (
-        !isAtEnd() &&
-        !check(TokenType::Stop)
-    ) {
-
-        if (check(TokenType::End)) {
-
-            error(
-                "unexpected 'end'; use 'stop' to close 'start:'"
-            );
-
+    blockSyntaxStack_.push_back(BlockSyntax::Legacy);
+    while (!isAtEnd() && !check(TokenType::Stop)) {
+        if (check(TokenType::End) || check(TokenType::RightBrace)) {
+            error("unexpected block terminator inside legacy 'start:'; expected 'stop'");
             advance();
             skipNewlines();
             continue;
         }
-
-        auto child =
-            parseStatement();
-
-        if (child) {
-
-            statement->body.push_back(
-                std::move(child)
-            );
-
-        } else {
-
-            synchronize();
-        }
-
+        auto child = parseStatement();
+        if (child) statement->body.push_back(std::move(child));
+        else synchronize();
         skipNewlines();
     }
-
-    consume(
-        TokenType::Stop,
-        "expected 'stop' to close 'start:'"
-    );
+    blockSyntaxStack_.pop_back();
+    consume(TokenType::Stop, "expected 'stop' to close 'start:'");
 
     return statement;
 }
@@ -626,39 +638,56 @@ Parser::parseIfStatement() {
         return nullptr;
     }
 
-    consume(
-        TokenType::Colon,
-        "expected ':' after if condition"
-    );
+    if (match(TokenType::LeftBrace)) {
+        const Token opening = previous();
+        statement->thenBody = parseBracedBody(opening, "if", true);
+        auto* currentIf = statement.get();
 
-    skipNewlines();
+        while (match(TokenType::Else)) {
+            currentIf->hasElse = true;
+            if (match(TokenType::If)) {
+                const Token elseIfToken = previous();
+                auto elseIf = std::make_unique<zplus::ast::IfStatement>();
+                setLocation(*elseIf, elseIfToken);
+                elseIf->condition = parseCondition();
+                if (!elseIf->condition) return nullptr;
+                if (!match(TokenType::LeftBrace)) {
+                    error("expected '{' after else-if condition");
+                    return nullptr;
+                }
+                const Token elseIfOpening = previous();
+                elseIf->thenBody = parseBracedBody(elseIfOpening, "if", true);
+                currentIf->elseBody.push_back(std::move(elseIf));
+                currentIf = static_cast<zplus::ast::IfStatement*>(
+                    currentIf->elseBody.back().get());
+                continue;
+            }
 
-    statement->thenBody =
-        parseUntil(
-            TokenType::Else
-        );
+            if (!match(TokenType::LeftBrace)) {
+                error("expected '{' after 'else'");
+                return nullptr;
+            }
+            const Token elseOpening = previous();
+            currentIf->elseBody = parseBracedBody(elseOpening, "else branch");
+            break;
+        }
 
-    if (match(TokenType::Else)) {
-
-        statement->hasElse = true;
-
-        consume(
-            TokenType::Colon,
-            "expected ':' after 'else'"
-        );
-
-        skipNewlines();
-
-        statement->elseBody =
-            parseUntil(
-                TokenType::End
-            );
+        consumeExplicitTerminator(TokenType::If, "if", opening);
+        return statement;
     }
 
-    consume(
-        TokenType::End,
-        "expected 'end' after if"
-    );
+    validateBlockSyntax(BlockSyntax::Legacy, token);
+    consume(TokenType::Colon,
+        "expected '{' after if condition (or ':' for legacy syntax)");
+    skipNewlines();
+    statement->thenBody = parseUntil(TokenType::Else);
+    if (match(TokenType::Else)) {
+        statement->hasElse = true;
+        consume(TokenType::Colon, "expected ':' after 'else'");
+        skipNewlines();
+        statement->elseBody = parseUntil(TokenType::End);
+    }
+    consume(TokenType::End, "expected 'end' after if");
 
     return statement;
 }
@@ -693,22 +722,19 @@ Parser::parseWhileStatement() {
         return nullptr;
     }
 
-    consume(
-        TokenType::Colon,
-        "expected ':' after while condition"
-    );
+    if (match(TokenType::LeftBrace)) {
+        const Token opening = previous();
+        statement->body = parseBracedBody(opening, "while");
+        consumeExplicitTerminator(TokenType::While, "while", opening);
+        return statement;
+    }
 
+    validateBlockSyntax(BlockSyntax::Legacy, token);
+    consume(TokenType::Colon,
+        "expected '{' after while condition (or ':' for legacy syntax)");
     skipNewlines();
-
-    statement->body =
-        parseUntil(
-            TokenType::End
-        );
-
-    consume(
-        TokenType::End,
-        "expected 'end' after while"
-    );
+    statement->body = parseUntil(TokenType::End);
+    consume(TokenType::End, "expected 'end' after while");
 
     return statement;
 }
@@ -758,22 +784,19 @@ Parser::parseRepeatStatement() {
         "expected ')' after repeat count"
     );
 
-    consume(
-        TokenType::Colon,
-        "expected ':' after repeat count"
-    );
+    if (match(TokenType::LeftBrace)) {
+        const Token opening = previous();
+        statement->body = parseBracedBody(opening, "repeat");
+        consumeExplicitTerminator(TokenType::Repeat, "repeat", opening);
+        return statement;
+    }
 
+    validateBlockSyntax(BlockSyntax::Legacy, token);
+    consume(TokenType::Colon,
+        "expected '{' after repeat count (or ':' for legacy syntax)");
     skipNewlines();
-
-    statement->body =
-        parseUntil(
-            TokenType::End
-        );
-
-    consume(
-        TokenType::End,
-        "expected 'end' after repeat"
-    );
+    statement->body = parseUntil(TokenType::End);
+    consume(TokenType::End, "expected 'end' after repeat");
 
     return statement;
 }
@@ -828,6 +851,142 @@ Parser::parseForStatement() {
         *statement,
         token
     );
+
+    if (!check(TokenType::LeftParen)) {
+        if (!check(TokenType::Identifier)) {
+            error("expected loop variable or '(' after 'for'");
+            return nullptr;
+        }
+
+        const Token variableToken = advance();
+        if (!check(TokenType::Identifier) || current().value != "in") {
+            error("expected 'in' after for-loop variable");
+            return nullptr;
+        }
+        advance();
+
+        auto first = parseExpression();
+        if (!first) {
+            return nullptr;
+        }
+
+        auto makeIdentifier = [](const std::string& name, const Token& source) {
+            auto identifier = std::make_unique<zplus::ast::Identifier>(name);
+            setLocation(*identifier, source);
+            return identifier;
+        };
+        auto makeInternalName = [this](const char* prefix) {
+            while (true) {
+                const std::string candidate =
+                    std::string(prefix) + std::to_string(syntheticNameCounter_++);
+                bool exists = false;
+                for (const Token& existing : tokens_) {
+                    if (existing.type == TokenType::Identifier &&
+                        existing.value == candidate) {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists) return candidate;
+            }
+        };
+        auto makeDeclaration = [](const std::string& name,
+                                  std::unique_ptr<zplus::ast::Expression> initializer,
+                                  const Token& source) {
+            auto declaration =
+                std::make_unique<zplus::ast::VariableDeclaration>(name);
+            setLocation(*declaration, source);
+            declaration->initializer = std::move(initializer);
+            return declaration;
+        };
+        auto makeNumber = [](const std::string& value, const Token& source) {
+            auto literal = std::make_unique<zplus::ast::Literal>(
+                zplus::ast::Literal::Kind::Number, value);
+            literal->isNumber = true;
+            setLocation(*literal, source);
+            return literal;
+        };
+        auto makeIncrement = [&](const std::string& name) {
+            return std::make_unique<zplus::ast::UnaryExpression>(
+                TokenType::PlusPlus, makeIdentifier(name, variableToken), false,
+                zplus::ast::Location(variableToken.line, variableToken.column,
+                                     variableToken.sourceFile));
+        };
+
+        auto wrapper = std::make_unique<zplus::ast::BlockStatement>();
+        setLocation(*wrapper, token);
+        auto loop = std::make_unique<zplus::ast::ForStatement>();
+        setLocation(*loop, token);
+
+        if (match(TokenType::Range)) {
+            auto last = parseExpression();
+            if (!last) return nullptr;
+
+            const std::string firstName = makeInternalName("__zp_range_start_");
+            const std::string lastName = makeInternalName("__zp_range_end_");
+            wrapper->statements.push_back(
+                makeDeclaration(firstName, std::move(first), variableToken));
+            wrapper->statements.push_back(
+                makeDeclaration(lastName, std::move(last), variableToken));
+
+            loop->initializer = makeDeclaration(
+                variableToken.value, makeIdentifier(firstName, variableToken),
+                variableToken);
+            loop->condition = std::make_unique<zplus::ast::BinaryExpression>(
+                makeIdentifier(variableToken.value, variableToken),
+                TokenType::Less,
+                makeIdentifier(lastName, variableToken),
+                zplus::ast::Location(variableToken.line, variableToken.column,
+                                     variableToken.sourceFile));
+            loop->increment = makeIncrement(variableToken.value);
+        } else {
+            const std::string iterableName = makeInternalName("__zp_iterable_");
+            const std::string indexName = makeInternalName("__zp_index_");
+            wrapper->statements.push_back(
+                makeDeclaration(iterableName, std::move(first), variableToken));
+
+            loop->initializer = makeDeclaration(
+                indexName, makeNumber("0", variableToken), variableToken);
+            auto lengthCallee = std::make_unique<zplus::ast::Identifier>("length");
+            setLocation(*lengthCallee, variableToken);
+            auto lengthCall = std::make_unique<zplus::ast::CallExpression>(
+                std::move(lengthCallee));
+            setLocation(*lengthCall, variableToken);
+            lengthCall->arguments.push_back(
+                makeIdentifier(iterableName, variableToken));
+            loop->condition = std::make_unique<zplus::ast::BinaryExpression>(
+                makeIdentifier(indexName, variableToken), TokenType::Less,
+                std::move(lengthCall),
+                zplus::ast::Location(variableToken.line, variableToken.column,
+                                     variableToken.sourceFile));
+            loop->increment = std::make_unique<zplus::ast::UnaryExpression>(
+                TokenType::PlusPlus, makeIdentifier(indexName, variableToken), false,
+                zplus::ast::Location(variableToken.line, variableToken.column,
+                                     variableToken.sourceFile));
+
+            loop->body.push_back(makeDeclaration(
+                variableToken.value,
+                std::make_unique<zplus::ast::IndexExpression>(
+                    makeIdentifier(iterableName, variableToken),
+                    makeIdentifier(indexName, variableToken),
+                    zplus::ast::Location(variableToken.line, variableToken.column,
+                                         variableToken.sourceFile)),
+                variableToken));
+        }
+
+        if (!match(TokenType::LeftBrace)) {
+            error("expected '{' after for-in header");
+            return nullptr;
+        }
+        const Token opening = previous();
+        auto body = parseBracedBody(opening, "for");
+        consumeExplicitTerminator(TokenType::For, "for", opening);
+        for (auto& bodyStatement : body) {
+            loop->body.push_back(std::move(bodyStatement));
+        }
+        wrapper->statements.push_back(std::move(loop));
+        return wrapper;
+    }
 
     consume(
         TokenType::LeftParen,
@@ -971,22 +1130,19 @@ Parser::parseForStatement() {
         "expected ')' after for expression"
     );
 
-    consume(
-        TokenType::Colon,
-        "expected ':' after for expression"
-    );
+    if (match(TokenType::LeftBrace)) {
+        const Token opening = previous();
+        statement->body = parseBracedBody(opening, "for");
+        consumeExplicitTerminator(TokenType::For, "for", opening);
+        return statement;
+    }
 
+    validateBlockSyntax(BlockSyntax::Legacy, token);
+    consume(TokenType::Colon,
+        "expected '{' after for header (or ':' for legacy syntax)");
     skipNewlines();
-
-    statement->body =
-        parseUntil(
-            TokenType::End
-        );
-
-    consume(
-        TokenType::End,
-        "expected 'end' after for"
-    );
+    statement->body = parseUntil(TokenType::End);
+    consume(TokenType::End, "expected 'end' after for");
 
     return statement;
 }
@@ -1044,6 +1200,7 @@ Parser::parseFunction() {
     // -> number
     // --------------------------------------------------------
 
+    bool hasColonReturnType = false;
     if (match(TokenType::Arrow)) {
 
         function->returnType =
@@ -1052,24 +1209,35 @@ Parser::parseFunction() {
         if (!function->returnType) {
             return nullptr;
         }
+    } else if (check(TokenType::Colon) &&
+               (peek(1).type == TokenType::NumberType ||
+                peek(1).type == TokenType::StringType ||
+                peek(1).type == TokenType::CharacterType ||
+                peek(1).type == TokenType::BooleanType ||
+                peek(1).type == TokenType::VoidType ||
+                peek(1).type == TokenType::Identifier)) {
+        advance();
+        function->returnType = parseType();
+        if (!function->returnType) return nullptr;
+        hasColonReturnType = true;
     }
 
-    consume(
-        TokenType::Colon,
-        "expected ':' after function declaration"
-    );
+    if (match(TokenType::LeftBrace)) {
+        const Token opening = previous();
+        function->body = parseBracedBody(opening, "fn");
+        consumeExplicitTerminator(TokenType::Fn, "fn", opening);
+        return function;
+    }
 
+    validateBlockSyntax(BlockSyntax::Legacy, token);
+    if (hasColonReturnType) {
+        error("a function return type written with ':' must be followed by '{'");
+    }
+    consume(TokenType::Colon,
+        "expected '{' after function signature (or ':' for legacy syntax)");
     skipNewlines();
-
-    function->body =
-        parseUntil(
-            TokenType::End
-        );
-
-    consume(
-        TokenType::End,
-        "expected 'end' after function"
-    );
+    function->body = parseUntil(TokenType::End);
+    consume(TokenType::End, "expected 'end' after function");
 
     return function;
 }
@@ -1248,6 +1416,35 @@ Parser::parseTryStatement() {
     const Token token = advance();
     auto statement = std::make_unique<zplus::ast::TryStatement>();
     setLocation(*statement, token);
+
+    if (match(TokenType::LeftBrace)) {
+        const Token opening = previous();
+        statement->tryBody = parseBracedBody(opening, "try", false, true);
+        if (!match(TokenType::Catch)) {
+            error("expected 'catch' after closing brace of 'try' block opened at line " +
+                std::to_string(opening.line));
+            return statement;
+        }
+        const bool parenthesizedCatch = match(TokenType::LeftParen);
+        if (!check(TokenType::Identifier)) {
+            error("expected error variable name in 'catch'");
+            return nullptr;
+        }
+        statement->catchName = advance().value;
+        if (parenthesizedCatch) {
+            consume(TokenType::RightParen, "expected ')' after catch variable");
+        }
+        if (!match(TokenType::LeftBrace)) {
+            error("expected '{' after catch clause");
+            return nullptr;
+        }
+        const Token catchOpening = previous();
+        statement->catchBody = parseBracedBody(catchOpening, "catch");
+        consumeExplicitTerminator(TokenType::Try, "try", opening);
+        return statement;
+    }
+
+    validateBlockSyntax(BlockSyntax::Legacy, token);
     consume(TokenType::Colon, "expected ':' after 'try'");
     skipNewlines();
     statement->tryBody = parseUntil(TokenType::Catch);
@@ -1274,6 +1471,15 @@ Parser::parseDeferStatement() {
     const Token token = advance();
     auto statement = std::make_unique<zplus::ast::DeferStatement>();
     setLocation(*statement, token);
+
+    if (match(TokenType::LeftBrace)) {
+        const Token opening = previous();
+        statement->body = parseBracedBody(opening, "defer");
+        consumeExplicitTerminator(TokenType::Defer, "defer", opening);
+        return statement;
+    }
+
+    validateBlockSyntax(BlockSyntax::Legacy, token);
     consume(TokenType::Colon, "expected ':' after 'defer'");
     skipNewlines();
     statement->body = parseUntil(TokenType::End);
@@ -1409,6 +1615,7 @@ Parser::parseUntil(
         std::unique_ptr<zplus::ast::Statement>
     > statements;
 
+    blockSyntaxStack_.push_back(BlockSyntax::Legacy);
     skipNewlines();
 
     while (
@@ -1459,7 +1666,114 @@ Parser::parseUntil(
         skipNewlines();
     }
 
+    blockSyntaxStack_.pop_back();
     return statements;
+}
+
+void Parser::validateBlockSyntax(
+    BlockSyntax syntax,
+    const Token& opening
+) {
+    if (blockSyntaxStack_.empty() || blockSyntaxStack_.back() == syntax) {
+        return;
+    }
+
+    const std::string syntaxName = syntax == BlockSyntax::Braced
+        ? "brace-based"
+        : "legacy colon-based";
+    const std::string enclosingName = blockSyntaxStack_.back() == BlockSyntax::Braced
+        ? "brace-based"
+        : "legacy colon-based";
+    errorAt(opening, "cannot mix " + syntaxName +
+        " block syntax inside a " + enclosingName + " block");
+}
+
+std::vector<std::unique_ptr<zplus::ast::Statement>>
+Parser::parseBracedBody(
+    const Token& opening,
+    const std::string& name,
+    bool stopAtElse,
+    bool stopAtCatch
+) {
+    std::vector<std::unique_ptr<zplus::ast::Statement>> statements;
+    validateBlockSyntax(BlockSyntax::Braced, opening);
+    blockSyntaxStack_.push_back(BlockSyntax::Braced);
+    skipNewlines();
+
+    while (!isAtEnd() && !check(TokenType::RightBrace)) {
+        if ((stopAtElse && check(TokenType::Else)) ||
+            (stopAtCatch && check(TokenType::Catch))) {
+            break;
+        }
+        if (check(TokenType::End) || check(TokenType::Stop) ||
+            check(TokenType::Else) || check(TokenType::Catch)) {
+            errorAt(current(), "expected '}' to close '" + name +
+                "' block opened at line " + std::to_string(opening.line) +
+                " before " + describeToken(current()));
+            break;
+        }
+
+        auto statement = parseStatement();
+        if (statement) {
+            statements.push_back(std::move(statement));
+        } else {
+            synchronize();
+        }
+        skipNewlines();
+    }
+
+    if (check(TokenType::RightBrace)) {
+        advance();
+    } else {
+        errorAt(current(), "expected '}' to close '" + name +
+            "' block opened at line " + std::to_string(opening.line) +
+            "; found " + describeToken(current()));
+    }
+    blockSyntaxStack_.pop_back();
+    return statements;
+}
+
+void Parser::consumeExplicitTerminator(
+    TokenType expected,
+    const std::string& name,
+    const Token& opening
+) {
+    const std::string expectedText = expected == TokenType::Stop
+        ? "'stop'"
+        : "'end " + name + "'";
+    if (expected == TokenType::Stop) {
+        if (match(TokenType::Stop)) return;
+        error("expected " + expectedText + " to close '" + name +
+            "' block opened at line " + std::to_string(opening.line) +
+            "; found " + describeToken(current()));
+        return;
+    }
+
+    if (!match(TokenType::End)) {
+        error("expected " + expectedText + " after closing brace of '" +
+            name + "' block opened at line " + std::to_string(opening.line) +
+            "; found " + describeToken(current()));
+        return;
+    }
+
+    if (match(expected)) return;
+
+    if (current().type == TokenType::Fn || current().type == TokenType::If ||
+        current().type == TokenType::While || current().type == TokenType::For ||
+        current().type == TokenType::Repeat || current().type == TokenType::Switch ||
+        current().type == TokenType::Try || current().type == TokenType::Defer ||
+        current().type == TokenType::Struct || current().type == TokenType::Class ||
+        current().type == TokenType::Enum || current().type == TokenType::Namespace) {
+        const Token actual = advance();
+        errorAt(actual, "block opened as '" + name + "' at line " +
+            std::to_string(opening.line) + " was closed with 'end " +
+            blockName(actual.type) + "'; expected " + expectedText);
+        return;
+    }
+
+    error("expected " + expectedText + " after closing brace of '" +
+        name + "' block opened at line " + std::to_string(opening.line) +
+        "; found " + describeToken(current()));
 }
 
 // ============================================================
@@ -3134,9 +3448,63 @@ Parser::parseSwitchStatement() {
         return nullptr;
     }
 
+    if (match(TokenType::LeftBrace)) {
+        const Token opening = previous();
+        validateBlockSyntax(BlockSyntax::Braced, opening);
+        blockSyntaxStack_.push_back(BlockSyntax::Braced);
+        skipNewlines();
+        while (!isAtEnd() && !check(TokenType::RightBrace)) {
+            if (match(TokenType::Case)) {
+                const Token caseToken = previous();
+                auto caseNode = std::make_unique<zplus::ast::CaseStatement>();
+                setLocation(*caseNode, caseToken);
+                caseNode->value = parseExpression();
+                if (!caseNode->value) {
+                    synchronize();
+                    continue;
+                }
+                if (!match(TokenType::LeftBrace)) {
+                    error("expected '{' after switch case value");
+                    synchronize();
+                    continue;
+                }
+                const Token caseOpening = previous();
+                caseNode->body = parseBracedBody(caseOpening, "case");
+                statement->cases.push_back(std::move(caseNode));
+            } else if (match(TokenType::Default)) {
+                if (statement->hasDefault) {
+                    errorAt(previous(), "duplicate default clause in switch");
+                }
+                statement->hasDefault = true;
+                if (!match(TokenType::LeftBrace)) {
+                    error("expected '{' after 'default'");
+                    synchronize();
+                    continue;
+                }
+                const Token defaultOpening = previous();
+                statement->defaultBody = parseBracedBody(defaultOpening, "default");
+            } else {
+                error("expected 'case', 'default', or '}' in switch");
+                synchronize();
+            }
+            skipNewlines();
+        }
+        if (match(TokenType::RightBrace)) {
+            blockSyntaxStack_.pop_back();
+            consumeExplicitTerminator(TokenType::Switch, "switch", opening);
+        } else {
+            blockSyntaxStack_.pop_back();
+            errorAt(current(), "expected '}' to close 'switch' block opened at line " +
+                std::to_string(opening.line) + "; found " + describeToken(current()));
+            consumeExplicitTerminator(TokenType::Switch, "switch", opening);
+        }
+        return statement;
+    }
+
+    validateBlockSyntax(BlockSyntax::Legacy, token);
     consume(
         TokenType::Colon,
-        "expected ':' after switch expression"
+        "expected '{' after switch expression (or ':' for legacy syntax)"
     );
 
     skipNewlines();
@@ -3310,16 +3678,21 @@ Parser::parseStruct() {
 
     advance();
 
-    consume(
-        TokenType::Colon,
-        "expected ':' after struct name"
-    );
+    const bool braced = match(TokenType::LeftBrace);
+    const Token opening = braced ? previous() : token;
+    if (braced) {
+        validateBlockSyntax(BlockSyntax::Braced, opening);
+        blockSyntaxStack_.push_back(BlockSyntax::Braced);
+    } else {
+        validateBlockSyntax(BlockSyntax::Legacy, token);
+        consume(TokenType::Colon, "expected '{' after struct name");
+    }
 
     skipNewlines();
 
     while (
         !isAtEnd() &&
-        !check(TokenType::End)
+        !(braced ? check(TokenType::RightBrace) : check(TokenType::End))
     ) {
 
         if (!check(TokenType::Identifier)) {
@@ -3380,10 +3753,19 @@ Parser::parseStruct() {
         skipNewlines();
     }
 
-    consume(
-        TokenType::End,
-        "expected 'end' after struct"
-    );
+    if (braced) {
+        if (match(TokenType::RightBrace)) {
+            blockSyntaxStack_.pop_back();
+            consumeExplicitTerminator(TokenType::Struct, "struct", opening);
+        } else {
+            blockSyntaxStack_.pop_back();
+            errorAt(current(), "expected '}' to close 'struct' block opened at line " +
+                std::to_string(opening.line) + "; found " + describeToken(current()));
+            consumeExplicitTerminator(TokenType::Struct, "struct", opening);
+        }
+    } else {
+        consume(TokenType::End, "expected 'end' after struct");
+    }
 
     return declaration;
 }
@@ -3434,16 +3816,21 @@ Parser::parseClass() {
 
     advance();
 
-    consume(
-        TokenType::Colon,
-        "expected ':' after class name"
-    );
+    const bool braced = match(TokenType::LeftBrace);
+    const Token opening = braced ? previous() : token;
+    if (braced) {
+        validateBlockSyntax(BlockSyntax::Braced, opening);
+        blockSyntaxStack_.push_back(BlockSyntax::Braced);
+    } else {
+        validateBlockSyntax(BlockSyntax::Legacy, token);
+        consume(TokenType::Colon, "expected '{' after class name");
+    }
 
     skipNewlines();
 
     while (
         !isAtEnd() &&
-        !check(TokenType::End)
+        !(braced ? check(TokenType::RightBrace) : check(TokenType::End))
     ) {
 
         // ----------------------------------------------------
@@ -3539,10 +3926,19 @@ Parser::parseClass() {
         skipNewlines();
     }
 
-    consume(
-        TokenType::End,
-        "expected 'end' after class"
-    );
+    if (braced) {
+        if (match(TokenType::RightBrace)) {
+            blockSyntaxStack_.pop_back();
+            consumeExplicitTerminator(TokenType::Class, "class", opening);
+        } else {
+            blockSyntaxStack_.pop_back();
+            errorAt(current(), "expected '}' to close 'class' block opened at line " +
+                std::to_string(opening.line) + "; found " + describeToken(current()));
+            consumeExplicitTerminator(TokenType::Class, "class", opening);
+        }
+    } else {
+        consume(TokenType::End, "expected 'end' after class");
+    }
 
     return declaration;
 }
@@ -3591,16 +3987,21 @@ Parser::parseEnum() {
 
     advance();
 
-    consume(
-        TokenType::Colon,
-        "expected ':' after enum name"
-    );
+    const bool braced = match(TokenType::LeftBrace);
+    const Token opening = braced ? previous() : token;
+    if (braced) {
+        validateBlockSyntax(BlockSyntax::Braced, opening);
+        blockSyntaxStack_.push_back(BlockSyntax::Braced);
+    } else {
+        validateBlockSyntax(BlockSyntax::Legacy, token);
+        consume(TokenType::Colon, "expected '{' after enum name");
+    }
 
     skipNewlines();
 
     while (
         !isAtEnd() &&
-        !check(TokenType::End)
+        !(braced ? check(TokenType::RightBrace) : check(TokenType::End))
     ) {
 
         if (!check(TokenType::Identifier)) {
@@ -3661,10 +4062,19 @@ Parser::parseEnum() {
         skipNewlines();
     }
 
-    consume(
-        TokenType::End,
-        "expected 'end' after enum"
-    );
+    if (braced) {
+        if (match(TokenType::RightBrace)) {
+            blockSyntaxStack_.pop_back();
+            consumeExplicitTerminator(TokenType::Enum, "enum", opening);
+        } else {
+            blockSyntaxStack_.pop_back();
+            errorAt(current(), "expected '}' to close 'enum' block opened at line " +
+                std::to_string(opening.line) + "; found " + describeToken(current()));
+            consumeExplicitTerminator(TokenType::Enum, "enum", opening);
+        }
+    } else {
+        consume(TokenType::End, "expected 'end' after enum");
+    }
 
     return declaration;
 }
@@ -3706,22 +4116,17 @@ Parser::parseNamespace() {
 
     advance();
 
-    consume(
-        TokenType::Colon,
-        "expected ':' after namespace name"
-    );
-
-    skipNewlines();
-
-    declaration->body =
-        parseUntil(
-            TokenType::End
-        );
-
-    consume(
-        TokenType::End,
-        "expected 'end' after namespace"
-    );
+    if (match(TokenType::LeftBrace)) {
+        const Token opening = previous();
+        declaration->body = parseBracedBody(opening, "namespace");
+        consumeExplicitTerminator(TokenType::Namespace, "namespace", opening);
+    } else {
+        validateBlockSyntax(BlockSyntax::Legacy, token);
+        consume(TokenType::Colon, "expected '{' after namespace name");
+        skipNewlines();
+        declaration->body = parseUntil(TokenType::End);
+        consume(TokenType::End, "expected 'end' after namespace");
+    }
 
     return declaration;
 }
@@ -3818,6 +4223,7 @@ Parser::parseUse() {
         while (check(TokenType::Identifier) ||
                check(TokenType::Number) ||
                check(TokenType::Dot) ||
+               check(TokenType::Range) ||
                check(TokenType::Slash) ||
                check(TokenType::Backslash) ||
                check(TokenType::Minus)) {

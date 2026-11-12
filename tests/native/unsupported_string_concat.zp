@@ -1,4 +1,4 @@
-start:
+start {
     let combined: string = "native " + "backend"
     say(combined)
-stop
+} stop

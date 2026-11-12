@@ -459,6 +459,12 @@ void PlatformApplication::drawText(
     window.frameDirty = true;
 }
 
+void PlatformApplication::drawImage(
+    int, const std::string&, int, int, int, int
+) {
+    throw std::runtime_error("image drawing is supported only on Windows");
+}
+
 void PlatformApplication::drawLine(
     int id, int x1, int y1, int x2, int y2, Color color, int thickness
 ) {

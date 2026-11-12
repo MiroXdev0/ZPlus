@@ -1,19 +1,19 @@
-pub fn heapUsed() -> number:
+pub fn heapUsed(): number {
     return __zmemory_heapUsed()
-end
+} end fn
 
-pub fn heapObjects() -> number:
+pub fn heapObjects(): number {
     return __zmemory_heapObjects()
-end
+} end fn
 
-pub fn collect():
+pub fn collect() {
     __zmemory_collect()
-end
+} end fn
 
-pub fn collectionCount() -> number:
+pub fn collectionCount(): number {
     return __zmemory_collectionCount()
-end
+} end fn
 
-pub fn setThreshold(bytes: number):
+pub fn setThreshold(bytes: number) {
     __zmemory_setThreshold(bytes)
-end
+} end fn

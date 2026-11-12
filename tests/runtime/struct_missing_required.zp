@@ -1,8 +1,8 @@
-struct Pair:
+struct Pair {
     first: number
     second: number
-end
+} end struct
 
-start:
+start {
     let pair = Pair(1)
-stop
+} stop

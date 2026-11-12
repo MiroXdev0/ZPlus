@@ -1,6 +1,6 @@
 use zaudio
 
-if zaudio.deviceCount() > 0:
+if zaudio.deviceCount() > 0 {
     zaudio.initialize()
     let music = zaudio.loadMusic("tone.mp3")
     let effect = zaudio.loadSound("tone.wav")
@@ -17,6 +17,6 @@ if zaudio.deviceCount() > 0:
     zaudio.unloadAll()
     zaudio.shutdown()
     say("Audio native integration passed")
-else:
+} else {
     say("Audio native integration skipped: no playback device")
-end
+} end if

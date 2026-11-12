@@ -1,39 +1,39 @@
-pub fn upper(value: string) -> string:
+pub fn upper(value: string): string {
     return __zstdlib_string_upper(value)
-end
-pub fn lower(value: string) -> string:
+} end fn
+pub fn lower(value: string): string {
     return __zstdlib_string_lower(value)
-end
-pub fn trim(value: string) -> string:
+} end fn
+pub fn trim(value: string): string {
     return __zstdlib_string_trim(value)
-end
-pub fn split(value: string, delimiter: string) -> string[]:
+} end fn
+pub fn split(value: string, delimiter: string): string[] {
     return __zstdlib_string_split(value, delimiter)
-end
-pub fn join(values: string[], separator: string) -> string:
+} end fn
+pub fn join(values: string[], separator: string): string {
     return __zstdlib_string_join(values, separator)
-end
-pub fn replace(value: string, search: string, replacement: string) -> string:
+} end fn
+pub fn replace(value: string, search: string, replacement: string): string {
     return __zstdlib_string_replace(value, search, replacement)
-end
-pub fn contains(value: string, search: string) -> boolean:
+} end fn
+pub fn contains(value: string, search: string): boolean {
     return __zstdlib_string_contains(value, search)
-end
-pub fn startsWith(value: string, prefix: string) -> boolean:
+} end fn
+pub fn startsWith(value: string, prefix: string): boolean {
     return __zstdlib_string_startsWith(value, prefix)
-end
-pub fn endsWith(value: string, suffix: string) -> boolean:
+} end fn
+pub fn endsWith(value: string, suffix: string): boolean {
     return __zstdlib_string_endsWith(value, suffix)
-end
-pub fn substring(value: string, offset: number, size: number) -> string:
+} end fn
+pub fn substring(value: string, offset: number, size: number): string {
     return __zstdlib_string_substring(value, offset, size)
-end
-pub fn length(value: string) -> number:
+} end fn
+pub fn length(value: string): number {
     return __zstdlib_string_length(value)
-end
-pub fn reverse(value: string) -> string:
+} end fn
+pub fn reverse(value: string): string {
     return __zstdlib_string_reverse(value)
-end
-pub fn repeat(value: string, repetitions: number) -> string:
+} end fn
+pub fn repeat(value: string, repetitions: number): string {
     return __zstdlib_string_repeat(value, repetitions)
-end
+} end fn

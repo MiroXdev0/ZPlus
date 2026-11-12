@@ -1,3 +1,3 @@
-pub fn text() -> string:
+pub fn text(): string {
     return "ZBuild integration works\n"
-end
+} end fn

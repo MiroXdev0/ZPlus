@@ -41,19 +41,19 @@ The compiler copies `zgraphics_runtime.dll` beside the requested executable. Kee
 
 ## Z+ API
 
-Import the module with `use zgraphics`. Window handles are numeric IDs owned by the runtime's single graphics application. The `start:` example below is complete:
+Import the module with `use zgraphics`. Window handles are numeric IDs owned by the runtime's single graphics application. The `start { ... } stop` example below is complete:
 
 ```zp
 use zgraphics
 
-start:
+start {
     let app = zgraphics.createWindow("Z+ demo", 720, 420)
     zgraphics.background(app, "#18202B")
     zgraphics.text(app, "Hello from Z+", 32, 36, "#FFFFFF", 28)
     zgraphics.rectangle(app, 32, 100, 220, 70, "#2563EB", true, 1)
     zgraphics.show(app)
     zgraphics.run(app)
-stop
+} stop
 ```
 
 ### Window and drawing functions
@@ -89,16 +89,16 @@ Example continuous loop:
 ```zp
 use zgraphics
 
-start:
+start {
     let app = zgraphics.createWindow("Frame loop", 640, 360)
     zgraphics.show(app)
-    while zgraphics.isOpen(app):
+    while zgraphics.isOpen(app) {
         zgraphics.update(app)
-        if zgraphics.keyDown(app, 27):
+        if zgraphics.keyDown(app, 27) {
             zgraphics.close(app)
-        end
-    end
-stop
+        } end if
+    } end while
+} stop
 ```
 
 ### Events

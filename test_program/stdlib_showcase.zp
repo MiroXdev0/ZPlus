@@ -7,7 +7,7 @@ use zfile as file
 use zstring as text
 use zargs as args
 
-start:
+start {
     let outputDir: string = args.get(0)
     let userName: string = args.get(1)
     let displayName: string = text.upper(userName)
@@ -37,4 +37,4 @@ start:
     file.write(path.join(outputDir, "report.txt"), "Average: 25\nMath check: passed\nCollection check: passed\nRandom check: passed\nTime check: passed\n")
 
     say("Report written")
-stop
+} stop

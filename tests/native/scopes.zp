@@ -1,139 +1,139 @@
-fn shadowParameter(value: number) -> number:
-    if true:
+fn shadowParameter(value: number): number {
+    if true {
         let value: number = 9
-        if value == 9:
+        if value == 9 {
             say("parameter inner")
-        else:
+        } else {
             say("parameter inner failed")
-        end
-    else:
+        } end if
+    } else {
         say("parameter branch failed")
-    end
+    } end if
     return value
-end
+} end fn
 
-fn nestedShadow() -> number:
+fn nestedShadow(): number {
     let value: number = 10
-    if true:
+    if true {
         let value: number = 20
-        if true:
+        if true {
             let value: number = 30
-            if value == 30:
+            if value == 30 {
                 say("nested inner")
-            else:
+            } else {
                 say("nested inner failed")
-            end
-        else:
+            } end if
+        } else {
             say("nested branch failed")
-        end
-        if value == 20:
+        } end if
+        if value == 20 {
             say("nested scope retained")
-        else:
+        } else {
             say("nested scope failed")
-        end
+        } end if
         value = 40
-        if value == 40:
+        if value == 40 {
             say("inner assignment")
-        else:
+        } else {
             say("inner assignment failed")
-        end
-    else:
+        } end if
+    } else {
         say("outer branch failed")
-    end
-    if value == 10:
+    } end if
+    if value == 10 {
         say("outer retained")
-    else:
+    } else {
         say("outer overwritten")
-    end
+    } end if
     return value
-end
+} end fn
 
-start:
+start {
     let result: number = nestedShadow()
-    if result == 10:
+    if result == 10 {
         say("function outer retained")
-    else:
+    } else {
         say("function outer overwritten")
-    end
+    } end if
 
     let parameterResult: number = shadowParameter(7)
-    if parameterResult == 7:
+    if parameterResult == 7 {
         say("parameter retained")
-    else:
+    } else {
         say("parameter overwritten")
-    end
+    } end if
 
     let outer: number = 1
-    if true:
+    if true {
         outer = 2
-        if outer == 2:
+        if outer == 2 {
             say("outer assignment")
-        else:
+        } else {
             say("outer assignment failed")
-        end
-    else:
+        } end if
+    } else {
         say("assignment branch failed")
-    end
+    } end if
 
     let branchValue: number = 100
-    if true:
+    if true {
         let branchValue: number = 5
-        if branchValue == 5:
+        if branchValue == 5 {
             say("then binding")
-        else:
+        } else {
             say("then binding failed")
-        end
-    else:
+        } end if
+    } else {
         let branchValue: number = 6
-        if branchValue == 6:
+        if branchValue == 6 {
             say("else binding")
-        else:
+        } else {
             say("else binding failed")
-        end
-    end
-    if false:
+        } end if
+    } end if
+    if false {
         let branchValue: number = 7
         say("false branch binding failed")
-    else:
+    } else {
         let branchValue: number = 8
-        if branchValue == 8:
+        if branchValue == 8 {
             say("separate else binding")
-        else:
+        } else {
             say("separate else binding failed")
-        end
-    end
-    if branchValue == 100:
+        } end if
+    } end if
+    if branchValue == 100 {
         say("branch outer retained")
-    else:
+    } else {
         say("branch outer overwritten")
-    end
+    } end if
 
     let loopValue: number = 100
-    for (let i: number = 0; i < 2; i++):
+    for (let i: number = 0; i < 2; i++) {
         let loopValue: number = i + 1
-        if loopValue == i + 1:
+        if loopValue == i + 1 {
             say("loop binding")
-        else:
+        } else {
             say("loop binding failed")
-        end
-        if i == 0:
+        } end if
+        if i == 0 {
             let i: number = 8
-            if i == 8:
+            if i == 8 {
                 say("loop shadow")
-            else:
+            } else {
                 say("loop shadow failed")
-            end
-        else:
-            if i == 1:
+            } end if
+        } else {
+            if i == 1 {
                 say("loop variable retained")
-            else:
+            } else {
                 say("loop variable overwritten")
-            end
-        end
-    end
-    if loopValue == 100:
+            } end if
+        } end if
+    } end for
+    if loopValue == 100 {
         say("loop outer retained")
-    else:
+    } else {
         say("loop outer overwritten")
-    end
-stop
+    } end if
+} stop

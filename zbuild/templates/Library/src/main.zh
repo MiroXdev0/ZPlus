@@ -1,9 +1,9 @@
 use "utilities.zh" as utilities
 
-pub fn greeting(name: string) -> string:
+pub fn greeting(name: string): string {
     return "Hello, " + name + "!"
-end
+} end fn
 
-pub fn bounded(value: number, lower: number, upper: number) -> number:
+pub fn bounded(value: number, lower: number, upper: number): number {
     return utilities.clamp(value, lower, upper)
-end
+} end fn

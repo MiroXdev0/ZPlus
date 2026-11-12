@@ -5,7 +5,7 @@ use "game/game_state.zh" as game_state
 use "systems/input.zh" as input
 use "systems/collision.zh" as collision
 
-start:
+start {
     let app = zgraphics.createWindow("{{PROJECT_NAME}}", 720, 420)
     zgraphics.background(app, "#18202B")
     zgraphics.setTargetFPS(app, 60)
@@ -18,31 +18,31 @@ start:
     let score = 0
     let collected = false
 
-    while zgraphics.isOpen(app):
+    while zgraphics.isOpen(app) {
         zgraphics.update(app)
-        if zgraphics.keyPressed(app, 27):
+        if zgraphics.keyPressed(app, 27) {
             zgraphics.close(app)
-        else:
-        end
+        } else {
+        } end if
 
-        if zgraphics.isOpen(app):
+        if zgraphics.isOpen(app) {
             playerX = player.moveX(app, playerX, input.horizontal(app))
             playerY = player.moveY(app, playerY, input.vertical(app))
-            if not collected and collision.overlaps(playerX, playerY, 28, 28, coinX, coinY, 20, 20):
+            if not collected and collision.overlaps(playerX, playerY, 28, 28, coinX, coinY, 20, 20) {
                 collected = true
                 score += 1
-            else:
-            end
+            } else {
+            } end if
 
             zgraphics.clear(app)
             world.draw(app)
-            if not collected:
+            if not collected {
                 zgraphics.circle(app, coinX + 10, coinY + 10, 10, "#FACC15", true, 1)
-            else:
-            end
+            } else {
+            } end if
             player.draw(app, playerX, playerY)
             game_state.drawHud(app, score)
-        else:
-        end
-    end
-stop
+        } else {
+        } end if
+    } end while
+} stop

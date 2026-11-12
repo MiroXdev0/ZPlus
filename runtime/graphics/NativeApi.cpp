@@ -11,6 +11,7 @@
 #include "../Http.hpp"
 #include "../SQLite.hpp"
 #include "../NumericFormat.hpp"
+#include "../installer/Platform.hpp"
 
 #include <cstdint>
 #include <cstdio>
@@ -399,6 +400,17 @@ std::string checkedText(const char* value, const char* argument) {
     return decodeString(checkedString(value, argument));
 }
 
+std::vector<std::string> checkedStringArray(std::uintptr_t value) {
+    const ManagedNativeArray& array = checkedArray(value);
+    std::vector<std::string> result;
+    result.reserve(array.elements.size());
+    for (const std::uintptr_t element : array.elements) {
+        result.push_back(checkedText(
+            reinterpret_cast<const char*>(element), "process argument"));
+    }
+    return result;
+}
+
 std::int64_t checkedNativeInteger(double value, const char* operation) {
     if (!std::isfinite(value) || std::trunc(value) != value ||
         value < static_cast<double>(std::numeric_limits<std::int64_t>::min()) ||
@@ -662,6 +674,18 @@ ZPLUS_GRAPHICS_API std::int64_t zpg_drawText(
     });
 }
 
+ZPLUS_GRAPHICS_API std::int64_t zpg_drawImage(
+    std::int64_t window, const char* path, std::int64_t x, std::int64_t y,
+    std::int64_t width, std::int64_t height
+) noexcept {
+    return guardVoid([&] {
+        graphics().drawImage(
+            checkedInt(window, "window"), checkedString(path, "image path"),
+            checkedInt(x, "x"), checkedInt(y, "y"),
+            checkedInt(width, "width"), checkedInt(height, "height"));
+    });
+}
+
 ZPLUS_GRAPHICS_API std::int64_t zpg_drawLine(
     std::int64_t window, std::int64_t x1, std::int64_t y1, std::int64_t x2,
     std::int64_t y2, const char* value, std::int64_t thickness
@@ -706,7 +730,7 @@ ZPLUS_GRAPHICS_API std::int64_t zpg_pollEvent(std::int64_t window) noexcept {
     return guard<std::int64_t>([&] {
         const int id = checkedInt(window, "window");
         events[id] = graphics().pollEvent(id);
-        return static_cast<std::int64_t>(events[id].type);
+        return encodeNativeNumber(static_cast<double>(events[id].type));
     });
 }
 
@@ -714,7 +738,7 @@ ZPLUS_GRAPHICS_API std::int64_t zpg_waitEvent(std::int64_t window) noexcept {
     return guard<std::int64_t>([&] {
         const int id = checkedInt(window, "window");
         events[id] = graphics().waitEvent(id);
-        return static_cast<std::int64_t>(events[id].type);
+        return encodeNativeNumber(static_cast<double>(events[id].type));
     });
 }
 
@@ -1761,6 +1785,15 @@ ZPLUS_GRAPHICS_API std::int64_t zpg_stdlib_file_delete(const char* path) noexcep
     });
 }
 
+ZPLUS_GRAPHICS_API std::int64_t zpg_stdlib_file_scheduleDeleteOnReboot(
+    const char* path
+) noexcept {
+    return guard<std::int64_t>([&] {
+        return zplus::installer::scheduleFileRemovalOnReboot(
+            checkedText(path, "path")) ? std::int64_t{1} : std::int64_t{0};
+    });
+}
+
 ZPLUS_GRAPHICS_API std::int64_t zpg_stdlib_file_createDirectory(const char* path) noexcept {
     return guard<std::int64_t>([&] {
         return zplus::stdlib::fileCreateDirectory(checkedText(path, "path"))
@@ -2000,5 +2033,197 @@ ZPLUS_GRAPHICS_API std::int64_t zpg_shutdown() noexcept {
         zplus::sqlite::shutdownDatabases();
         events.clear();
         application.reset();
+    });
+}
+
+ZPLUS_GRAPHICS_API std::int64_t zpg_stdlib_file_copyFile(
+    const char* source, const char* destination, std::int64_t overwrite
+) noexcept {
+    return guard<std::int64_t>([&] {
+        if (overwrite != 0 && overwrite != 1) {
+            throw std::invalid_argument("overwrite must be a boolean");
+        }
+        return zplus::installer::copyFile(
+            checkedText(source, "source"), checkedText(destination, "destination"),
+            overwrite != 0) ? std::int64_t{1} : std::int64_t{0};
+    });
+}
+
+ZPLUS_GRAPHICS_API std::int64_t zpg_stdlib_file_moveFile(
+    const char* source, const char* destination, std::int64_t overwrite
+) noexcept {
+    return guard<std::int64_t>([&] {
+        if (overwrite != 0 && overwrite != 1) {
+            throw std::invalid_argument("overwrite must be a boolean");
+        }
+        return zplus::installer::moveFile(
+            checkedText(source, "source"), checkedText(destination, "destination"),
+            overwrite != 0) ? std::int64_t{1} : std::int64_t{0};
+    });
+}
+
+ZPLUS_GRAPHICS_API std::int64_t zpg_stdlib_file_removeEmptyDirectory(
+    const char* path
+) noexcept {
+    return guard<std::int64_t>([&] {
+        return zplus::installer::removeEmptyDirectory(
+            checkedText(path, "path")) ? std::int64_t{1} : std::int64_t{0};
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_stdlib_crypto_sha256File(
+    const char* path
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::installer::sha256File(
+            checkedText(path, "path")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_stdlib_process_run(
+    const char* executable, std::uintptr_t arguments,
+    const char* workingDirectory, std::int64_t timeout
+) noexcept {
+    return guard<const char*>([&] {
+        const auto milliseconds = checkedNativeInteger(
+            decodeNativeNumber(timeout), "process timeout");
+        return allocateManagedResult(zplus::installer::runProcess(
+            checkedText(executable, "executable"),
+            checkedStringArray(arguments),
+            checkedText(workingDirectory, "working directory"),
+            milliseconds));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_stdlib_system_platform() noexcept {
+    return guard<const char*>([] {
+        return allocateManagedResult(zplus::installer::platformName());
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_stdlib_system_architecture() noexcept {
+    return guard<const char*>([] {
+        return allocateManagedResult(zplus::installer::architecture());
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_stdlib_system_osVersion() noexcept {
+    return guard<const char*>([] {
+        return allocateManagedResult(zplus::installer::operatingSystemVersion());
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_stdlib_system_executablePath() noexcept {
+    return guard<const char*>([] {
+        return allocateManagedResult(zplus::installer::executablePath());
+    });
+}
+
+ZPLUS_GRAPHICS_API std::int64_t zpg_stdlib_system_availableSpace(
+    const char* path
+) noexcept {
+    return guard<std::int64_t>([&] {
+        return encodeNativeNumber(static_cast<double>(
+            zplus::installer::availableSpace(checkedText(path, "path"))));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_stdlib_system_selectFolder(
+    const char* title, const char* initialPath
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::installer::selectFolder(
+            checkedText(title, "title"), checkedText(initialPath, "initial path")));
+    });
+}
+
+ZPLUS_GRAPHICS_API std::int64_t zpg_stdlib_system_messageBox(
+    const char* title, const char* message, const char* buttons, const char* icon
+) noexcept {
+    return guard<std::int64_t>([&] {
+        return encodeNativeNumber(static_cast<double>(zplus::installer::messageBox(
+            checkedText(title, "title"), checkedText(message, "message"),
+            checkedText(buttons, "buttons"), checkedText(icon, "icon"))));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_stdlib_registry_read(
+    const char* keyPath, const char* valueName
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::installer::registryRead(
+            checkedText(keyPath, "key path"), checkedText(valueName, "value name")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_stdlib_registry_valueKind(
+    const char* keyPath, const char* valueName
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::installer::registryValueKind(
+            checkedText(keyPath, "key path"), checkedText(valueName, "value name")));
+    });
+}
+
+ZPLUS_GRAPHICS_API std::int64_t zpg_stdlib_registry_write(
+    const char* keyPath, const char* valueName, const char* value, const char* kind
+) noexcept {
+    return guard<std::int64_t>([&] {
+        return zplus::installer::registryWrite(
+            checkedText(keyPath, "key path"), checkedText(valueName, "value name"),
+            checkedText(value, "value"), checkedText(kind, "kind"))
+            ? std::int64_t{1} : std::int64_t{0};
+    });
+}
+
+ZPLUS_GRAPHICS_API std::int64_t zpg_stdlib_registry_deleteValue(
+    const char* keyPath, const char* valueName
+) noexcept {
+    return guard<std::int64_t>([&] {
+        return zplus::installer::registryDeleteValue(
+            checkedText(keyPath, "key path"), checkedText(valueName, "value name"))
+            ? std::int64_t{1} : std::int64_t{0};
+    });
+}
+
+ZPLUS_GRAPHICS_API std::int64_t zpg_stdlib_system_createShortcut(
+    const char* path, const char* target, const char* arguments,
+    const char* workingDirectory
+) noexcept {
+    return guard<std::int64_t>([&] {
+        return zplus::installer::createShortcut(
+            checkedText(path, "path"), checkedText(target, "target"),
+            checkedText(arguments, "arguments"),
+            checkedText(workingDirectory, "working directory"))
+            ? std::int64_t{1} : std::int64_t{0};
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_stdlib_system_shortcutTarget(
+    const char* path
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::installer::shortcutTarget(
+            checkedText(path, "path")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_stdlib_system_shortcutArguments(
+    const char* path
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::installer::shortcutArguments(
+            checkedText(path, "path")));
+    });
+}
+
+ZPLUS_GRAPHICS_API std::int64_t zpg_stdlib_system_removeShortcutIfMatches(
+    const char* path, const char* target, const char* arguments
+) noexcept {
+    return guard<std::int64_t>([&] {
+        return zplus::installer::removeShortcutIfMatches(
+            checkedText(path, "path"), checkedText(target, "target"),
+            checkedText(arguments, "arguments"))
+            ? std::int64_t{1} : std::int64_t{0};
     });
 }

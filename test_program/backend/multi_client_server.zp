@@ -1,43 +1,43 @@
 use zhttp as http
 use zjson as json
 
-start:
+start {
     let server = http.serverCreate("127.0.0.1", 8082)
     http.serverConfigure(server, 1048576, 30000)
     let serving = false
-    if http.serverStart(server):
+    if http.serverStart(server) {
         serving = true
         printz("Multi-client echo server listening on http://127.0.0.1:8082\n")
-    else:
+    } else {
         printz("Could not start multi-client server\n")
-    end
-    while serving:
+    } end if
+    while serving {
         let request = http.serverNext(server, 250)
-        if request != "":
+        if request != "" {
             let method = json.getString(request, "/method")
             let path = json.getString(request, "/path")
             let requestId = json.getNumber(request, "/id")
-            if method == "GET" and path == "/health":
+            if method == "GET" and path == "/health" {
                 http.serverRespond(server, requestId, 200, "{\"content-type\":\"text/plain; charset=utf-8\"}", "ok\n")
-            else:
-                if method == "POST" and path == "/echo":
+            } else {
+                if method == "POST" and path == "/echo" {
                     let clientId = http.requestHeader(request, "x-client-id")
                     let body = json.getString(request, "/body")
                     let response = "{\"clientId\":" + json.quote(clientId) + ",\"body\":" + json.quote(body) + "}"
                     http.serverRespond(server, requestId, 200, "{\"content-type\":\"application/json\"}", response)
-                else:
-                    if method == "POST" and path == "/__stop":
+                } else {
+                    if method == "POST" and path == "/__stop" {
                         http.serverRespond(server, requestId, 200, "{}", "stopping\n")
                         serving = false
-                    else:
+                    } else {
                         http.serverRespond(server, requestId, 404, "{}", "not found\n")
-                    end
-                end
-            end
-        else:
+                    } end if
+                } end if
+            } end if
+        } else {
             printz("")
-        end
-    end
+        } end if
+    } end while
 
     http.serverStop(server)
-stop
+} stop

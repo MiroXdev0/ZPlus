@@ -1,27 +1,27 @@
-pub fn abs(value: number) -> number:
-    if value < 0:
+pub fn abs(value: number): number {
+    if value < 0 {
         return -value
-    else:
+    } else {
         return value
-    end
-end
+    } end if
+} end fn
 
-pub fn min(left: number, right: number) -> number:
-    if left < right:
+pub fn min(left: number, right: number): number {
+    if left < right {
         return left
-    else:
+    } else {
         return right
-    end
-end
+    } end if
+} end fn
 
-pub fn max(left: number, right: number) -> number:
-    if left > right:
+pub fn max(left: number, right: number): number {
+    if left > right {
         return left
-    else:
+    } else {
         return right
-    end
-end
+    } end if
+} end fn
 
-pub fn clamp(value: number, lower: number, upper: number) -> number:
+pub fn clamp(value: number, lower: number, upper: number): number {
     return max(lower, min(value, upper))
-end
+} end fn

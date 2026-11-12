@@ -1,43 +1,43 @@
 let shared: number = 10
 
-fn zero() -> number:
+fn zero(): number {
     return 9
-end
+} end fn
 
-fn one(value: number) -> number:
+fn one(value: number): number {
     return value + 1
-end
+} end fn
 
-fn many(first: number, second: number, third: number, fourth: number, fifth: number, sixth: number, seventh: number, eighth: number, ninth: number) -> number:
+fn many(first: number, second: number, third: number, fourth: number, fifth: number, sixth: number, seventh: number, eighth: number, ninth: number): number {
     return first + second + third + fourth + fifth + sixth + seventh + eighth + ninth
-end
+} end fn
 
-fn withDefault(value: number, extra: number = 2) -> number:
+fn withDefault(value: number, extra: number = 2): number {
     return value + extra
-end
+} end fn
 
-fn nested(value: number) -> number:
+fn nested(value: number): number {
     return one(one(value))
-end
+} end fn
 
-fn recursive(value: number) -> number:
-    if value <= 1:
+fn recursive(value: number): number {
+    if value <= 1 {
         return 1
-    else:
+    } else {
         return value * recursive(value - 1)
-    end
-end
+    } end if
+} end fn
 
-fn fromGlobal(value: number) -> number:
+fn fromGlobal(value: number): number {
     return shared + value
-end
+} end fn
 
-fn fromLocal(value: number) -> number:
+fn fromLocal(value: number): number {
     let local: number = value * 2
     return local + zero()
-end
+} end fn
 
-start:
+start {
     say(zero())
     say(one(4))
     say(many(1, 2, 3, 4, 5, 6, 7, 8, 9))
@@ -49,8 +49,8 @@ start:
     say(fromLocal(2))
 
     let total: number = 0
-    for (let i: number = 0; i < 3; i++):
+    for (let i: number = 0; i < 3; i++) {
         total += one(i)
-    end
+    } end for
     say(total)
-stop
+} stop

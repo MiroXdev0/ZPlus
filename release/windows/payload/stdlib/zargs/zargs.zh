@@ -1,12 +1,12 @@
-pub fn count() -> number:
+pub fn count(): number {
     return __zstdlib_args_count()
-end
-pub fn get(index: number) -> string:
+} end fn
+pub fn get(index: number): string {
     return __zstdlib_args_get(index)
-end
-pub fn has(value: string) -> boolean:
+} end fn
+pub fn has(value: string): boolean {
     return __zstdlib_args_has(value)
-end
-pub fn all() -> string[]:
+} end fn
+pub fn all(): string[] {
     return __zstdlib_args_all()
-end
+} end fn

@@ -1,0 +1,15 @@
+pub fn readString(keyPath: string, valueName: string): string {
+    return __zstdlib_registry_read(keyPath, valueName)
+} end fn
+
+pub fn valueKind(keyPath: string, valueName: string): string {
+    return __zstdlib_registry_valueKind(keyPath, valueName)
+} end fn
+
+pub fn writeString(keyPath: string, valueName: string, value: string, kind: string): boolean {
+    return __zstdlib_registry_write(keyPath, valueName, value, kind)
+} end fn
+
+pub fn deleteValue(keyPath: string, valueName: string): boolean {
+    return __zstdlib_registry_deleteValue(keyPath, valueName)
+} end fn

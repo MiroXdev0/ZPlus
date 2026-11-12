@@ -6,20 +6,20 @@ ZGraphics and can run in interpreter or native programs.
 ```zp
 use zphysics
 
-start:
+start {
     let world = zphysics.createWorld(0, 980)
     let floor = zphysics.createBody(world, "static", 320, 420)
     zphysics.createBox(world, floor, 600, 20)
     let ball = zphysics.createBody(world, "dynamic", 320, 80)
     zphysics.createCircle(world, ball, 18)
 
-    for (let frame: number = 0; frame < 180; frame++):
+    for (let frame: number = 0; frame < 180; frame++) {
         zphysics.update(world, 1 / 60)
-    end
+    } end for
 
     say(zphysics.getPositionY(ball))
     zphysics.destroyWorld(world)
-stop
+} stop
 ```
 
 ## World lifecycle and stepping

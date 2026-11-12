@@ -1,0 +1,11 @@
+name = "Empty"
+description = "The smallest valid Z+ executable project."
+version = "1.0.0"
+required_zplus_version = "0.5.0"
+default_target_type = "executable"
+platforms = ["Windows", "Linux"]
+required_modules = []
+aliases = ["minimal"]
+configuration = ["backend=interpreter"]
+directories = ["src"]
+files = ["zproject.toml", "README.md", "src/main.zp"]

@@ -7,6 +7,6 @@
 
 namespace zplus::backend::native {
 
-std::vector<std::uint8_t> writePE(const NativeImage& image);
+std::vector<std::uint8_t> writePE(const NativeImage& image, bool windowsGui = false);
 
 } // namespace zplus::backend::native

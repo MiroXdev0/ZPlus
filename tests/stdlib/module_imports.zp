@@ -1,0 +1,27 @@
+use math as legacyMath
+use zargs
+use zaudio
+use zcollections
+use zcrypto
+use zenv
+use zfile
+use zfilesystem
+use zgraphics
+use zhttp
+use zjson
+use zlog
+use zmath
+use zmemory.management as managedMemory
+use zpath
+use zphysics
+use zprocess
+use zrandom
+use zregistry
+use zsqlite
+use zstring
+use zsystem
+use ztime
+
+start {
+    say("all standard-library modules imported")
+} stop

@@ -1,0 +1,176 @@
+pub fn createWindow(title: string, width: number, height: number) -> number:
+    return __zgraphics_createWindow(title, width, height)
+end
+
+pub fn numberText(value: number) -> string:
+    return __zgraphics_numberText(value)
+end
+
+pub fn setPosition(window: number, x: number, y: number):
+    __zgraphics_setPosition(window, x, y)
+end
+
+pub fn resize(window: number, width: number, height: number):
+    __zgraphics_resize(window, width, height)
+end
+
+pub fn setTitle(window: number, title: string):
+    __zgraphics_setTitle(window, title)
+end
+
+pub fn background(window: number, color: string):
+    __zgraphics_setBackground(window, color)
+end
+
+pub fn show(window: number):
+    __zgraphics_show(window)
+end
+
+pub fn hide(window: number):
+    __zgraphics_hide(window)
+end
+
+pub fn minimize(window: number):
+    __zgraphics_minimize(window)
+end
+
+pub fn maximize(window: number):
+    __zgraphics_maximize(window)
+end
+
+pub fn restore(window: number):
+    __zgraphics_restore(window)
+end
+
+pub fn focus(window: number):
+    __zgraphics_focus(window)
+end
+
+pub fn close(window: number):
+    __zgraphics_close(window)
+end
+
+pub fn isOpen(window: number) -> boolean:
+    return __zgraphics_isOpen(window)
+end
+
+pub fn run(window: number) -> number:
+    return __zgraphics_run(window)
+end
+
+pub fn text(window: number, value: string, x: number, y: number, color: string, size: number):
+    __zgraphics_drawText(window, value, x, y, color, size)
+end
+
+pub fn image(window: number, path: string, x: number, y: number, width: number, height: number):
+    __zgraphics_drawImage(window, path, x, y, width, height)
+end
+
+pub fn line(window: number, x1: number, y1: number, x2: number, y2: number, color: string, thickness: number):
+    __zgraphics_drawLine(window, x1, y1, x2, y2, color, thickness)
+end
+
+pub fn rectangle(window: number, x: number, y: number, width: number, height: number, color: string, filled: boolean, thickness: number):
+    __zgraphics_drawRectangle(window, x, y, width, height, color, filled, thickness)
+end
+
+pub fn circle(window: number, x: number, y: number, radius: number, color: string, filled: boolean, thickness: number):
+    __zgraphics_drawCircle(window, x, y, radius, color, filled, thickness)
+end
+
+pub fn clear(window: number):
+    __zgraphics_clear(window)
+end
+
+pub fn pollEvent(window: number) -> number:
+    return __zgraphics_pollEvent(window)
+end
+
+pub fn waitEvent(window: number) -> number:
+    return __zgraphics_waitEvent(window)
+end
+
+pub fn update(window: number):
+    __zgraphics_update(window)
+end
+
+pub fn setTargetFPS(window: number, targetFps: number):
+    __zgraphics_setTargetFPS(window, targetFps)
+end
+
+pub fn deltaTimeMs(window: number) -> number:
+    return __zgraphics_deltaTimeMs(window)
+end
+
+pub fn framesPerSecond(window: number) -> number:
+    return __zgraphics_framesPerSecond(window)
+end
+
+pub fn keyDown(window: number, key: number) -> boolean:
+    return __zgraphics_keyDown(window, key)
+end
+
+pub fn keyPressed(window: number, key: number) -> boolean:
+    return __zgraphics_keyPressed(window, key)
+end
+
+pub fn keyReleased(window: number, key: number) -> boolean:
+    return __zgraphics_keyReleased(window, key)
+end
+
+pub fn mouseX(window: number) -> number:
+    return __zgraphics_mouseX(window)
+end
+
+pub fn mouseY(window: number) -> number:
+    return __zgraphics_mouseY(window)
+end
+
+pub fn mouseButtonDown(window: number, button: number) -> boolean:
+    return __zgraphics_mouseButtonDown(window, button)
+end
+
+pub fn mouseButtonPressed(window: number, button: number) -> boolean:
+    return __zgraphics_mouseButtonPressed(window, button)
+end
+
+pub fn mouseButtonReleased(window: number, button: number) -> boolean:
+    return __zgraphics_mouseButtonReleased(window, button)
+end
+
+pub fn eventX(window: number) -> number:
+    return __zgraphics_eventX(window)
+end
+
+pub fn eventY(window: number) -> number:
+    return __zgraphics_eventY(window)
+end
+
+pub fn eventKey(window: number) -> number:
+    return __zgraphics_eventKey(window)
+end
+
+pub fn eventText(window: number) -> string:
+    return __zgraphics_eventText(window)
+end
+
+pub fn pointInRectangle(pointX: number, pointY: number, x: number, y: number, width: number, height: number) -> boolean:
+    return pointX >= x and pointY >= y and pointX < x + width and pointY < y + height
+end
+
+pub fn rectanglesIntersect(firstX: number, firstY: number, firstWidth: number, firstHeight: number, secondX: number, secondY: number, secondWidth: number, secondHeight: number) -> boolean:
+    return firstX < secondX + secondWidth and firstX + firstWidth > secondX and firstY < secondY + secondHeight and firstY + firstHeight > secondY
+end
+
+pub fn pointInCircle(pointX: number, pointY: number, centerX: number, centerY: number, radius: number) -> boolean:
+    let deltaX: number = pointX - centerX
+    let deltaY: number = pointY - centerY
+    return deltaX * deltaX + deltaY * deltaY <= radius * radius
+end
+
+pub fn circlesIntersect(firstX: number, firstY: number, firstRadius: number, secondX: number, secondY: number, secondRadius: number) -> boolean:
+    let deltaX: number = firstX - secondX
+    let deltaY: number = firstY - secondY
+    let combinedRadius: number = firstRadius + secondRadius
+    return deltaX * deltaX + deltaY * deltaY <= combinedRadius * combinedRadius
+end

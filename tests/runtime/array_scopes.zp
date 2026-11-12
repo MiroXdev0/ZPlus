@@ -1,7 +1,7 @@
 let values: number[] = [1, 2]
 
-start:
-    if true:
+start {
+    if true {
         let values: number[] = [3]
         values[0] = 4
         let nested: number[][] = [[5]]
@@ -10,18 +10,18 @@ start:
         say(nested[0][0])
         values = [7]
         say(values[0])
-    else:
+    } else {
         say(0)
-    end
+    } end if
 
     values[0] = 9
     say(values[0])
     say(length(values))
 
-    for (let iteration: number = 0; iteration < 2; iteration++):
+    for (let iteration: number = 0; iteration < 2; iteration++) {
         let current: number[] = [iteration]
         current[0] += 1
         say(current[0])
-    end
+    } end for
     say(values[0])
-stop
+} stop

@@ -1,10 +1,10 @@
 use math
 use "message.zh" as message
 
-start:
-    if math.clamp(22, 0, 10) == 10:
+start {
+    if math.clamp(22, 0, 10) == 10 {
         printz(message.text())
-    else:
+    } else {
         printz("Unexpected math result\n")
-    end
-stop
+    } end if
+} stop

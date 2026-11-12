@@ -1,12 +1,12 @@
 use zjson as json
 
-start:
+start {
     let payload = "{\"user\":{\"name\":\"Mira \\uD83D\\uDE80\",\"active\":true},\"items\":[3,{\"ok\":true}]}"
-    if json.valid(payload):
+    if json.valid(payload) {
         printz("json-valid\n")
-    else:
+    } else {
         printz("json-invalid\n")
-    end
+    } end if
     printz(json.getString(payload, "/user/name"), "\n")
     printz(json.get(payload, "/items/1"), "\n")
     printz(json.getBoolean(payload, "/user/active"), "\n")
@@ -15,9 +15,9 @@ start:
     printz(json.kind(payload, "/user"), "\n")
     printz(json.compact(" { \"n\" : 1 } "), "\n")
     printz(json.quote("a\"b"), "\n")
-    if not json.valid("{bad}"):
+    if not json.valid("{bad}") {
         printz("invalid-json-rejected\n")
-    else:
+    } else {
         printz("invalid-json-accepted\n")
-    end
-stop
+    } end if
+} stop

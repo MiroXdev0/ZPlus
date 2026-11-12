@@ -1,0 +1,9 @@
+use zstring as text
+
+start {
+    if text.contains(text.upper("z+"), "Z+") {
+        say("ZPLUS_RELEASE_VERIFY_OK")
+    } else {
+        say("ZPLUS_RELEASE_VERIFY_FAILED")
+    } end if
+} stop

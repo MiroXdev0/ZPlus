@@ -2,19 +2,19 @@ use zcollections as collections
 
 let globalValue: number = 2.5
 
-fn fractional(value: number, offset: number = 0.25) -> number:
+fn fractional(value: number, offset: number = 0.25): number {
     return value * 1.5 + offset
-end
+} end fn
 
-fn sumFive(a: number, b: number, c: number, d: number, e: number) -> number:
+fn sumFive(a: number, b: number, c: number, d: number, e: number): number {
     return a + b + c + d + e
-end
+} end fn
 
-fn mixed(first: number, label: string, second: number) -> number:
+fn mixed(first: number, label: string, second: number): number {
     return first + second
-end
+} end fn
 
-start:
+start {
     globalValue += 0.25
     say(globalValue)
     let arithmetic: number = fractional(2.0)
@@ -50,49 +50,49 @@ start:
     let inverse: number = ~0
     let positive: number = +value
     let negative: number = -3
-    if value == 1:
+    if value == 1 {
         say("eq")
-    else:
+    } else {
         say("eq-fail")
-    end
-    if value != 2:
+    } end if
+    if value != 2 {
         say("ne")
-    else:
+    } else {
         say("ne-fail")
-    end
-    if value < 2:
+    } end if
+    if value < 2 {
         say("lt")
-    else:
+    } else {
         say("lt-fail")
-    end
-    if value <= 1:
+    } end if
+    if value <= 1 {
         say("le")
-    else:
+    } else {
         say("le-fail")
-    end
-    if value > 0:
+    } end if
+    if value > 0 {
         say("gt")
-    else:
+    } else {
         say("gt-fail")
-    end
-    if value >= 1:
+    } end if
+    if value >= 1 {
         say("ge")
-    else:
+    } else {
         say("ge-fail")
-    end
-    if inverse == -1:
+    } end if
+    if inverse == -1 {
         say("inverse")
-    else:
+    } else {
         say("inverse-fail")
-    end
-    if positive == 1:
+    } end if
+    if positive == 1 {
         say("positive")
-    else:
+    } else {
         say("positive-fail")
-    end
-    if negative == -3 && negative < 0 && !false:
+    } end if
+    if negative == -3 && negative < 0 && !false {
         say("negative")
-    else:
+    } else {
         say("negative-fail")
-    end
-stop
+    } end if
+} stop

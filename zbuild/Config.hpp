@@ -29,6 +29,7 @@ struct ProjectConfig {
     std::string backend = "native";
     std::string mode = "debug";
     std::string outputDirectory = "build";
+    bool windowsGui = false;
     int optimization = 0;
     unsigned jobs = 0;
     std::string compiler;

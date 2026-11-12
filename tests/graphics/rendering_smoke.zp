@@ -1,6 +1,6 @@
 use zgraphics
 
-start:
+start {
     let app = zgraphics.createWindow("ZGraphics rendering smoke", 480, 300)
     let x: number = 24
     let direction: number = 1
@@ -10,31 +10,31 @@ start:
     zgraphics.background(app, "#102030")
     zgraphics.show(app)
 
-    while zgraphics.isOpen(app) and frame < 120:
+    while zgraphics.isOpen(app) and frame < 120 {
         zgraphics.update(app)
-        if zgraphics.keyDown(app, 27):
+        if zgraphics.keyDown(app, 27) {
             zgraphics.close(app)
-        else:
+        } else {
             zgraphics.clear(app)
             zgraphics.background(app, "#102030")
             zgraphics.rectangle(app, x, 96, 52, 52, "#22C55E", true, 1)
             zgraphics.text(app, "Buffered frame " + zgraphics.numberText(frame), 24, 28, "#F8FAFC", 20)
             x += direction * 5
-            if x >= 404:
+            if x >= 404 {
                 direction = -1
-            else:
-                if x <= 24:
+            } else {
+                if x <= 24 {
                     direction = 1
-                else:
-                end
-            end
+                } else {
+                } end if
+            } end if
             frame += 1
-        end
-    end
+        } end if
+    } end while
 
-    if zgraphics.isOpen(app):
+    if zgraphics.isOpen(app) {
         zgraphics.close(app)
-    else:
-    end
+    } else {
+    } end if
     say("ZGraphics buffered rendering smoke passed")
-stop
+} stop

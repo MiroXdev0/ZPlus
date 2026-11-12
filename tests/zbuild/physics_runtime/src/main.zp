@@ -1,13 +1,13 @@
 use zphysics
 
-start:
+start {
     let world = zphysics.createWorld(0, 0)
     let body = zphysics.createBody(world, "static", 10, 10)
     zphysics.createBox(world, body, 4, 4)
-    if zphysics.raycast(world, 0, 10, 20, 10) == body:
+    if zphysics.raycast(world, 0, 10, 20, 10) == body {
         say("ZBuild physics integration passed")
-    else:
+    } else {
         say("ZBuild physics integration failed")
-    end
+    } end if
     zphysics.destroyWorld(world)
-stop
+} stop

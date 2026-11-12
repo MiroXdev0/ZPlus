@@ -2,47 +2,47 @@ use zmemory.management
 
 let shared: string = "global" + " string"
 
-fn decorate(value: string) -> string:
+fn decorate(value: string): string {
     return value + "!"
-end
+} end fn
 
-fn makeTransient(value: string) -> string:
+fn makeTransient(value: string): string {
     return decorate(value) + "?"
-end
+} end fn
 
-fn readShared() -> string:
+fn readShared(): string {
     return shared
-end
+} end fn
 
-fn exerciseActiveRoot(value: string) -> string:
+fn exerciseActiveRoot(value: string): string {
     zmemory.setThreshold(1024)
     let result: string = value + "!"
-    for (let i: number = 0; i < 5000; i++):
+    for (let i: number = 0; i < 5000; i++) {
         let churn: string = "a" + "b"
-    end
+    } end for
     return result
-end
+} end fn
 
-start:
+start {
     let transient: string = makeTransient("managed")
-    if zmemory.heapObjects() > 0:
+    if zmemory.heapObjects() > 0 {
         say("native managed string allocated")
-    else:
+    } else {
         say("native managed string missing")
-    end
+    } end if
     say(transient)
     transient = "released"
     zmemory.collect()
     say(readShared())
-    if zmemory.heapObjects() == 1:
+    if zmemory.heapObjects() == 1 {
         say("native managed string reclaimed")
-    else:
+    } else {
         say("native managed string retained")
-    end
+    } end if
     say(exerciseActiveRoot(readShared()))
-    if zmemory.collectionCount() > 0:
+    if zmemory.collectionCount() > 0 {
         say("native collection completed")
-    else:
+    } else {
         say("native collection missing")
-    end
-stop
+    } end if
+} stop

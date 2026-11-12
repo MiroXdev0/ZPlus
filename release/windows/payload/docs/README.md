@@ -36,16 +36,20 @@ Import `.zh` declarations with a module-relative `use`. Modules are private by d
 ```zp
 use "stdlib/math/math.zh" as math
 
-start:
+start {
     say(math.clamp(22, 0, 10))
-stop
+} stop
 ```
 
 Paths are resolved relative to the file containing each `use`, not the process working directory. Imports can nest and repeated references to the same canonical file load it once. Absolute module paths are denied. Imported `.zh` files contain declarations and cannot contain a `start` block or executable top-level statements. See [MODULES.md](./MODULES.md) for graph behavior, visibility, diagnostics, and limitations.
 
 ## Standard library
 
-The initial source library is in [stdlib/](./stdlib/). Its implemented math module provides `abs`, `min`, `max`, and `clamp`. These are ordinary Z+ functions, not compiler built-ins. Text, collection, file I/O, and system APIs are not published until the compiler has reliable language/runtime primitives for them; see [stdlib/README.md](./stdlib/README.md).
+The standard library in [stdlib/](./stdlib/) includes math, strings,
+collections, file/path/system APIs, JSON, HTTP, SQLite, graphics, audio,
+physics, and installer integrations. Backend and platform support varies by
+module; see [stdlib/README.md](./stdlib/README.md) for the API inventory and
+limitations.
 
 ## ZGraphics
 

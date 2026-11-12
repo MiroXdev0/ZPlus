@@ -1,0 +1,5 @@
+start {
+    if true {
+        say("never run")
+    } end while
+} stop

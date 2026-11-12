@@ -1,0 +1,11 @@
+name = "Game"
+description = "Interactive ZGraphics game with keyboard movement, collision, and modular game logic."
+version = "1.0.0"
+required_zplus_version = "0.5.0"
+default_target_type = "executable"
+platforms = ["Windows (interpreter or native)", "Linux (interpreter with X11)"]
+required_modules = ["zgraphics"]
+aliases = ["2d"]
+configuration = ["backend=interpreter"]
+directories = ["src/game", "src/systems", "assets/textures", "assets/audio", "assets/fonts", "tests"]
+files = ["zproject.toml", "README.md", "src/main.zp", "src/game/player.zh", "src/game/world.zh", "src/game/game_state.zh", "src/systems/input.zh", "src/systems/collision.zh"]

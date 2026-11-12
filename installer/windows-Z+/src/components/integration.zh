@@ -1,0 +1,142 @@
+use zcrypto as crypto
+use zenv as env
+use zfile as file
+use zfilesystem as filesystem
+use zpath as path
+use zregistry as registry
+use zstring as text
+use zsystem as system
+
+fn integrationSamePath(left: string, right: string): boolean {
+    let first = text.lower(text.trim(path.normalize(left)))
+    let second = text.lower(text.trim(path.normalize(right)))
+    return text.length(first) == text.length(second) and text.contains(first, second)
+} end fn
+
+fn integrationSameValue(left: string, right: string): boolean {
+    let first = text.lower(text.trim(left))
+    let second = text.lower(text.trim(right))
+    return text.length(first) == text.length(second) and text.contains(first, second)
+} end fn
+
+fn hasPathEntry(currentPath: string, target: string): boolean {
+    let entries = text.split(currentPath, ";")
+    for (let index: number = 0; index < length(entries); index++) {
+        if integrationSamePath(entries[index], target) {
+            return true
+        } end if
+    } end for
+    return false
+} end fn
+
+pub fn addPathEntry(currentPath: string, target: string): string {
+    if hasPathEntry(currentPath, target) {
+        return currentPath
+    } end if
+    if text.length(currentPath) == 0 {
+        return target
+    } end if
+    return currentPath + ";" + target
+} end fn
+
+pub fn removePathEntry(currentPath: string, target: string): string {
+    let result = ";" + currentPath + ";"
+    result = text.replace(result, ";" + target + ";", ";")
+    if text.length(result) > 0 and text.startsWith(result, ";") {
+        result = text.substring(result, 1, text.length(result) - 1)
+    } end if
+    if text.length(result) > 0 and text.endsWith(result, ";") {
+        result = text.substring(result, 0, text.length(result) - 1)
+    } end if
+    return result
+} end fn
+
+pub fn configure(installDirectory: string, installerExecutable: string): string {
+    let executable = path.join(installDirectory, "uninstall.exe")
+    let hash = crypto.sha256File(installerExecutable)
+    if not filesystem.copyFile(installerExecutable, executable, false) {
+        return "Could not install the uninstaller executable."
+    } end if
+    if not integrationSameValue(crypto.sha256File(executable), hash) {
+        filesystem.deleteFile(executable)
+        return "The uninstaller failed its SHA-256 integrity check."
+    } end if
+    file.append(path.join(installDirectory, ".zplus-install-manifest.tsv"), "uninstall.exe\t" + hash + "\n")
+
+    let metadata = path.join(installDirectory, ".zplus-integration-manifest.txt")
+    file.write(metadata, "")
+    let bin = path.join(installDirectory, "bin")
+    let currentPath = registry.readString("Environment", "Path")
+    if not hasPathEntry(currentPath, bin) {
+        let kind = registry.valueKind("Environment", "Path")
+        let writeKind = "expandString"
+        if text.length(kind) > 0 {
+            writeKind = kind
+        } end if
+        let updatedPath = addPathEntry(currentPath, bin)
+        if not registry.writeString("Environment", "Path", updatedPath, writeKind) {
+            return "Could not add the Z+ compiler directory to the current-user PATH."
+        } end if
+        file.append(metadata, "PATH_ADDED\n")
+    } end if
+
+    let extensionKey = "Software\\Classes\\.zp"
+    let progId = "ZPlus.Source"
+    let commandKey = "Software\\Classes\\ZPlus.Source\\shell\\open\\command"
+    let existingExtension = registry.readString(extensionKey, "")
+    let existingCommand = registry.readString(commandKey, "")
+    if text.length(existingExtension) == 0 and text.length(existingCommand) == 0 {
+        if registry.writeString(extensionKey, "", progId, "string") and registry.writeString(commandKey, "", "notepad.exe \"%1\"", "string") {
+            file.append(metadata, "ASSOCIATION_ADDED\n")
+        } else {
+            registry.deleteValue(extensionKey, "")
+            return "Could not register the safe .zp source-file association."
+        } end if
+    } end if
+
+    let startMenu = path.join(env.get("APPDATA"), "Microsoft\\Windows\\Start Menu\\Programs\\Z+")
+    let shortcut = path.join(startMenu, "Uninstall Z+.lnk")
+    if not filesystem.exists(shortcut) {
+        filesystem.createDirectory(startMenu)
+        if system.createShortcut(shortcut, executable, "--uninstall", installDirectory) {
+            file.append(metadata, "SHORTCUT_ADDED\n")
+        } end if
+    } end if
+    return ""
+} end fn
+
+pub fn remove(installDirectory: string): string {
+    let metadata = path.join(installDirectory, ".zplus-integration-manifest.txt")
+    if not file.exists(metadata) {
+        return ""
+    } end if
+    let records = file.read(metadata)
+    let bin = path.join(installDirectory, "bin")
+    if text.contains(records, "PATH_ADDED") {
+        let currentPath = registry.readString("Environment", "Path")
+        let updatedPath = removePathEntry(currentPath, bin)
+        if not integrationSameValue(currentPath, updatedPath) {
+            let kind = registry.valueKind("Environment", "Path")
+            if text.length(kind) == 0 {
+                kind = "expandString"
+            } end if
+            if not registry.writeString("Environment", "Path", updatedPath, kind) {
+                return "Could not remove the Z+ PATH entry; it was left unchanged."
+            } end if
+        } end if
+    } end if
+    if text.contains(records, "ASSOCIATION_ADDED") {
+        if integrationSameValue(registry.readString("Software\\Classes\\.zp", ""), "ZPlus.Source") {
+            registry.deleteValue("Software\\Classes\\.zp", "")
+        } end if
+        if integrationSameValue(registry.readString("Software\\Classes\\ZPlus.Source\\shell\\open\\command", ""), "notepad.exe \"%1\"") {
+            registry.deleteValue("Software\\Classes\\ZPlus.Source\\shell\\open\\command", "")
+        } end if
+    } end if
+    if text.contains(records, "SHORTCUT_ADDED") {
+        let shortcut = path.join(path.join(env.get("APPDATA"), "Microsoft\\Windows\\Start Menu\\Programs\\Z+"), "Uninstall Z+.lnk")
+        system.removeShortcutIfMatches(shortcut, path.join(installDirectory, "uninstall.exe"), "--uninstall")
+    } end if
+    file.delete(metadata)
+    return ""
+} end fn

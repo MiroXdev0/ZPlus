@@ -177,6 +177,7 @@ enum class TokenType {
     Comma,
     Colon,
     Dot,
+    Range,
     Semicolon,
 
 

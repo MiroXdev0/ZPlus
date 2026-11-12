@@ -1,11 +1,14 @@
-start:
+start {
     let value: number = 3
-    switch value:
-        case 1:
+    switch value {
+        case 1 {
             say("switch failed")
-        case 3:
+        }
+        case 3 {
             say("switch passed")
-        default:
+        }
+        default {
             say("switch failed")
-    end
-stop
+    }
+    } end switch
+} stop

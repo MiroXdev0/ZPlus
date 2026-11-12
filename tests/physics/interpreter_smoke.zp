@@ -1,16 +1,16 @@
 use zphysics
 
-start:
+start {
     let world = zphysics.createWorld(0, 9.8)
     let floor = zphysics.createBody(world, "static", 10, 20)
     zphysics.createBox(world, floor, 20, 2)
     let body = zphysics.createBody(world, "dynamic", 10, 0)
     zphysics.createCircle(world, body, 1)
     zphysics.update(world, 0.1)
-    if zphysics.getPositionY(body) > 0 and zphysics.pointQuery(world, 10, 20) == 1:
+    if zphysics.getPositionY(body) > 0 and zphysics.pointQuery(world, 10, 20) == 1 {
         say("ZPhysics interpreter integration passed")
-    else:
+    } else {
         say("ZPhysics interpreter integration failed")
-    end
+    } end if
     zphysics.destroyWorld(world)
-stop
+} stop

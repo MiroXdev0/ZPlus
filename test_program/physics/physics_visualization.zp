@@ -1,7 +1,7 @@
 use zphysics
 use zgraphics
 
-start:
+start {
     let window = zgraphics.createWindow("ZPhysics visualization", 640, 480)
     zgraphics.background(window, "#101820")
     zgraphics.setTargetFPS(window, 60)
@@ -15,13 +15,13 @@ start:
     let block = zphysics.createBody(world, "dynamic", 360, 40)
     zphysics.createBox(world, block, 42, 42)
 
-    while zgraphics.isOpen(window):
+    while zgraphics.isOpen(window) {
         zgraphics.update(window)
-        if zgraphics.keyDown(window, 27):
+        if zgraphics.keyDown(window, 27) {
             zgraphics.close(window)
-        else:
-        end
-        if zgraphics.isOpen(window):
+        } else {
+        } end if
+        if zgraphics.isOpen(window) {
             let delta = zgraphics.deltaTimeMs(window) / 1000
             zphysics.update(world, delta)
             zgraphics.clear(window)
@@ -36,10 +36,10 @@ start:
             zgraphics.circle(window, ballX, ballY, 22, "#4CC9F0", false, 2)
             zgraphics.rectangle(window, blockX - 21, blockY - 21, 42, 42, "#F4A261", false, 2)
             zgraphics.text(window, status, 16, 16, "#FFFFFF", 16)
-        else:
-        end
-    end
+        } else {
+        } end if
+    } end while
 
     zphysics.destroyWorld(world)
     zgraphics.close(window)
-stop
+} stop

@@ -1,58 +1,58 @@
-pub fn pi() -> number:
+pub fn pi(): number {
     return __zstdlib_math_pi()
-end
-pub fn e() -> number:
+} end fn
+pub fn e(): number {
     return __zstdlib_math_e()
-end
+} end fn
 
-pub fn sqrt(value: number) -> number:
+pub fn sqrt(value: number): number {
     return __zstdlib_math_sqrt(value)
-end
-pub fn pow(base: number, exponent: number) -> number:
+} end fn
+pub fn pow(base: number, exponent: number): number {
     return __zstdlib_math_pow(base, exponent)
-end
-pub fn abs(value: number) -> number:
+} end fn
+pub fn abs(value: number): number {
     return __zstdlib_math_abs(value)
-end
-pub fn min(left: number, right: number) -> number:
+} end fn
+pub fn min(left: number, right: number): number {
     return __zstdlib_math_min(left, right)
-end
-pub fn max(left: number, right: number) -> number:
+} end fn
+pub fn max(left: number, right: number): number {
     return __zstdlib_math_max(left, right)
-end
-pub fn round(value: number) -> number:
+} end fn
+pub fn round(value: number): number {
     return __zstdlib_math_round(value)
-end
-pub fn floor(value: number) -> number:
+} end fn
+pub fn floor(value: number): number {
     return __zstdlib_math_floor(value)
-end
-pub fn ceil(value: number) -> number:
+} end fn
+pub fn ceil(value: number): number {
     return __zstdlib_math_ceil(value)
-end
-pub fn sin(value: number) -> number:
+} end fn
+pub fn sin(value: number): number {
     return __zstdlib_math_sin(value)
-end
-pub fn cos(value: number) -> number:
+} end fn
+pub fn cos(value: number): number {
     return __zstdlib_math_cos(value)
-end
-pub fn tan(value: number) -> number:
+} end fn
+pub fn tan(value: number): number {
     return __zstdlib_math_tan(value)
-end
-pub fn asin(value: number) -> number:
+} end fn
+pub fn asin(value: number): number {
     return __zstdlib_math_asin(value)
-end
-pub fn acos(value: number) -> number:
+} end fn
+pub fn acos(value: number): number {
     return __zstdlib_math_acos(value)
-end
-pub fn atan(value: number) -> number:
+} end fn
+pub fn atan(value: number): number {
     return __zstdlib_math_atan(value)
-end
-pub fn log(value: number) -> number:
+} end fn
+pub fn log(value: number): number {
     return __zstdlib_math_log(value)
-end
-pub fn log10(value: number) -> number:
+} end fn
+pub fn log10(value: number): number {
     return __zstdlib_math_log10(value)
-end
-pub fn exp(value: number) -> number:
+} end fn
+pub fn exp(value: number): number {
     return __zstdlib_math_exp(value)
-end
+} end fn

@@ -1,39 +1,39 @@
-pub fn valid(source: string) -> boolean:
+pub fn valid(source: string): boolean {
     return __zjson_valid(source)
-end
+} end fn
 
-pub fn compact(source: string) -> string:
+pub fn compact(source: string): string {
     return __zjson_compact(source)
-end
+} end fn
 
-pub fn quote(value: string) -> string:
+pub fn quote(value: string): string {
     return __zjson_quote(value)
-end
+} end fn
 
-pub fn get(source: string, pointer: string) -> string:
+pub fn get(source: string, pointer: string): string {
     return __zjson_get(source, pointer)
-end
+} end fn
 
-pub fn getString(source: string, pointer: string) -> string:
+pub fn getString(source: string, pointer: string): string {
     return __zjson_getString(source, pointer)
-end
+} end fn
 
-pub fn getNumber(source: string, pointer: string) -> number:
+pub fn getNumber(source: string, pointer: string): number {
     return __zjson_getNumber(source, pointer)
-end
+} end fn
 
-pub fn getBoolean(source: string, pointer: string) -> boolean:
+pub fn getBoolean(source: string, pointer: string): boolean {
     return __zjson_getBoolean(source, pointer)
-end
+} end fn
 
-pub fn arrayLength(source: string, pointer: string) -> number:
+pub fn arrayLength(source: string, pointer: string): number {
     return __zjson_arrayLength(source, pointer)
-end
+} end fn
 
-pub fn arrayGet(source: string, pointer: string, index: number) -> string:
+pub fn arrayGet(source: string, pointer: string, index: number): string {
     return __zjson_arrayGet(source, pointer, index)
-end
+} end fn
 
-pub fn kind(source: string, pointer: string) -> string:
+pub fn kind(source: string, pointer: string): string {
     return __zjson_kind(source, pointer)
-end
+} end fn

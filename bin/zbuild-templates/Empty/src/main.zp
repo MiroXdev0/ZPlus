@@ -1,3 +1,3 @@
-start:
+start {
     printz("{{PROJECT_NAME}} is ready.\n")
-stop
+} stop

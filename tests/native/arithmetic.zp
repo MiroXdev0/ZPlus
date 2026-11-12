@@ -1,9 +1,9 @@
-start:
+start {
     let value: number = (9 + 3) * 4 - 6
     let result: number = value / 2
-    if result == 21:
+    if result == 21 {
         say("arithmetic passed")
-    else:
+    } else {
         say("arithmetic failed")
-    end
-stop
+    } end if
+} stop

@@ -1,5 +1,5 @@
 use zstring as text
 
-start:
+start {
     let parts: string[] = text.split("a,b", "")
-stop
+} stop

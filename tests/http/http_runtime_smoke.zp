@@ -1,24 +1,24 @@
 use zhttp as http
 
-start:
+start {
     let server = http.serverCreate("127.0.0.1", 0)
-    if http.serverStart(server):
+    if http.serverStart(server) {
         printz("http-started\n")
-    else:
+    } else {
         printz("http-start-failed\n")
-    end
-    if http.serverPort(server) > 0:
+    } end if
+    if http.serverPort(server) > 0 {
         printz("http-port-assigned\n")
-    else:
+    } else {
         printz("http-port-missing\n")
-    end
-    if http.serverRunning(server):
+    } end if
+    if http.serverRunning(server) {
         printz("http-running\n")
-    else:
+    } else {
         printz("http-not-running\n")
-    end
+    } end if
     http.serverNext(server, 1)
     printz("http-poll-completed\n")
     http.serverStop(server)
     printz("http-stopped\n")
-stop
+} stop

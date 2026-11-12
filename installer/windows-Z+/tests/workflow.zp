@@ -1,0 +1,88 @@
+use zenv as env
+use zcrypto as crypto
+use zfile as file
+use zfilesystem as filesystem
+use zpath as path
+use zstring as text
+use "../src/components/deployment.zh" as deployment
+use "../src/components/integration.zh" as integration
+use "../src/components/install-directory.zh" as location
+
+start {
+    let root = env.currentDirectory()
+    let payload = path.join(root, "payload")
+    let destination = path.join(root, "installed")
+    filesystem.createDirectory(path.join(payload, "bin"))
+    filesystem.createDirectory(path.join(payload, "docs"))
+    file.write(path.join(payload, "bin\\00-valid.txt"), "valid-payload")
+    file.write(path.join(payload, "bin\\probe.txt"), "compiler-payload")
+    file.write(path.join(payload, "docs\\readme.txt"), "optional-documentation")
+    let manifest = path.join(root, "payload.sha256")
+    file.write(manifest, "bin\\00-valid.txt\t" + crypto.sha256File(path.join(payload, "bin\\00-valid.txt")) + "\nbin\\probe.txt\t" + crypto.sha256File(path.join(payload, "bin\\probe.txt")) + "\ndocs\\readme.txt\t" + crypto.sha256File(path.join(payload, "docs\\readme.txt")) + "\n")
+
+    if not location.isSafe(destination) {
+        say("installer rejected a valid absolute destination")
+    } end if
+    if location.isSafe("C:\\..\\Windows") {
+        say("installer accepted a path traversal")
+    } end if
+    let pathWithCompiler = integration.addPathEntry("C:\\Tools;C:\\Editor", "C:\\ZPlus\\bin")
+    if not text.contains(pathWithCompiler, "C:\\Tools") or not text.contains(pathWithCompiler, "C:\\Editor") or not text.contains(pathWithCompiler, "C:\\ZPlus\\bin") {
+        say("PATH addition did not preserve existing entries")
+    } end if
+    let pathWithoutCompiler = integration.removePathEntry(pathWithCompiler, "C:\\ZPlus\\bin")
+    if text.contains(pathWithoutCompiler, "C:\\ZPlus\\bin") or not text.contains(pathWithoutCompiler, "C:\\Tools") or not text.contains(pathWithoutCompiler, "C:\\Editor") {
+        say("PATH removal did not preserve unrelated entries")
+    } end if
+    let duplicatePath = integration.addPathEntry("C:\\ZPlus\\bin;C:\\Tools", "c:\\zplus\\BIN")
+    if text.length(duplicatePath) != text.length("C:\\ZPlus\\bin;C:\\Tools") {
+        say("PATH addition created a duplicate entry")
+    } end if
+    let installError = deployment.install(payload, manifest, destination, false, false, 0, "")
+    if text.length(installError) != 0 {
+        say("installation failed: " + installError)
+    } end if
+    if not text.contains(file.read(path.join(destination, "bin\\probe.txt")), "compiler-payload") {
+        say("payload copy failed")
+    } end if
+    if file.exists(path.join(destination, "docs\\readme.txt")) {
+        say("optional component selection failed")
+    } end if
+
+    file.write(path.join(destination, "bin\\probe.txt"), "user-modified")
+    file.write(path.join(destination, "user-project.zp"), "user data")
+    let removal = deployment.uninstall(destination)
+    if not text.contains(removal, "modified file(s) were preserved") {
+        say("uninstaller did not report preserved files")
+    } end if
+    if not text.contains(file.read(path.join(destination, "bin\\probe.txt")), "user-modified") {
+        say("uninstaller removed a modified file")
+    } end if
+    if not text.contains(file.read(path.join(destination, "user-project.zp")), "user data") {
+        say("uninstaller removed an untracked user file")
+    } end if
+    if file.exists(path.join(destination, ".zplus-install-manifest.tsv")) {
+        say("uninstaller did not remove its manifest")
+    } end if
+
+    let tamperedDestination = path.join(root, "tampered-install")
+    file.write(path.join(payload, "bin\\probe.txt"), "tampered-payload")
+    let tamperedError = deployment.install(payload, manifest, tamperedDestination, false, false, 0, "")
+    if text.length(tamperedError) == 0 {
+        say("installer accepted a payload that did not match its SHA-256 manifest")
+    } end if
+    if file.exists(path.join(tamperedDestination, "bin\\00-valid.txt")) {
+        say("failed installation did not roll back copied files")
+    } end if
+    file.write(path.join(payload, "bin\\probe.txt"), "compiler-payload")
+
+    let occupied = path.join(root, "occupied")
+    filesystem.createDirectory(occupied)
+    file.write(path.join(occupied, "keep.txt"), "keep")
+    let rejected = deployment.install(payload, manifest, occupied, true, true, 0, "")
+    if not text.contains(rejected, "not empty") or not text.contains(file.read(path.join(occupied, "keep.txt")), "keep") {
+        say("non-empty destination protection failed")
+    } end if
+
+    say("zplus-installer-workflow-passed")
+} stop

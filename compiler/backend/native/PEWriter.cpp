@@ -105,7 +105,7 @@ void setSection(
 
 } // namespace
 
-std::vector<std::uint8_t> writePE(const NativeImage& image) {
+std::vector<std::uint8_t> writePE(const NativeImage& image, bool windowsGui) {
     if (image.code.empty() || image.entryOffset >= image.code.size()) {
         throw std::runtime_error("PE writer: invalid code or entry point");
     }
@@ -247,7 +247,7 @@ std::vector<std::uint8_t> writePE(const NativeImage& image) {
     put32(output, optional + 56, imageSize);
     put32(output, optional + 60, static_cast<std::uint32_t>(kHeaderSize));
     put32(output, optional + 64, 0);
-    put16(output, optional + 68, 3);
+    put16(output, optional + 68, windowsGui ? 2 : 3);
     put16(output, optional + 70, 0x8100);
     put64(output, optional + 72, 0x100000);
     put64(output, optional + 80, 0x1000);

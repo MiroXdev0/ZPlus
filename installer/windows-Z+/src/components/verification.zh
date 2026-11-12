@@ -1,0 +1,36 @@
+use zcrypto as crypto
+use zfile as file
+use zjson as json
+use zpath as path
+use zprocess as process
+use zstring as text
+
+pub fn verify(installDirectory: string): string {
+    let bin = path.join(installDirectory, "bin")
+    let compiler = path.join(bin, "zp.exe")
+    let library = path.join(bin, "stdlib")
+    if not file.exists(compiler) {
+        return "Compiler executable is missing: " + compiler
+    } end if
+    if not file.isDirectory(path.join(library, "zstring")) {
+        return "The standard library is missing beside the compiler."
+    } end if
+
+    let version = process.run(compiler, ["version"], bin, 15000)
+    if json.getNumber(version, "/exitCode") != 0 or not text.contains(json.getString(version, "/stdout"), "1.1.2") {
+        return "The installed compiler did not report version 1.1.2: " + json.getString(version, "/stderr")
+    } end if
+
+    let sample = path.join(installDirectory, ".zplus-install-check.zp")
+    file.write(sample, "start:\n    say(\"ZPLUS_INSTALL_CHECK_OK\")\nstop\n")
+    let result = process.run(compiler, ["run", sample], bin, 30000)
+    file.delete(sample)
+    if json.getNumber(result, "/exitCode") != 0 or not text.contains(json.getString(result, "/stdout"), "ZPLUS_INSTALL_CHECK_OK") {
+        return "The compiler could not compile and run the verification program: " + json.getString(result, "/stderr")
+    } end if
+
+    if text.length(crypto.sha256File(compiler)) == 0 {
+        return "The compiler integrity check returned an empty SHA-256 digest."
+    } end if
+    return ""
+} end fn

@@ -10,6 +10,7 @@
 #include "Json.hpp"
 #include "Http.hpp"
 #include "SQLite.hpp"
+#include "installer/Platform.hpp"
 
 #include <algorithm>
 #include <array>
@@ -1802,6 +1803,26 @@ static RuntimeValue executeStandardLibraryBuiltin(
             zplus::stdlib::fileWrite(text(0), text(1), name == "append");
             return false;
         }
+        if (name == "copyFile" || name == "moveFile") {
+            if (count != 3) failArity();
+            RuntimeValue overwrite = value(2);
+            if (!std::holds_alternative<bool>(overwrite)) {
+                throw std::invalid_argument(callee + " argument 3 must be a boolean");
+            }
+            return name == "copyFile"
+                ? zplus::installer::copyFile(
+                    text(0), text(1), std::get<bool>(overwrite))
+                : zplus::installer::moveFile(
+                    text(0), text(1), std::get<bool>(overwrite));
+        }
+        if (name == "removeEmptyDirectory") {
+            if (count != 1) failArity();
+            return zplus::installer::removeEmptyDirectory(text(0));
+        }
+        if (name == "scheduleDeleteOnReboot") {
+            if (count != 1) failArity();
+            return zplus::installer::scheduleFileRemovalOnReboot(text(0));
+        }
         if (count != 1) failArity();
         if (name == "read") return managedHeap().makeString(zplus::stdlib::fileRead(text(0)));
         if (name == "exists") return zplus::stdlib::fileExists(text(0));
@@ -1820,6 +1841,91 @@ static RuntimeValue executeStandardLibraryBuiltin(
             }
             return heap.makeArray(std::move(values));
         }
+    }
+    if (operation == "crypto_sha256File") {
+        if (count != 1) failArity();
+        return managedHeap().makeString(zplus::installer::sha256File(text(0)));
+    }
+    if (operation == "process_run") {
+        if (count != 4) failArity();
+        RuntimeArray& arguments = array(1);
+        std::vector<std::string> strings;
+        strings.reserve(arguments.elements.size());
+        for (const RuntimeValue& argument : arguments.elements) {
+            if (!isString(argument)) {
+                throw std::invalid_argument(callee + " arguments must contain only strings");
+            }
+            strings.push_back(stringValue(argument));
+        }
+        return managedHeap().makeString(zplus::installer::runProcess(
+            text(0), strings, text(2),
+            standardInteger(value(3), "process timeout")));
+    }
+    if (operation.rfind("system_", 0) == 0) {
+        const std::string name = operation.substr(7);
+        if (name == "platform" || name == "architecture" ||
+            name == "osVersion" || name == "executablePath") {
+            if (count != 0) failArity();
+            if (name == "platform") {
+                return managedHeap().makeString(zplus::installer::platformName());
+            }
+            if (name == "architecture") {
+                return managedHeap().makeString(zplus::installer::architecture());
+            }
+            if (name == "osVersion") {
+                return managedHeap().makeString(zplus::installer::operatingSystemVersion());
+            }
+            return managedHeap().makeString(zplus::installer::executablePath());
+        }
+        if (name == "availableSpace") {
+            if (count != 1) failArity();
+            return static_cast<double>(zplus::installer::availableSpace(text(0)));
+        }
+        if (name == "selectFolder") {
+            if (count != 2) failArity();
+            return managedHeap().makeString(
+                zplus::installer::selectFolder(text(0), text(1)));
+        }
+        if (name == "messageBox") {
+            if (count != 4) failArity();
+            return static_cast<double>(zplus::installer::messageBox(
+                text(0), text(1), text(2), text(3)));
+        }
+        if (name == "createShortcut") {
+            if (count != 4) failArity();
+            return zplus::installer::createShortcut(
+                text(0), text(1), text(2), text(3));
+        }
+        if (name == "shortcutTarget" || name == "shortcutArguments") {
+            if (count != 1) failArity();
+            return managedHeap().makeString(name == "shortcutTarget"
+                ? zplus::installer::shortcutTarget(text(0))
+                : zplus::installer::shortcutArguments(text(0)));
+        }
+        if (name == "removeShortcutIfMatches") {
+            if (count != 3) failArity();
+            return zplus::installer::removeShortcutIfMatches(
+                text(0), text(1), text(2));
+        }
+    }
+    if (operation == "registry_read") {
+        if (count != 2) failArity();
+        return managedHeap().makeString(
+            zplus::installer::registryRead(text(0), text(1)));
+    }
+    if (operation == "registry_valueKind") {
+        if (count != 2) failArity();
+        return managedHeap().makeString(
+            zplus::installer::registryValueKind(text(0), text(1)));
+    }
+    if (operation == "registry_write") {
+        if (count != 4) failArity();
+        return zplus::installer::registryWrite(
+            text(0), text(1), text(2), text(3));
+    }
+    if (operation == "registry_deleteValue") {
+        if (count != 2) failArity();
+        return zplus::installer::registryDeleteValue(text(0), text(1));
     }
     if (operation.rfind("env_", 0) == 0) {
         const std::string name = operation.substr(4);
@@ -2071,6 +2177,11 @@ static RuntimeValue executeGraphicsBuiltin(
         app.drawText(graphicsInteger(args[0], "window"), valueToString(args[1]),
                      graphicsInteger(args[2], "x"), graphicsInteger(args[3], "y"),
                      parseColor(valueToString(args[4])), graphicsInteger(args[5], "size"));
+    } else if (callee == "__zgraphics_drawImage") {
+        const auto args = graphicsArguments(instruction, environment, 6);
+        app.drawImage(graphicsInteger(args[0], "window"), valueToString(args[1]),
+                      graphicsInteger(args[2], "x"), graphicsInteger(args[3], "y"),
+                      graphicsInteger(args[4], "width"), graphicsInteger(args[5], "height"));
     } else if (callee == "__zgraphics_drawLine") {
         const auto args = graphicsArguments(instruction, environment, 7);
         app.drawLine(graphicsInteger(args[0], "window"), graphicsInteger(args[1], "x1"),
@@ -2608,7 +2719,17 @@ static ExecutionResult executeFunction(
             }
             const RuntimeValue value =
                 resolveValue(instruction.operands[0], environment);
-            throw std::runtime_error(valueToString(value));
+            std::string message = valueToString(value);
+            if (isStruct(value)) {
+                const RuntimeStructPtr structure = std::get<RuntimeStructPtr>(value);
+                if (structure->typeName == "Error") {
+                    const auto field = structure->fields.find("message");
+                    if (field != structure->fields.end() && isString(field->second)) {
+                        message = stringValue(field->second);
+                    }
+                }
+            }
+            throw std::runtime_error(std::move(message));
         }
 
         if (op == "scope_push") {
@@ -4086,53 +4207,69 @@ static ExecutionResult executeFunction(
             op +
             "'"
         );
-        } catch (const std::exception& error) {
-            if (exceptionHandlers.empty()) {
+        } catch (const std::exception&) {
+            std::exception_ptr pendingError = std::current_exception();
+            bool handled = false;
+            while (!exceptionHandlers.empty()) {
+                const ExceptionHandler handler =
+                    std::move(exceptionHandlers.back());
+                exceptionHandlers.pop_back();
                 try {
-                    runDeferredTo(0);
-                    deferScopeMarks.clear();
+                    while (deferScopeMarks.size() > handler.deferScopeDepth) {
+                        const std::size_t targetDepth = deferScopeMarks.back();
+                        deferScopeMarks.pop_back();
+                        runDeferredTo(targetDepth);
+                    }
+                    runDeferredTo(handler.deferredCallDepth);
                 } catch (...) {
-                    throw;
+                    pendingError = std::current_exception();
+                    continue;
                 }
-                throw;
+
+                std::string message;
+                try {
+                    std::rethrow_exception(pendingError);
+                } catch (const std::exception& pendingException) {
+                    message = pendingException.what();
+                } catch (...) {
+                    message = "unknown error";
+                }
+                RuntimeValue errorMessage = managedHeap().makeString(message);
+                const std::array<RuntimeValue, 1> roots{errorMessage};
+                auto* errorObject = managedHeap().makeStruct(
+                    "Error",
+                    {{"message", std::move(errorMessage)}},
+                    roots
+                );
+                storeVariable(
+                    environment,
+                    handler.errorBinding,
+                    RuntimeStructPtr{errorObject}
+                );
+
+                const auto target = std::find_if(
+                    function.blocks.begin(),
+                    function.blocks.end(),
+                    [&handler](const zplus::ir::BasicBlock& candidate) {
+                        return candidate.label == handler.blockLabel;
+                    }
+                );
+                if (target == function.blocks.end()) {
+                    throw std::runtime_error(
+                        "exception handler block '" + handler.blockLabel +
+                        "' does not exist");
+                }
+                block = &*target;
+                ip = 0;
+                handled = true;
+                break;
             }
 
-            const ExceptionHandler handler =
-                std::move(exceptionHandlers.back());
-            exceptionHandlers.pop_back();
-            while (deferScopeMarks.size() > handler.deferScopeDepth) {
-                const std::size_t targetDepth = deferScopeMarks.back();
-                deferScopeMarks.pop_back();
-                runDeferredTo(targetDepth);
+            if (!handled) {
+                runDeferredTo(0);
+                deferScopeMarks.clear();
+                std::rethrow_exception(pendingError);
             }
-            runDeferredTo(handler.deferredCallDepth);
-            RuntimeValue message = managedHeap().makeString(error.what());
-            const std::array<RuntimeValue, 1> roots{message};
-            auto* errorObject = managedHeap().makeStruct(
-                "Error",
-                {{"message", std::move(message)}},
-                roots
-            );
-            storeVariable(
-                environment,
-                handler.errorBinding,
-                RuntimeStructPtr{errorObject}
-            );
-
-            const auto target = std::find_if(
-                function.blocks.begin(),
-                function.blocks.end(),
-                [&handler](const zplus::ir::BasicBlock& candidate) {
-                    return candidate.label == handler.blockLabel;
-                }
-            );
-            if (target == function.blocks.end()) {
-                throw std::runtime_error(
-                    "exception handler block '" + handler.blockLabel +
-                    "' does not exist");
-            }
-            block = &*target;
-            ip = 0;
         }
     }
 

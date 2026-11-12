@@ -1,0 +1,230 @@
+use zcrypto as crypto
+use zfile as file
+use zfilesystem as filesystem
+use zgraphics as graphics
+use zpath as path
+use zstring as text
+use "../ui/layout.zh" as layout
+
+fn isSelected(relativePath: string, docs: boolean, examples: boolean): boolean {
+    if text.startsWith(relativePath, "docs\\") and not docs {
+        return false
+    } end if
+
+    if text.startsWith(relativePath, "examples\\") and not examples {
+        return false
+    } end if
+    return true
+} end fn
+
+fn deploymentSameText(left: string, right: string): boolean {
+    return text.length(left) == text.length(right) and text.contains(left, right)
+} end fn
+
+fn expectedHash(manifest: string, relativePath: string): string {
+    let records = text.split(manifest, "\n")
+    for (let index: number = 0; index < length(records); index++) {
+        let fields = text.split(records[index], "\t")
+        if length(fields) == 2 and deploymentSameText(fields[0], relativePath) {
+            return text.upper(text.trim(fields[1]))
+        } end if
+    } end for
+    return ""
+} end fn
+
+fn countFiles(sourceDirectory: string, relativeDirectory: string, docs: boolean, examples: boolean): number {
+    let entries = filesystem.listDirectory(sourceDirectory)
+    let count = 0
+    for (let index: number = 0; index < length(entries); index++) {
+        let entry = entries[index]
+        let relative = entry
+        if text.length(relativeDirectory) != 0 {
+            relative = path.join(relativeDirectory, entry)
+        } end if
+        if isSelected(relative, docs, examples) {
+            let source = path.join(sourceDirectory, entry)
+            if filesystem.isDirectory(source) {
+                count += countFiles(source, relative, docs, examples)
+            } else {
+                count += 1
+            } end if
+        } end if
+    } end for
+    return count
+} end fn
+
+fn drawProgress(window: number, relativePath: string, copied: number, total: number, logoPath: string): boolean {
+    if window <= 0 {
+        return true
+    } end if
+    layout.progress(window, relativePath, copied, total, logoPath)
+    graphics.update(window)
+    let event = graphics.pollEvent(window)
+    if event == 1 {
+        return false
+    } end if
+    if event == 3 {
+        if graphics.eventKey(window) == 1 and layout.actionAt(4, graphics.eventX(window), graphics.eventY(window)) == 2 {
+            return false
+        } end if
+    } end if
+    return true
+} end fn
+
+fn copyTree(sourceDirectory: string, relativeDirectory: string, destinationRoot: string, manifest: string, docs: boolean, examples: boolean, window: number, total: number, copied: number, logoPath: string): number {
+    let entries = filesystem.listDirectory(sourceDirectory)
+    for (let index: number = 0; index < length(entries); index++) {
+        let entry = entries[index]
+        let relative = entry
+        if text.length(relativeDirectory) != 0 {
+            relative = path.join(relativeDirectory, entry)
+        } end if
+        if isSelected(relative, docs, examples) {
+            let source = path.join(sourceDirectory, entry)
+            let destination = path.join(destinationRoot, relative)
+            if filesystem.isDirectory(source) {
+                if not filesystem.createDirectory(destination) {
+                    if not filesystem.isDirectory(destination) {
+                        return -1
+                    } end if
+                } end if
+                copied = copyTree(source, relative, destinationRoot, manifest, docs, examples, window, total, copied, logoPath)
+                if copied < 0 {
+                    return copied
+                } end if
+            } else {
+                if not drawProgress(window, relative, copied, total, logoPath) {
+                    return -2
+                } end if
+                let expected = expectedHash(manifest, relative)
+                if text.length(expected) == 0 or not deploymentSameText(crypto.sha256File(source), expected) {
+                    file.append(path.join(destinationRoot, "install.log"), "integrity failure\t" + relative + "\n")
+                    return -1
+                } end if
+                file.append(path.join(destinationRoot, "install.log"), "copy\t" + relative + "\n")
+                if not filesystem.copyFile(source, destination, false) {
+                    filesystem.deleteFile(destination)
+                    file.append(path.join(destinationRoot, "install.log"), "copy failed\t" + relative + "\n")
+                    return -1
+                } end if
+                if not deploymentSameText(crypto.sha256File(destination), expected) {
+                    filesystem.deleteFile(destination)
+                    file.append(path.join(destinationRoot, "install.log"), "verification failed\t" + relative + "\n")
+                    return -1
+                } end if
+                file.append(path.join(destinationRoot, ".zplus-install-manifest.tsv"), relative + "\t" + expected + "\n")
+                file.append(path.join(destinationRoot, "install.log"), "verified\t" + relative + "\n")
+                copied += 1
+            } end if
+        } end if
+    } end for
+    return copied
+} end fn
+
+fn rollback(destinationRoot: string) {
+    let manifestPath = path.join(destinationRoot, ".zplus-install-manifest.tsv")
+    if not file.exists(manifestPath) {
+        return
+    } end if
+    let records = text.split(file.read(manifestPath), "\n")
+    for (let index: number = 0; index < length(records); index++) {
+        let record = records[index]
+        if text.contains(record, "\t") {
+            let fields = text.split(record, "\t")
+            if length(fields) == 2 {
+                let target = path.join(destinationRoot, fields[0])
+                if file.exists(target) and deploymentSameText(crypto.sha256File(target), fields[1]) {
+                    filesystem.deleteFile(target)
+                } end if
+            } end if
+        } end if
+    } end for
+    file.delete(manifestPath)
+} end fn
+
+pub fn install(payloadDirectory: string, payloadManifest: string, destination: string, docs: boolean, examples: boolean, window: number, logoPath: string): string {
+    if not filesystem.isDirectory(payloadDirectory) {
+        return "The installer payload directory is missing: " + payloadDirectory
+    } end if
+    if not file.exists(payloadManifest) {
+        return "The payload SHA-256 manifest is missing: " + payloadManifest
+    } end if
+    if filesystem.exists(destination) {
+        if not filesystem.isDirectory(destination) {
+            return "The installation path exists but is not a directory."
+        } end if
+        let existingManifest = path.join(destination, ".zplus-install-manifest.tsv")
+        if file.exists(existingManifest) {
+            return "An existing Z+ installation is present. Uninstall it before installing this version."
+        } end if
+        if length(filesystem.listDirectory(destination)) != 0 {
+            return "The selected directory is not empty. Choose an empty directory to protect existing files."
+        } end if
+    } end if
+
+    let total = countFiles(payloadDirectory, "", docs, examples)
+    if total == 0 {
+        return "No installable files were found in the payload."
+    } end if
+    if not filesystem.createDirectory(destination) and not filesystem.isDirectory(destination) {
+        return "Could not create the installation directory."
+    } end if
+    file.write(path.join(destination, "install.log"), "Z+ 1.1.2 installation started\n")
+    file.write(path.join(destination, ".zplus-install-manifest.tsv"), "")
+    let copied = copyTree(payloadDirectory, "", destination, file.read(payloadManifest), docs, examples, window, total, 0, logoPath)
+    if copied < 0 {
+        rollback(destination)
+        if copied == -2 {
+            file.append(path.join(destination, "install.log"), "installation canceled; copied files rolled back\n")
+            return "Installation was canceled. Copied files were rolled back."
+        } end if
+        file.append(path.join(destination, "install.log"), "installation failed; copied files rolled back\n")
+        return "Installation stopped while copying or verifying a payload file. Completed files were rolled back."
+    } end if
+    file.append(path.join(destination, "install.log"), "payload installation completed\n")
+    return ""
+} end fn
+
+pub fn uninstall(installDirectory: string): string {
+    let manifestPath = path.join(installDirectory, ".zplus-install-manifest.tsv")
+    if not file.exists(manifestPath) {
+        return "No Z+ installation manifest exists at this location."
+    } end if
+    file.append(path.join(installDirectory, "install.log"), "uninstallation started\n")
+    let records = text.split(file.read(manifestPath), "\n")
+    let preserved = 0
+    let rebootRemoval = false
+    for (let index: number = 0; index < length(records); index++) {
+        let record = records[index]
+        if text.contains(record, "\t") {
+            let fields = text.split(record, "\t")
+            if length(fields) == 2 {
+                let target = path.join(installDirectory, fields[0])
+                if file.exists(target) {
+                    if deploymentSameText(crypto.sha256File(target), fields[1]) {
+                        if deploymentSameText(fields[0], "uninstall.exe") {
+                            if filesystem.scheduleDeleteOnReboot(target) {
+                                rebootRemoval = true
+                            } else {
+                                preserved += 1
+                            } end if
+                        } else {
+                            filesystem.deleteFile(target)
+                        } end if
+                    } else {
+                        preserved += 1
+                    } end if
+                } end if
+            } end if
+        } end if
+    } end for
+    file.delete(manifestPath)
+    file.append(path.join(installDirectory, "install.log"), "uninstallation completed\n")
+    if rebootRemoval and preserved == 0 {
+        return "Z+ files were removed. The running uninstaller will be deleted after Windows restarts."
+    } end if
+    if preserved > 0 {
+        return "Uninstall finished. " + graphics.numberText(preserved) + " modified file(s) were preserved."
+    } end if
+    return "Z+ files recorded by this installer were removed."
+} end fn

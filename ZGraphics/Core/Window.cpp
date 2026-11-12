@@ -138,6 +138,16 @@ void Application::drawText(
     impl_->platform.drawText(window, text, x, y, color, size);
 }
 
+void Application::drawImage(
+    int window, const std::string& path, int x, int y, int width, int height
+) {
+    if (path.empty()) throw std::invalid_argument("image path must not be empty");
+    if (width <= 0 || height <= 0) {
+        throw std::invalid_argument("image dimensions must be positive");
+    }
+    impl_->platform.drawImage(window, path, x, y, width, height);
+}
+
 void Application::drawLine(
     int window, int x1, int y1, int x2, int y2, Color color, int thickness
 ) {

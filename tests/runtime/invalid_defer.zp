@@ -1,6 +1,6 @@
-start:
-    defer:
+start {
+    defer {
         say("first")
         say("second")
-    end
-stop
+    } end defer
+} stop

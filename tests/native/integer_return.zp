@@ -1,7 +1,7 @@
-start:
-    if 42 == 42:
+start {
+    if 42 == 42 {
         say("integer constant passed")
-    else:
+    } else {
         say("integer constant failed")
-    end
-stop
+    } end if
+} stop

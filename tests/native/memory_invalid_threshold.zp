@@ -1,5 +1,5 @@
 use zmemory.management
 
-start:
+start {
     zmemory.setThreshold(512)
-stop
+} stop

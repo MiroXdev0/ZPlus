@@ -4,7 +4,7 @@ endif()
 
 file(MAKE_DIRECTORY "${WORK_DIR}")
 set(program "${SOURCE_DIR}/tests/runtime/error_handling.zp")
-set(expected "try cleanup\ninner: boom\nraised again\nnested\nlast\nreturned\n7\nruntime: cannot pop from an empty array\nouter\n")
+set(expected "try cleanup\ninner: boom\nraised again\nnested\nlast\nreturned\n7\nruntime: cannot pop from an empty array\ncleanup: cleanup failure\nrethrow: boom\nouter\n")
 
 execute_process(
     COMMAND "${ZP}" check "${program}"
@@ -67,7 +67,9 @@ if(native_result EQUAL 0)
     message(FATAL_ERROR "native backend unexpectedly accepted interpreter-only exception opcodes")
 endif()
 if(NOT "${native_output_text}${native_error}" MATCHES
-   "not supported")
+   "not supported" OR
+   NOT "${native_output_text}${native_error}" MATCHES
+   "error_handling\\.zp:[0-9]+:[0-9]+")
     message(FATAL_ERROR
-        "native backend did not report the unsupported feature clearly\n${native_output_text}${native_error}")
+        "native backend did not report the unsupported feature with its source location\n${native_output_text}${native_error}")
 endif()

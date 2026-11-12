@@ -296,12 +296,13 @@ ProjectConfig loadProject(const std::filesystem::path& file) {
 
     const auto& build = table("build");
     rejectUnknownKeys(build,
-        {"backend", "mode", "output_dir", "optimization", "jobs"},
+        {"backend", "mode", "output_dir", "optimization", "jobs", "windows_gui"},
         "[build]");
     project.backend = requireString(build, "backend", "native");
     project.mode = requireString(build, "mode", "debug");
     project.outputDirectory = requireString(build, "output_dir", "build");
     project.optimization = static_cast<int>(requireInteger(build, "optimization", 0));
+    project.windowsGui = requireBool(build, "windows_gui", false);
     const auto jobs = requireInteger(build, "jobs", 0);
     if (jobs < 0 || jobs > 1024) throw std::runtime_error("build.jobs must be from 0 to 1024");
     project.jobs = static_cast<unsigned>(jobs);
@@ -331,6 +332,14 @@ ProjectConfig loadProject(const std::filesystem::path& file) {
     if (project.backend != "native" && project.backend != "interpreter") {
         throw std::runtime_error("build.backend must be 'native' or 'interpreter'");
     }
+    if (project.windowsGui && project.backend != "native") {
+        throw std::runtime_error("build.windows_gui requires build.backend = 'native'");
+    }
+#ifndef _WIN32
+    if (project.windowsGui) {
+        throw std::runtime_error("build.windows_gui is supported only by Windows builds");
+    }
+#endif
     if (project.mode != "debug" && project.mode != "release") {
         throw std::runtime_error("build.mode must be 'debug' or 'release'");
     }

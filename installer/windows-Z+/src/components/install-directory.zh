@@ -1,0 +1,29 @@
+use zenv as env
+use zpath as path
+use zstring as text
+
+pub fn defaultDirectory(): string {
+    let local = env.get("LOCALAPPDATA")
+    if text.length(local) == 0 {
+        return path.join(env.homeDirectory(), "ZPlus")
+    } end if
+    return path.join(path.join(local, "Programs"), "ZPlus")
+} end fn
+
+pub fn isSafe(value: string): boolean {
+    if text.length(value) == 0 or text.contains(value, "..") or text.contains(value, "\t") or text.contains(value, "\n") {
+        return false
+    } end if
+    let normalized = path.normalize(value)
+    if text.length(normalized) == 0 or not path.isAbsolute(normalized) {
+        return false
+    } end if
+    if text.contains(normalized, "..") or text.contains(normalized, "\t") or text.contains(normalized, "\n") {
+        return false
+    } end if
+    let parent = path.directory(normalized)
+    if text.length(parent) == text.length(normalized) and text.contains(parent, normalized) {
+        return false
+    } end if
+    return true
+} end fn

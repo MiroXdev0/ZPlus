@@ -1,6 +1,6 @@
 use zgraphics
 
-start:
+start {
     let first = zgraphics.createWindow("Z+ Window One", 480, 300)
     let second = zgraphics.createWindow("Z+ Window Two", 480, 300)
     zgraphics.background(first, "#172554")
@@ -13,4 +13,4 @@ start:
     zgraphics.show(second)
     zgraphics.run(first)
     zgraphics.close(second)
-stop
+} stop

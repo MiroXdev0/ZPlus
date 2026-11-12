@@ -1,6 +1,6 @@
 use zgraphics
 
-start:
+start {
     let app = zgraphics.createWindow("invalid", 0, 240)
     zgraphics.close(app)
-stop
+} stop

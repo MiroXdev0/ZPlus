@@ -1,21 +1,21 @@
-pub fn join(left: string, right: string) -> string:
+pub fn join(left: string, right: string): string {
     return __zstdlib_path_join(left, right)
-end
-pub fn normalize(value: string) -> string:
+} end fn
+pub fn normalize(value: string): string {
     return __zstdlib_path_normalize(value)
-end
-pub fn extension(value: string) -> string:
+} end fn
+pub fn extension(value: string): string {
     return __zstdlib_path_extension(value)
-end
-pub fn filename(value: string) -> string:
+} end fn
+pub fn filename(value: string): string {
     return __zstdlib_path_filename(value)
-end
-pub fn directory(value: string) -> string:
+} end fn
+pub fn directory(value: string): string {
     return __zstdlib_path_directory(value)
-end
-pub fn absolute(value: string) -> string:
+} end fn
+pub fn absolute(value: string): string {
     return __zstdlib_path_absolute(value)
-end
-pub fn isAbsolute(value: string) -> boolean:
+} end fn
+pub fn isAbsolute(value: string): boolean {
     return __zstdlib_path_isAbsolute(value)
-end
+} end fn

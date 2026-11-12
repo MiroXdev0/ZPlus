@@ -1,0 +1,119 @@
+pub fn initialize():
+    __zaudio_initialize()
+end
+
+pub fn initialized() -> boolean:
+    return __zaudio_initialized()
+end
+
+pub fn shutdown():
+    __zaudio_shutdown()
+end
+
+pub fn loadMusic(path: string) -> number:
+    return __zaudio_loadMusic(path)
+end
+
+pub fn loadSound(path: string) -> number:
+    return __zaudio_loadSound(path)
+end
+
+pub fn unload(handle: number):
+    __zaudio_unload(handle)
+end
+
+pub fn unloadAll():
+    __zaudio_unloadAll()
+end
+
+pub fn play(handle: number):
+    __zaudio_play(handle)
+end
+
+pub fn pause(handle: number):
+    __zaudio_pause(handle)
+end
+
+pub fn resume(handle: number):
+    __zaudio_resume(handle)
+end
+
+pub fn stop(handle: number):
+    __zaudio_stop(handle)
+end
+
+pub fn isPlaying(handle: number) -> boolean:
+    return __zaudio_isPlaying(handle)
+end
+
+pub fn isPaused(handle: number) -> boolean:
+    return __zaudio_isPaused(handle)
+end
+
+pub fn isStopped(handle: number) -> boolean:
+    return __zaudio_isStopped(handle)
+end
+
+pub fn setVolume(handle: number, volume: number):
+    __zaudio_setVolume(handle, volume)
+end
+
+pub fn getVolume(handle: number) -> number:
+    return __zaudio_getVolume(handle)
+end
+
+pub fn setLooping(handle: number, looping: boolean):
+    __zaudio_setLooping(handle, looping)
+end
+
+pub fn isLooping(handle: number) -> boolean:
+    return __zaudio_isLooping(handle)
+end
+
+pub fn setPlaybackPosition(handle: number, seconds: number):
+    __zaudio_setPlaybackPosition(handle, seconds)
+end
+
+pub fn getPlaybackPosition(handle: number) -> number:
+    return __zaudio_getPlaybackPosition(handle)
+end
+
+pub fn getDuration(handle: number) -> number:
+    return __zaudio_getDuration(handle)
+end
+
+pub fn setMasterVolume(volume: number):
+    __zaudio_setMasterVolume(volume)
+end
+
+pub fn getMasterVolume() -> number:
+    return __zaudio_getMasterVolume()
+end
+
+pub fn mute():
+    __zaudio_mute()
+end
+
+pub fn unmute():
+    __zaudio_unmute()
+end
+
+pub fn isMuted() -> boolean:
+    return __zaudio_isMuted()
+end
+
+pub fn deviceCount() -> number:
+    return __zaudio_deviceCount()
+end
+
+pub fn deviceName(index: number) -> string:
+    return __zaudio_deviceName(index)
+end
+
+pub fn defaultDevice() -> string:
+    return __zaudio_defaultDevice()
+end
+
+pub fn selectDevice(name: string):
+    __zaudio_selectDevice(name)
+end

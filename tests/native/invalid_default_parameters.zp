@@ -1,7 +1,7 @@
-fn invalid(first: number = 1, second: number) -> number:
+fn invalid(first: number = 1, second: number): number {
     return first + second
-end
+} end fn
 
-start:
+start {
     say(invalid())
-stop
+} stop

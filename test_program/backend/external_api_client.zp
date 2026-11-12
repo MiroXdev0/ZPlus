@@ -2,12 +2,12 @@ use zhttp as http
 use zjson as json
 use zgraphics as graphics
 
-start:
+start {
     let response = http.request("GET", "http://127.0.0.1:8080/health", "{}", "", 5000)
     let status = json.getNumber(response, "/status")
-    if status == 200:
+    if status == 200 {
         printz("Health service replied: ", json.getString(response, "/body"), "\n")
-    else:
+    } else {
         printz("Health request failed with status ", graphics.numberText(status), "\n")
-    end
-stop
+    } end if
+} stop

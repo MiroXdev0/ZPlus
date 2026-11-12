@@ -61,8 +61,16 @@ bool testExecutableFormats(const char* elfOutputPath) {
         read16(pe, optionalHeader) != 0x20B ||
         read32(pe, optionalHeader + 16) != 0x1000 ||
         read16(pe, peOffset + 6) != 2 ||
+        read16(pe, optionalHeader + 68) != 3 ||
         read32(pe, 0x202) == 0) {
         std::cerr << "PE writer produced an invalid PE32+ executable image\n";
+        return false;
+    }
+    const auto guiPe = zplus::backend::native::writePE(image, true);
+    const std::uint32_t guiPeOffset = read32(guiPe, 0x3C);
+    const std::size_t guiOptionalHeader = static_cast<std::size_t>(guiPeOffset) + 4 + 20;
+    if (read16(guiPe, guiOptionalHeader + 68) != 2) {
+        std::cerr << "PE writer did not select the Windows GUI subsystem\n";
         return false;
     }
     return true;

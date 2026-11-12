@@ -1,7 +1,7 @@
-fn first(values: number[]) -> number:
+fn first(values: number[]): number {
     return values[0]
-end
+} end fn
 
-start:
+start {
     say(first(["not a number"]))
-stop
+} stop

@@ -53,6 +53,25 @@ int main() {
                 zbuild::loadProject(temporary / "UnitProject" / "zproject.toml");
             require(project.implicitTarget, "generated console project should use a valid implicit target");
             require(project.entry == "src/main.zp", "generated project entry should be configured");
+            require(!project.windowsGui, "generated console projects should keep the console subsystem");
+
+#ifdef _WIN32
+            const auto guiProject = temporary / "windows-gui";
+            std::filesystem::create_directories(guiProject / "src");
+            {
+                std::ofstream source(guiProject / "src" / "main.zp");
+                source << "start:\nstop\n";
+            }
+            {
+                std::ofstream config(guiProject / "zproject.toml");
+                config << "[project]\nname = \"WindowsGui\"\nentry = \"src/main.zp\"\n"
+                          "\n[build]\nbackend = \"native\"\nwindows_gui = true\n"
+                          "\n[platform]\nwindows = true\nlinux = false\n";
+            }
+            const auto guiConfig =
+                zbuild::loadProject(guiProject / "zproject.toml");
+            require(guiConfig.windowsGui, "Windows GUI subsystem setting should parse");
+#endif
 
             const auto localProject = temporary / "local";
             const auto consumerProject = temporary / "consumer";

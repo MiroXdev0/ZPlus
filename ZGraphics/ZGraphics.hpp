@@ -59,6 +59,7 @@ public:
     bool isOpen(int window);
 
     void drawText(int window, const std::string& text, int x, int y, Color color, int size);
+    void drawImage(int window, const std::string& path, int x, int y, int width, int height);
     void drawLine(int window, int x1, int y1, int x2, int y2, Color color, int thickness);
     void drawRectangle(
         int window,

@@ -70,7 +70,8 @@ std::vector<std::uint8_t> NativeCodeGenerator::generate(
 
 void NativeCodeGenerator::writeExecutable(
     const zplus::ir::Module& module,
-    const std::filesystem::path& output
+    const std::filesystem::path& output,
+    bool windowsGui
 ) const {
     if (output.empty()) {
         throw std::runtime_error("native output path cannot be empty");
@@ -79,6 +80,7 @@ void NativeCodeGenerator::writeExecutable(
 #if defined(_WIN32)
 #if !defined(_M_X64) && !defined(__x86_64__)
     (void)module;
+    (void)windowsGui;
     throw std::runtime_error("native code generation is supported only on x86-64 hosts");
 #endif
     const NativeImage image = generateX64(module, true);
@@ -97,8 +99,11 @@ void NativeCodeGenerator::writeExecutable(
     const bool needsPhysicsRuntime = std::any_of(
         image.importFixups.begin(), image.importFixups.end(),
         [](const auto& fixup) { return fixup.library == "zphysics_runtime.dll"; });
-    const auto bytes = writePE(image);
+    const auto bytes = writePE(image, windowsGui);
 #elif defined(__linux__)
+    if (windowsGui) {
+        throw std::runtime_error("the Windows GUI subsystem is available only for Windows executables");
+    }
     const NativeImage image = generateX64(module, false);
     const bool needsAudioRuntime = std::any_of(
         image.importFixups.begin(), image.importFixups.end(),
@@ -108,6 +113,9 @@ void NativeCodeGenerator::writeExecutable(
         [](const auto& fixup) { return fixup.library == "libzphysics_runtime.so"; });
     const auto bytes = writeELF(image);
 #else
+    if (windowsGui) {
+        throw std::runtime_error("the Windows GUI subsystem is available only for Windows executables");
+    }
     const auto bytes = generate(module);
 #endif
     if (bytes.size() > static_cast<std::size_t>(std::numeric_limits<std::streamsize>::max())) {

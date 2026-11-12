@@ -1,0 +1,5 @@
+start {
+    if true {
+        say("missing close")
+    end if
+} stop

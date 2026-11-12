@@ -1,6 +1,6 @@
 use zaudio
 
-if zaudio.deviceCount() > 0:
+if zaudio.deviceCount() > 0 {
     zaudio.initialize()
     let music = zaudio.loadMusic("assets/tone.ogg")
     zaudio.play(music)
@@ -8,6 +8,6 @@ if zaudio.deviceCount() > 0:
     zaudio.unload(music)
     zaudio.shutdown()
     say("ZBuild audio integration passed")
-else:
+} else {
     say("ZBuild audio integration skipped: no playback device")
-end
+} end if

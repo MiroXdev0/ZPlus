@@ -5,6 +5,8 @@
 #include <stdexcept>
 #include <utility>
 
+#include <objidl.h>
+#include <gdiplus.h>
 #include <windowsx.h>
 
 namespace zplus::graphics {
@@ -38,7 +40,7 @@ struct PlatformApplication::Window {
         int height = 0;
     };
 
-    enum class CommandType { Text, Line, Rectangle, Circle };
+    enum class CommandType { Text, Image, Line, Rectangle, Circle };
     struct Command {
         CommandType type;
         std::wstring text;
@@ -77,6 +79,10 @@ PlatformApplication::PlatformApplication() {
     if (!RegisterClassExW(&klass) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
         throw std::runtime_error("cannot register Z+ graphics window class");
     }
+    Gdiplus::GdiplusStartupInput startupInput;
+    if (Gdiplus::GdiplusStartup(&gdiplusToken_, &startupInput, nullptr) != Gdiplus::Ok) {
+        throw std::runtime_error("cannot initialize Windows image rendering");
+    }
 }
 
 PlatformApplication::~PlatformApplication() {
@@ -85,6 +91,7 @@ PlatformApplication::~PlatformApplication() {
         releaseSurfaces(*window);
         releaseFonts(*window);
     }
+    if (gdiplusToken_ != 0) Gdiplus::GdiplusShutdown(gdiplusToken_);
 }
 
 PlatformApplication::Window& PlatformApplication::get(int id) {
@@ -174,6 +181,22 @@ void PlatformApplication::drawText(
     auto& window = getOpen(id);
     window.commands.push_back({Window::CommandType::Text, toWide(text), x, y, 0, 0,
                                1, false, size, color});
+    window.frameDirty = true;
+}
+
+void PlatformApplication::drawImage(
+    int id, const std::string& path, int x, int y, int width, int height
+) {
+    auto& window = getOpen(id);
+    Window::Command command{};
+    command.type = Window::CommandType::Image;
+    command.text = toWide(path);
+    command.x1 = x;
+    command.y1 = y;
+    command.x2 = width;
+    command.y2 = height;
+    command.color = {255, 255, 255, 255};
+    window.commands.push_back(std::move(command));
     window.frameDirty = true;
 }
 
@@ -384,6 +407,18 @@ bool PlatformApplication::render(Window& window, HDC dc, bool completed) {
                                       DT_LEFT | DT_TOP | DT_WORDBREAK) != 0;
                         SelectObject(dc, oldFont);
                     }
+                }
+                break;
+            }
+            case Window::CommandType::Image: {
+                Gdiplus::Image image(command.text.c_str());
+                if (image.GetLastStatus() != Gdiplus::Ok) {
+                    succeeded = false;
+                } else {
+                    Gdiplus::Graphics imageGraphics(dc);
+                    succeeded = imageGraphics.DrawImage(
+                        &image, command.x1, command.y1,
+                        command.x2, command.y2) == Gdiplus::Ok;
                 }
                 break;
             }

@@ -1,18 +1,18 @@
-pub fn integer(minimum: number, maximum: number) -> number:
+pub fn integer(minimum: number, maximum: number): number {
     return __zstdlib_random_integer(minimum, maximum)
-end
-pub fn number(minimum: number, maximum: number) -> number:
+} end fn
+pub fn number(minimum: number, maximum: number): number {
     return __zstdlib_random_number(minimum, maximum)
-end
-pub fn boolean() -> boolean:
+} end fn
+pub fn boolean(): boolean {
     return __zstdlib_random_boolean()
-end
-pub fn choice(values: number[]) -> number:
+} end fn
+pub fn choice(values: number[]): number {
     return __zstdlib_random_choice(values)
-end
-pub fn shuffle(values: number[]) -> number[]:
+} end fn
+pub fn shuffle(values: number[]): number[] {
     return __zstdlib_random_shuffle(values)
-end
-pub fn seed(value: number):
+} end fn
+pub fn seed(value: number) {
     __zstdlib_random_seed(value)
-end
+} end fn

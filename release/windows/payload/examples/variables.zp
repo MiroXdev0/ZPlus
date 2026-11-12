@@ -1,0 +1,6 @@
+start {
+    let name: string = "Z+"
+    let version: number = 1.1
+    say(name)
+    say(version)
+} stop

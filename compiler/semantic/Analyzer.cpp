@@ -613,8 +613,33 @@ bool Analyzer::analyze(
     for (const char* operation : {"exists", "delete", "createDirectory", "isDirectory"}) {
         declareBuiltin(std::string("__zstdlib_file_") + operation, {string}, boolean);
     }
+    declareBuiltin("__zstdlib_file_scheduleDeleteOnReboot", {string}, boolean);
     declareBuiltin("__zstdlib_file_listDirectory", {string}, Type::array(string));
     declareBuiltin("__zstdlib_file_size", {string}, number);
+    declareBuiltin("__zstdlib_file_copyFile", {string, string, boolean}, boolean);
+    declareBuiltin("__zstdlib_file_moveFile", {string, string, boolean}, boolean);
+    declareBuiltin("__zstdlib_file_removeEmptyDirectory", {string}, boolean);
+    declareBuiltin("__zstdlib_crypto_sha256File", {string}, string);
+    declareBuiltin("__zstdlib_process_run",
+        {string, Type::array(string), string, number}, string);
+    for (const char* operation : {"platform", "architecture", "osVersion", "executablePath"}) {
+        declareBuiltin(std::string("__zstdlib_system_") + operation, {}, string);
+    }
+    declareBuiltin("__zstdlib_system_availableSpace", {string}, number);
+    declareBuiltin("__zstdlib_system_selectFolder", {string, string}, string);
+    declareBuiltin("__zstdlib_system_messageBox",
+        {string, string, string, string}, number);
+    declareBuiltin("__zstdlib_registry_read", {string, string}, string);
+    declareBuiltin("__zstdlib_registry_valueKind", {string, string}, string);
+    declareBuiltin("__zstdlib_registry_write",
+        {string, string, string, string}, boolean);
+    declareBuiltin("__zstdlib_registry_deleteValue", {string, string}, boolean);
+    declareBuiltin("__zstdlib_system_createShortcut",
+        {string, string, string, string}, boolean);
+    declareBuiltin("__zstdlib_system_shortcutTarget", {string}, string);
+    declareBuiltin("__zstdlib_system_shortcutArguments", {string}, string);
+    declareBuiltin("__zstdlib_system_removeShortcutIfMatches",
+        {string, string, string}, boolean);
     declareBuiltin("__zstdlib_env_get", {string}, string);
     declareBuiltin("__zstdlib_env_set", {string, string}, voidType);
     declareBuiltin("__zstdlib_env_exists", {string}, boolean);
@@ -779,6 +804,8 @@ bool Analyzer::analyze(
     declareBuiltin("__zgraphics_isOpen", {number}, boolean);
     declareBuiltin("__zgraphics_run", {number}, number);
     declareBuiltin("__zgraphics_drawText", {number, string, number, number, string, number}, voidType);
+    declareBuiltin("__zgraphics_drawImage",
+                   {number, string, number, number, number, number}, voidType);
     declareBuiltin("__zgraphics_drawLine",
                    {number, number, number, number, number, string, number}, voidType);
     declareBuiltin("__zgraphics_drawRectangle",

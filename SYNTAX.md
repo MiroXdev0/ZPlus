@@ -38,28 +38,81 @@ one.
 ## 2. Hello World
 
 ```zp
-start:
+start {
     printz("Hello, world!")
-stop
+} stop
 ```
 
-`start:` begins the program's explicit entry block; `stop` closes it. `printz` is the preferred output function and writes one or more values without adding a newline. `say` writes one value followed by a newline. **Implemented.**
+`start {` begins the program's explicit entry block; `} stop` closes it. `printz` is the preferred output function and writes one or more values without adding a newline. `say` writes one value followed by a newline. **Implemented.**
 
 ## 3. Program Structure
 
-The compiler accepts top-level declarations and statements. A `start:` / `stop` block is supported, but not mandatory; top-level executable statements are also placed in the generated program entry function. Functions are declared outside or alongside the entry block.
+The compiler accepts top-level declarations and statements. A `start {` / `} stop` block is supported, but not mandatory; top-level executable statements are also placed in the generated program entry function. Functions are declared outside or alongside the entry block.
 
 ```zp
-fn announce(message: string):
+fn announce(message: string) {
     say(message)
-end
+} end fn
 
-start:
+start {
     announce("Ready")
-stop
+} stop
 ```
 
-`start` requires a colon and is closed by `stop`. Functions and other compound constructs use a colon and `end`. Newlines and indentation make code readable, but indentation has no syntactic meaning. The compiler creates an internal entry function for top-level code. If a zero-parameter function named `main` is declared, `zp run` and `zp build` use it as the entry point; otherwise they use top-level code. **Implemented.**
+Brace blocks with explicit typed terminators are the official syntax. The older colon/`end` syntax remains accepted for existing programs, but a block cannot mix the two styles. Newlines and indentation are not block delimiters. The compiler creates an internal entry function for top-level code. If a zero-parameter function named `main` is declared, `zp run` and `zp build` use it as the entry point; otherwise they use top-level code. **Implemented; legacy syntax remains available.**
+
+### Official brace syntax and migration
+
+`{` opens a block and `}` closes its body. The matching terminator is required after the closing brace: functions use `end fn`, conditionals use `end if`, loops use their corresponding `end while`, `end for`, or `end repeat`, switch uses `end switch`, and `start` uses `stop`. `else` and `else if` continue the same `if` and do not have their own terminator. Semicolons are not required between ordinary statements.
+
+```zp
+fn calculate(a: number, b: number): number {
+    return a + b
+} end fn
+
+start {
+    let score = calculate(40, 50)
+    if score >= 90 {
+        say("Excellent")
+    } else if score >= 70 {
+        say("Good")
+    } else {
+        say("Needs improvement")
+    } end if
+
+    while score < 100 {
+        score++
+    } end while
+
+    for index in 0..3 {
+        say(index)
+    } end for
+
+    let values = [7, 8]
+    for value in values {
+        say(value)
+    } end for
+} stop
+```
+
+Range iteration is start-inclusive and end-exclusive (`0..3` visits 0, 1, and 2). The start and end expressions are evaluated once. Array iteration evaluates the collection once and visits its elements in index order. C-style `for (initializer; condition; increment) { ... } end for` remains supported as well. `switch` retains its existing `case`/`default` behavior; `match` is not implemented. `try`/`catch` and `defer` support braces and require `end try` and `end defer`, respectively.
+
+Each block must use one style throughout: do not nest colon/`end` blocks inside brace blocks or vice versa. Struct, class, enum, and namespace declarations use braces and matching explicit terminators as well. Terminator mismatches and missing braces/terminators are parser errors that identify the opened block where available.
+
+Migration is structural, not a text replacement. For each old block, replace its colon with `{`, its matching generic `end` with `} end <block-kind>`, and keep `else` within the `if`. Replace `start:` / `stop` with `start {` / `} stop`. Keep old syntax unchanged when not migrating; both forms remain accepted, but not mixed within one block.
+
+| Legacy form | Brace form |
+|---|---|
+| `fn f(): ... end` | `fn f() { ... } end fn` |
+| `if condition: ... end` | `if condition { ... } end if` |
+| `while condition: ... end` | `while condition { ... } end while` |
+| `for (...): ... end` | `for (...) { ... } end for` |
+| `switch value: ... end` | `switch value { ... } end switch` |
+| `start: ... stop` | `start { ... } stop` |
+| `struct Name: ... end` | `struct Name { ... } end struct` |
+| `class Name: ... end` | `class Name { ... } end class` |
+| `enum Name: ... end` | `enum Name { ... } end enum` |
+| `namespace Name: ... end` | `namespace Name { ... } end namespace` |
 
 ## 4. Variables and Types
 
@@ -75,14 +128,14 @@ const name [: type] = expression
 The analyzer creates nested scopes for the program, `start`, functions, branches, loops, switch cases, and namespaces. An inner scope can shadow an outer declaration, but same-scope duplicates are rejected. Direct top-level functions are predeclared (so they can be referenced before their definition); variable declarations are analyzed in order. Each variable and parameter reference is resolved to its declaration and given a unique IR binding identity. Consequently, shadowing creates a distinct runtime binding, assignments target the lexically resolved declaration, and a block-local name is no longer visible after leaving its scope. The interpreter may retain the inaccessible local slot until its function returns.
 
 ```zp
-start:
+start {
     let score: number = 10
     let nextScore = score + 1
     const title: string = "Results"
     let pending: number
     say(title)
     say(nextScore)
-stop
+} stop
 ```
 
 The example declares typed and inferred mutable values, a constant, and an uninitialized typed variable. **Implemented.** The interpreter initializes an uninitialized local to numeric zero; this is a runtime default, not source-level type inference.
@@ -102,19 +155,19 @@ The built-in type spellings are:
 Custom type annotations use an identifier, such as `Player`. Array and pointer type spellings are `elementType[]` and `elementType*`, respectively. Array suffixes can be repeated for nested arrays; the parser accepts one pointer suffix.
 
 ```zp
-struct Player:
+struct Player {
     name: string
     score: number
-end
+} end struct
 
-start:
+start {
     let count: number = 3
     let active: bool = true
     let initial: character = 'A'
     say(count)
     say(active)
     say(initial)
-stop
+} stop
 ```
 
 Primitive annotations are checked by the analyzer. Struct annotations support runtime construction and member access in the interpreter and Windows x64 native backend; classes and enums still have no general runtime object model. `void` is a recognized annotation, not a value type. **Primitive types: implemented; structs: interpreter and Windows x64 implemented with documented limits; Linux native custom aggregates: unsupported.**
@@ -126,13 +179,13 @@ The lexer recognizes decimal integers and fractions, scientific notation, hexade
 Strings use double quotes and characters use single quotes. String escapes include `\n`, `\t`, `\r`, `\b`, `\f`, `\v`, `\a`, `\0`, `\\`, `\"`, and `\'`. Character literals must contain one character (or one recognized escape). Physical newlines are not allowed inside a quoted literal.
 
 ```zp
-start:
+start {
     say(12.5e2)
     say(0x10)
     say("first\nsecond")
     say('Z')
     say(false)
-stop
+} stop
 ```
 
 Decimal, scientific, binary (`0b...`), and hexadecimal (`0x...`) literals are parsed as IEEE-754 double values. The native backend preserves those values as 64-bit doubles. Division by zero follows IEEE-754 behavior (`inf`, `-inf`, or `nan`); output uses a consistent shortest-round-trip representation and prints special values as `inf`, `-inf`, or `nan`. The interpreter represents characters as strings and `null` as false. **Implemented for numeric execution on Windows x64; native runtime imports and Linux execution remain platform-limited.**
@@ -144,7 +197,7 @@ Decimal, scientific, binary (`0b...`), and hexadecimal (`0x...`) literals are pa
 Expressions include literals, identifiers, parenthesized expressions, calls, array literals, indexing, member access, unary and binary operators, assignments, and the conditional `?:` expression.
 
 ```zp
-start:
+start {
     let first: number = 6
     let second: number = 2
     let total: number = first + second * 3
@@ -153,7 +206,7 @@ start:
     let label: string = positive ? "valid" : "invalid"
     say(message)
     say(label)
-stop
+} stop
 ```
 
 Arithmetic, comparisons, logical operators, string concatenation, and conditional selection are executable. `+` concatenation is semantically accepted for two strings; mixed string/number addition is not. **Implemented** for these forms.
@@ -185,11 +238,11 @@ Assignment targets must be identifiers, member accesses, or index expressions. A
 Strings can be printed and concatenated with `+` or `+=` when both operands are strings according to semantic analysis. There is no string interpolation or built-in string-method syntax.
 
 ```zp
-start:
+start {
     let greeting: string = "Hello"
     greeting += ", Z+"
     say(greeting)
-stop
+} stop
 ```
 
 The interpreter also concatenates if either runtime value is a string, but the semantic analyzer only promises compatible string operands. **Implemented** for the checked string operations shown.
@@ -197,106 +250,107 @@ The interpreter also concatenates if either runtime value is a string, but the s
 ## 6. Functions
 
 ```text
-fn name(parameter [: type] [= default], ...) [-> returnType]:
+fn name(parameter [: type] [= default], ...) [: returnType] {
     statements
-end
+} end fn
 ```
 
-Parentheses are required, including for a zero-parameter function. Parameter type annotations and the return annotation are optional. Missing parameter types become `unknown`; a missing return annotation means `void`—return types are not inferred. Trailing parameters may have default expressions; later parameters must also have defaults. Defaults are evaluated when the call omits those arguments, in parameter order, and can refer to earlier parameters. `return` can provide an expression or no value and is only valid inside a function. Explicit returned values are checked against the declared return type, but the analyzer does not require every control-flow path to return.
+Parentheses are required, including for a zero-parameter function. Parameter type annotations and the return annotation are optional. Missing parameter types become `unknown`; a missing return annotation means `void`—return types are not inferred. The legacy `-> returnType` spelling remains accepted. Trailing parameters may have default expressions; later parameters must also have defaults. Defaults are evaluated when the call omits those arguments, in parameter order, and can refer to earlier parameters. `return` can provide an expression or no value and is only valid inside a function. Explicit returned values are checked against the declared return type, but the analyzer does not require every control-flow path to return.
 
 ```zp
-fn add(left: number, right: number) -> number:
+fn add(left: number, right: number): number {
     return left + right
-end
+} end fn
 
-fn greet(name: string = "friend") -> string:
+fn greet(name: string = "friend"): string {
     return "Hello, " + name
-end
+} end fn
 
-start:
+start {
     say(add(2, 3))
     say(greet("Z+"))
-stop
+} stop
 ```
 
 Default expressions are type-checked and evaluated only when their trailing argument is omitted. They are evaluated in parameter order and may refer to earlier parameters. Parameters without defaults cannot follow parameters with defaults. The interpreter and native backend receive the completed argument list, so both execution paths use the same defaults. **Default arguments: implemented.**
 
 ## 7. Control Flow
 
-Conditions for `if`, `while`, and `for` must be boolean (or have `unknown` type). Parentheses around a condition are optional. Every body starts after `:` and is closed by `end`, except the program entry block, which uses `stop`.
+Conditions for `if`, `while`, and C-style `for` must be boolean (or have `unknown` type). Parentheses around a condition are optional. Braces and explicit terminators are the official block form:
 
 ```zp
-start:
+start {
     let value: number = 0
 
-    if value == 0:
+    if value == 0 {
         say("zero")
-    else:
+    } else {
         say("nonzero")
-    end
+    } end if
 
-    while value < 2:
+    while value < 2 {
         value++
-    end
+    } end while
 
-    repeat(2):
+    repeat(2) {
         say("repeat")
-    end
+    } end repeat
 
-    for (let i: number = 0; i < 3; i++):
-        if i == 0:
+    for (let i: number = 0; i < 3; i++) {
+        if i == 0 {
             continue
-        else:
-        end
-        if i == 2:
+        } end if
+        if i == 2 {
             break
-        else:
-        end
+        } end if
         say(i)
-    end
+    } end for
 
-    switch value:
-        case 2:
+    switch value {
+        case 2 {
             say("matched")
-        default:
+        }
+        default {
             say("other")
-    end
-stop
+        }
+    } end switch
+} stop
 ```
 
-- `if` supports `else`; there is no dedicated `else if` production, but nested `if` statements are possible.
-- **Parser limitation:** an `if` without `else` currently fails to parse. The parser scans its then-body looking for `else` and consumes `end` as an unexpected token if no `else` is present. Include an `else:` branch (which may be empty) to compile an `if`.
-- `while condition:` repeats while true.
-- `repeat(count):` requires a numeric count and repeats a fixed number of times.
-- `for (initializer; condition; increment):` requires parentheses and both semicolons; each clause may be omitted.
+- `if` supports an optional `else`, including `else if` chains. Braced `if` without `else` is valid.
+- `while condition { ... } end while` repeats while true.
+- `repeat(count) { ... } end repeat` requires a numeric count and repeats a fixed number of times.
+- C-style `for (initializer; condition; increment) { ... } end for` requires parentheses and both semicolons; each clause may be omitted.
+- `for name in start..end { ... } end for` iterates the integer values from start inclusive to end exclusive. `for name in array { ... } end for` visits array elements in order.
 - `break` and `continue` are valid only inside loops according to semantic analysis. Although switch lowering has break handling, semantic analysis rejects `break` inside a switch unless it is also inside a loop.
-- `switch expression:` supports `case expression:` and `default:`. A selected case runs then branches to the end; there is no fall-through.
+- `switch expression { ... } end switch` supports braced `case expression { ... }` and `default { ... }` arms. A selected case runs then branches to the end; there is no fall-through.
 
-The loop forms, `if` with `else`, and switch dispatch are implemented by the interpreter. **Implemented with the `if` limitation above.**
+The loop forms, `if`/`else if`/`else`, and switch dispatch are lowered through the shared AST and implemented by the interpreter and Windows x64 native backend. The old colon/`end` form remains accepted for compatibility and retains its legacy parsing constraints. **Implemented.**
 
 ### Error handling and cleanup
 
-`throw expression` raises an error. The interpreter converts the value to its
-string representation and stores it in an `Error` value with a `message`
-field. A `try` requires one `catch` clause:
+`throw expression` raises an error. The interpreter converts ordinary values
+to their string representation and stores the result in an `Error` value with
+a `message` field. Throwing a caught `Error` value again preserves its
+`message`. A `try` requires one `catch` clause; the binding may be written with
+or without parentheses:
 
 ```zp
-fn divide(a: number, b: number) -> number:
-    if b == 0:
+fn divide(a: number, b: number): number {
+    if b == 0 {
         throw "Division by zero"
-    else:
-    end
+    } end if
     return a / b
-end
+} end fn
 
-start:
-    try:
+start {
+    try {
         let result = divide(10, 0)
         say(result)
-    catch (error):
+    } catch error {
         say(error.message)
-    end
-stop
+    } end try
+} stop
 ```
 
 An active `catch` handles explicit `throw` values and interpreter runtime
@@ -318,11 +372,11 @@ scope are attempted; if one or more fail, the first cleanup failure is
 propagated after the remaining calls have run and may replace the error that
 started unwinding.
 
-The interpreter implements these behaviors. The Windows x64 native backend
-does not yet implement `try`, `catch`, `throw`, or `defer` and reports them as
-unsupported; ordinary programs without these constructs remain supported.
-Native `scope_push`/`scope_pop` markers are ignored only when the module has no
-deferred calls.
+The interpreter implements these behaviors. The Windows x64 and Linux native
+backends do not yet implement `try`, `catch`, `throw`, or `defer` and report
+them as unsupported with the source location when available; ordinary programs
+without these constructs remain supported. Native `scope_push`/`scope_pop`
+markers are ignored only when the module has no deferred calls.
 
 ## 8. Data Structures
 
@@ -331,12 +385,12 @@ deferred calls.
 Array literals use square brackets; array types use `T[]`, including nested forms such as `number[][]`. The analyzer checks array element compatibility, indexed receiver types, numeric index types, and assignment compatibility.
 
 ```zp
-start:
+start {
     let values: number[] = [10, 20, 30]
     say(values[0])
     values[1] = 99
     say(length(values))
-stop
+} stop
 ```
 
 The interpreter executes typed and inferred arrays, empty typed arrays, nested arrays, indexed reads and writes, compound indexed assignment, and dynamic mutation. The built-ins are `push(array, value)`, `pop(array)`, `clear(array)`, `insert(array, index, value)`, `remove(array, index)`, `contains(array, value)`, and `length(array)`. `pop`/`remove` return the removed element; `push`/`clear`/`insert` return no value. Arrays grow geometrically and aliases refer to the same mutable array. `clear`, `pop`, and `remove` shrink logical length while retaining capacity for reuse. `contains` compares numbers and booleans by value, strings by contents, and nested arrays by identity.
@@ -346,74 +400,74 @@ Windows x64 native builds support the same operations, including function argume
 ### Structs, classes, and enums
 
 ```text
-struct Name:
+struct Name {
     field [: type] [= default]
-end
+} end struct
 
-class Name:
+class Name {
     field [: type] [= initializer]
-    fn method(...):
+    fn method(...) {
         ...
-    end
-end
+    } end fn
+} end class
 
-enum Name:
+enum Name {
     Member [= numericExpression]
-end
+} end enum
 ```
 
 ```zp
-struct Player:
+struct Player {
     name: string = "Ari"
     health: number = 100
-end
+} end struct
 
-class Counter:
+class Counter {
     value: number = 0
-    fn current() -> number:
+    fn current(): number {
         return 0
-    end
-end
+    } end fn
+} end class
 
-enum State:
+enum State {
     Ready
     Done = 1
-end
+} end enum
 
-start:
+start {
     say("Declarations are accepted")
-stop
+} stop
 ```
 
 Structs support positional construction, typed fields, literal defaults, field reads and writes, nested structs, arrays in fields, arrays of structs, and passing/returning instances through functions. Struct values use reference semantics in both the interpreter and Windows x64 native backend. The `is` operator recognizes struct instances in both execution modes. For example:
 
 ```zp
-struct Player:
+struct Player {
     name: string
     health: number = 100
-end
+} end struct
 
-start:
+start {
     let player = Player("Ari")
     player.health -= 5
     say(player.health)
-stop
+} stop
 ```
 
 Fields without defaults are required constructor arguments. Constructor arguments fill fields in declaration order, so required fields must precede defaulted fields. Current field defaults must be literals. Assignment, array insertion, and function argument/return passing preserve object identity; mutating an alias changes the same instance. Interpreter structs are traced by the interpreter's managed heap. Windows native structs are tagged managed references in the existing native tracing heap; collection traces references in arrays and struct fields. Fields are public; per-field visibility is not implemented.
 
-Windows x64 native programs support struct allocation, fields, identity, `is` checks, arrays and function argument/return references. Native struct execution and tracing under allocation pressure are covered by regression tests. Linux native struct operations remain explicitly unsupported, and native `.zh` struct imports have not yet been validated. Classes/methods, enums, function values, structured error handling, and `defer` remain unimplemented at runtime; their declarations must not be mistaken for executable support. **Structs: interpreter and Windows x64 implemented; Linux and native module-import parity incomplete. Classes/enums: partial declarations only.**
+Windows x64 native programs support struct allocation, fields, identity, `is` checks, arrays and function argument/return references. Native struct execution and tracing under allocation pressure are covered by regression tests. Linux native struct operations remain explicitly unsupported, and native `.zh` struct imports have not yet been validated. Classes/methods, enums, and function values have no general runtime model. Structured error handling and `defer` execute in the interpreter but are not implemented by the Windows x64 native backend. **Structs: interpreter and Windows x64 implemented; Linux and native module-import parity incomplete. Classes/enums: partial declarations only.**
 
 ### Pointers and references
 
 Pointer type annotations use `T*`; the parser also recognizes unary `&` and `*`, and pointer-member access `->`.
 
 ```zp
-start:
+start {
     let value: number = 1
     let reference: number* = &value
     say(*reference)
-stop
+} stop
 ```
 
 The parser and analyzer accept the pointer type and address-of expression, but IR generation rejects unary `&` as an unsupported operator, so this example does not pass `zp check`. Unary `*` lowers to a plain `load`, not a real pointer dereference; `->` lowers to an unsupported member opcode. The runtime has no pointer/reference values. **Parsed and partially semantically analyzed; not implemented.**
@@ -422,18 +476,18 @@ The parser and analyzer accept the pointer type and address-of expression, but I
 
 ```zp
 // math.zh
-pub fn twice(value: number) -> number:
+pub fn twice(value: number): number {
     return value * 2
-end
+} end fn
 ```
 
 ```zp
 // main.zp
 use "math.zh" as math
 
-start:
+start {
     say(math.twice(21))
-stop
+} stop
 ```
 
 `use` is a module-loading statement. Relative paths are resolved from the directory of the file containing the statement; both `/` and `\` separators are normalized. Quoted paths support spaces. The target must exist and have a `.zh` extension. Absolute paths (including drive-qualified and UNC paths) are rejected. Dependencies are traversed depth-first in source order; canonical paths identify modules and repeated references load once. A cycle fails with a dependency-chain diagnostic.
@@ -454,10 +508,10 @@ Standard module names resolve from the configured compiler `stdlib/` directory:
 use zmath as math
 use zstring as text
 
-start:
+start {
     let result: number = math.sqrt(144) + math.pow(2, 3)
     say(text.upper("ready"))
-stop
+} stop
 ```
 
 The current implemented modules and backend limits are listed in
@@ -484,12 +538,12 @@ thresholds, and limitations.
 The source-level output built-ins are `say(value)`, `printz(value, ...values)`, and the deprecated compatibility alias `printm(value, ...values)`. `printz` and `printm` write each argument consecutively, without separators or a trailing newline; `say` writes one value followed by a newline. In the interpreter, printable values include strings, numbers, booleans, and arrays (recursively). Native output currently accepts strings only; Windows and Linux native builds support multiple string arguments.
 
 ```zp
-start:
+start {
     printz("Age: ", 16)
     printz("This line has no newline")
     say("This line ends with a newline")
     printm("Existing projects remain compatible")
-stop
+} stop
 ```
 
 `printm` behaves exactly like `printz` and produces a compiler deprecation warning recommending `printz`. `printz` does not produce a warning. Array programs also have `length(array)`, `push(array, value)`, `pop(array)`, `clear(array)`, `insert(array, index, value)`, `remove(array, index)`, and `contains(array, value)` as described above.
@@ -500,12 +554,12 @@ The lexer skips `//` line comments and `/* ... */` block comments. Block comment
 
 ```zp
 // A small complete program.
-start:
+start {
     /* The comment can span
        more than one line. */
     let message: string = "Ready"
     say(message)
-stop
+} stop
 ```
 
 Newlines generally separate statements; semicolons can also separate statements and are mandatory between `for` header clauses. A newline cannot generally continue an expression. Keep expressions, declarations, and headers on one line unless the grammar explicitly provides a block.
@@ -569,7 +623,8 @@ Bitwise operators follow the tiers shown above. The parser does not recognize `a
 | Binary, hexadecimal, decimal, scientific numeric literals | Supported | Parsed and represented as doubles; Windows x64 native execution supports fractions and IEEE-754 division/comparison |
 | Arrays and indexing | Parsed, semantically checked | Nested arrays, indexing, mutation, and length execute in the interpreter and Windows x64 native backend and are tracing-GC managed; Linux native compilation rejects them |
 | Managed memory | `use zmemory.management` and public APIs | Interpreter arrays/dynamic strings and Windows x64 native arrays/dynamic strings use mark-and-sweep; other interpreter strings remain value-owned |
-| Structs, classes, enums | Parsed, semantically checked | Type metadata only; no runtime aggregate values |
+| Structs | Parsed, semantically checked | Interpreter and Windows x64 runtime values; Linux native unsupported |
+| Classes, enums, namespaces | Braced declarations parsed | No general runtime class/enum or namespace-qualified lookup |
 | Member access and `->` | Parsed; member types remain unresolved | IR generated; interpreter throws for member operations |
 | Pointer types and address-of | Parsed; pointer types accepted | Address-of fails IR generation; no runtime pointers |
 | `use` with `.zh` declarations | Parsed by compiler and extension | Canonical-path dependency graph; public/private visibility, aliases, qualified function/variable/constant access; globals initialize in interpreter and native supported scalar subset |
@@ -590,13 +645,13 @@ The standard-library module `zgraphics` provides numeric window handles and modu
 ```zp
 use zgraphics
 
-start:
+start {
     let app = zgraphics.createWindow("Z+ graphics", 640, 360)
     zgraphics.background(app, "#18202B")
     zgraphics.text(app, "Close this window to exit", 24, 28, "#FFFFFF", 24)
     zgraphics.show(app)
     zgraphics.run(app)
-stop
+} stop
 ```
 
 This opens a real desktop window when run with `zp run` or built as a native Windows x64 program. Native builds package `zgraphics_runtime.dll` beside the output executable; both files must remain together. Linux native graphics linking is not implemented. Basic drawing calls include `line`, `rectangle`, and `circle`. `pollEvent` returns immediately with an event code or `0`; `waitEvent` blocks. Event details are read through `eventX`, `eventY`, `eventKey`, and `eventText`. Event codes are `1` for close, `2`/`3` for mouse down/up, `4` for mouse move, `5` for key down, and `6` for text input. See [ZGraphics/README.md](./ZGraphics/README.md) for the complete API and platform limitations. There are no object methods, native controls, or function callbacks.
@@ -639,7 +694,7 @@ destroy their owning world. Polygon vertices use a semicolon-separated
 ```zp
 use zphysics
 
-start:
+start {
     let world = zphysics.createWorld(0, 980)
     let floor = zphysics.createBody(world, "static", 320, 420)
     zphysics.createBox(world, floor, 600, 20)
@@ -648,7 +703,7 @@ start:
     zphysics.update(world, 1 / 60)
     say(zphysics.getPositionY(ball))
     zphysics.destroyWorld(world)
-stop
+} stop
 ```
 
 Worlds use a fixed-step accumulator and cap catch-up work. Box2D solver details
@@ -663,11 +718,11 @@ execution is not verified in this environment. See
 ### Executable core example
 
 ```zp
-fn add(a: number, b: number) -> number:
+fn add(a: number, b: number): number {
     return a + b
-end
+} end fn
 
-start:
+start {
     const label: string = "sum="
     let total: number = add(1, 2)
     total += 1
@@ -675,39 +730,39 @@ start:
     say(total)
 
     let ok: boolean = total == 4 and true
-    if ok:
+    if ok {
         say("condition")
-    else:
+    } else {
         say("wrong")
-    end
+    } end if
 
     let w: number = 0
-    while w < 1:
+    while w < 1 {
         w++
-    end
+    } end while
 
-    repeat(1):
+    repeat(1) {
         say("repeat")
-    end
+    } end repeat
 
-    for (let i: number = 0; i < 3; i++):
-        if i == 0:
+    for (let i: number = 0; i < 3; i++) {
+        if i == 0 {
             continue
-        else:
-        end
-        if i == 2:
+        } end if
+        if i == 2 {
             break
-        else:
-        end
+        } end if
         say(i)
-    end
+    } end for
 
-    switch total:
-        case 4:
+    switch total {
+        case 4 {
             say("case")
-        default:
+        }
+        default {
             say("default")
-    end
+        }
+    } end switch
 
     say(ok ? "yes" : "no")
     let bits: number = (1 | 2) ^ 3
@@ -715,7 +770,7 @@ start:
     let mark: char = 'Z'
     say(mark)
     printz("end")
-stop
+} stop
 ```
 
 This program passes both `zp check` and `zp run` with the current compiler. It exercises functions, declarations, numbers, strings, booleans, characters, arithmetic, assignment, comparisons, logical and bitwise operations, conditionals, loops, switch, `break`, `continue`, and the source-level output built-ins.
@@ -723,36 +778,36 @@ This program passes both `zp check` and `zp run` with the current compiler. It e
 ### Declaration and module-syntax example
 
 ```zp
-struct Player:
+struct Player {
     name: string = "A"
     health: number = 100
-end
+} end struct
 
-class Counter:
+class Counter {
     value: number = 0
-    fn current() -> number:
+    fn current(): number {
         return 0
-    end
-end
+    } end fn
+} end class
 
-enum State:
+enum State {
     Ready
     Done = 1
-end
+} end enum
 
-namespace Data:
+namespace Data {
     let count: number = 1
-end
+} end namespace
 
 import "math" as math
 
-export fn twice(x: number) -> number:
+export fn twice(x: number): number {
     return x * 2
-end
+} end fn
 
-start:
+start {
     say("syntax passes")
-stop
+} stop
 ```
 
 This program passes `zp check`; it demonstrates accepted declaration and module syntax, not working runtime objects or module loading. These limitations are detailed above.

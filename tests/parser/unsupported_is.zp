@@ -1,3 +1,3 @@
-start:
+start {
     say(1 is 1)
-stop
+} stop

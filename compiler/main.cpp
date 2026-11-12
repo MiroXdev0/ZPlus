@@ -143,6 +143,7 @@ void usage() {
 
         << "Options:\n"
         << "  -o <file>    Set native executable output path (build only)\n"
+        << "  --windows-gui  Use the Windows GUI subsystem (Windows builds only)\n"
         << "  -h, --help   Show this help message\n\n"
 
         << "Examples:\n"
@@ -449,6 +450,7 @@ int main(
     const std::string filename = argv[2];
     std::filesystem::path outputPath;
     bool outputPathSet = false;
+    bool windowsGui = false;
     std::vector<std::string> programArguments;
 
 
@@ -493,6 +495,15 @@ int main(
             }
             outputPath = argv[++i];
             outputPathSet = true;
+            continue;
+        }
+
+        if (argument == "--windows-gui") {
+            if (command != "build") {
+                printError("option '--windows-gui' is valid only with the build command");
+                return 1;
+            }
+            windowsGui = true;
             continue;
         }
 
@@ -564,7 +575,7 @@ int main(
 
         try {
             zplus::backend::native::NativeCodeGenerator generator;
-            generator.writeExecutable(module, outputPath);
+            generator.writeExecutable(module, outputPath, windowsGui);
         }
         catch (const std::exception& error) {
             printError(std::string("native compilation failed: ") + error.what());

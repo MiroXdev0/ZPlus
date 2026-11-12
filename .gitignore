@@ -2,3 +2,5 @@ build/
 build-zbuild/
 
 *.dll
+
+!bin/ZPlus/*.dll

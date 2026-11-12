@@ -1,33 +1,33 @@
-struct Player:
+struct Player {
     name: string
     health: number = 100
     score: number = 0
-end
+} end struct
 
-struct Inventory:
+struct Inventory {
     items: number[]
-end
+} end struct
 
-struct Session:
+struct Session {
     player: Player
-end
+} end struct
 
-fn updatePlayer(player: Player) -> Player:
+fn updatePlayer(player: Player): Player {
     player.health -= 10
     return player
-end
+} end fn
 
-start:
+start {
     let player = Player("Alex")
     let aliasByAssignment = player
     let differentInstance = Player("Alex")
     say(aliasByAssignment == player)
     say(differentInstance == player)
-    if player is Player:
+    if player is Player {
         say("is player")
-    else:
+    } else {
         say("wrong type")
-    end
+    } end if
     say(player.name)
     say(player.health)
     say(player.score)
@@ -47,4 +47,4 @@ start:
     players[0].health += 5
     say(players[1].health)
     say(player.health)
-stop
+} stop

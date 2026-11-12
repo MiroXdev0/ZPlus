@@ -6,10 +6,10 @@ Entry programs use `.zp`; reusable source modules use `.zh`. A `use` statement i
 use "math.zh"
 use "modules/network.zh" as net
 
-start:
+start {
     say(math.add(10, 20))
     say(net.status())
-stop
+} stop
 ```
 
 `use path.zh` accepts an unquoted path made from identifier/number segments, dots, hyphens, and slash separators. Quoted paths also support spaces. Both `/` and `\` are normalized on the host platform.
@@ -28,18 +28,18 @@ stop
 Declarations in a `.zh` module are private by default. `pub` makes functions, variables/constants, structs, classes, and enums accessible outside their declaring module:
 
 ```zp
-pub fn add(left: number, right: number) -> number:
+pub fn add(left: number, right: number): number {
     return left + right
-end
+} end fn
 
-fn internalHelper() -> number:
+fn internalHelper(): number {
     return 1
-end
+} end fn
 ```
 
 An importer can reference public functions, constants, and variables with the module name or alias, such as `math.add(1, 2)` or `math.answer`. Public declarations also remain available by unqualified name for backward-compatible convenience when that name is unambiguous. Private declarations are only accessible inside their declaring module; external qualified or unqualified access is diagnosed. Public types can be used by their unqualified type name. Type syntax does not currently support dotted/qualified custom type names.
 
-Public structs can be constructed by their unqualified type name after importing the declaring module. Struct construction, fields, and runtime type checks currently execute in the interpreter only; native builds reject the generated member operations. Private type names and ambiguous public type names remain subject to the same module visibility checks.
+Public structs can be constructed by their unqualified type name after importing the declaring module. Struct construction, fields, and runtime type checks execute in the interpreter and Windows x64 native backend; Linux native support is unavailable. Native imported-struct behavior is not covered by the current module tests. Private type names and ambiguous public type names remain subject to the same module visibility checks.
 
 The loader preserves the source location and owning module on declarations. Duplicate names and ambiguous unqualified public names are diagnosed rather than silently selected. `export` and legacy `import` are older parser constructs; they do not replace `pub` or load a source file.
 
@@ -58,10 +58,10 @@ directory, not relative to the process working directory:
 use zmath as math
 use zstring as text
 
-start:
+start {
     let result: number = math.sqrt(144)
     say(text.upper("ready"))
-stop
+} stop
 ```
 
 The aliases qualify public declarations and are resolved by the analyzer.
@@ -97,17 +97,17 @@ Project/
 `header.zh`:
 
 ```zp
-pub fn greet(name: string):
+pub fn greet(name: string) {
     say("Hello " + name)
-end
+} end fn
 ```
 
 `modules/math.zh`:
 
 ```zp
-pub fn add(left: number, right: number) -> number:
+pub fn add(left: number, right: number): number {
     return left + right
-end
+} end fn
 ```
 
 `main.zp`:
@@ -116,8 +116,8 @@ end
 use header.zh
 use "modules/math.zh" as math
 
-start:
+start {
     greet("Z+")
     say(math.add(10, 20))
-stop
+} stop
 ```

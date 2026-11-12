@@ -1,14 +1,14 @@
-start:
+start {
     let total: number = 0
     let index: number = 0
-    while index < 10:
+    while index < 10 {
         total += index
         index++
-    end
+    } end while
 
-    if total == 45:
+    if total == 45 {
         say("control flow passed")
-    else:
+    } else {
         say("control flow failed")
-    end
-stop
+    } end if
+} stop

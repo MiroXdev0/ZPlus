@@ -1,0 +1,31 @@
+use zargs as args
+use zpath as path
+use zsystem as system
+use zstring as text
+use "ui/wizard.zh" as wizard
+use "components/deployment.zh" as deployment
+use "components/integration.zh" as integration
+
+start {
+    if system.platform() != "Windows" or system.architecture() != "x64" {
+        system.messageBox("Z+ Setup", "This release supports Windows x64 only.", "ok", "error")
+    } else {
+        let executableDirectory = path.directory(system.executablePath())
+        let payloadDirectory = path.join(executableDirectory, "payload")
+        let payloadManifest = path.join(executableDirectory, "payload.sha256")
+        if args.has("--uninstall") {
+            let answer = system.messageBox("Z+ Uninstaller", "Remove the Z+ files recorded by this installation?", "yesNo", "warning")
+            if answer == 6 {
+                let integrationError = integration.remove(executableDirectory)
+                if text.length(integrationError) == 0 {
+                    let result = deployment.uninstall(executableDirectory)
+                    system.messageBox("Z+ Uninstaller", result, "ok", "info")
+                } else {
+                    system.messageBox("Z+ Uninstaller", integrationError, "ok", "error")
+                } end if
+            } end if
+        } else {
+            wizard.run(payloadDirectory, payloadManifest)
+        } end if
+    } end if
+} stop

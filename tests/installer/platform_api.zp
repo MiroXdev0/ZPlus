@@ -1,0 +1,69 @@
+use zcrypto as crypto
+use zenv as env
+use zfile as file
+use zfilesystem as filesystem
+use zjson as json
+use zpath as path
+use zprocess as process
+use zregistry as registry
+use zsystem as system
+use zstring as text
+
+start {
+    let root = env.currentDirectory()
+    let testDirectory = path.join(root, "installer-platform-api")
+    file.createDirectory(testDirectory)
+
+    let source = path.join(testDirectory, "source.txt")
+    let copied = path.join(testDirectory, "copied.txt")
+    let moved = path.join(testDirectory, "moved.txt")
+    file.write(source, "abc")
+    if crypto.sha256File(source) != "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD" {
+        say("sha256 failed")
+    } end if
+    if not filesystem.copyFile(source, copied, false) {
+        say("copy failed")
+    } end if
+    if file.read(copied) != "abc" {
+        say("copy contents failed")
+    } end if
+    if not filesystem.moveFile(copied, moved, false) {
+        say("move failed")
+    } end if
+    if filesystem.exists(copied) or file.read(moved) != "abc" {
+        say("move result failed")
+    } end if
+    if not filesystem.deleteFile(source) or not filesystem.deleteFile(moved) {
+        say("delete failed")
+    } end if
+    if not filesystem.removeEmptyDirectory(testDirectory) {
+        say("remove empty directory failed")
+    } end if
+
+    if system.platform() != "Windows" or system.architecture() != "x64" or system.osVersion() == "" or system.availableSpace(root) <= 0 {
+        say("system information failed")
+    } end if
+
+    let command = "C:\\Windows\\System32\\cmd.exe"
+    let result = process.run(command, ["/d", "/c", "echo ZPLUS_PROCESS_OK"], root, 10000)
+    if json.getNumber(result, "/exitCode") != 0 or not text.contains(json.getString(result, "/stdout"), "ZPLUS_PROCESS_OK") {
+        say("process execution failed")
+    } end if
+
+    let key = "Software\\ZPlus\\Tests\\InstallerPlatform"
+    if not registry.writeString(key, "probe", "preserved", "string") {
+        say("registry write failed")
+    } end if
+    if registry.readString(key, "probe") != "preserved" or registry.valueKind(key, "probe") != "string" {
+        say("registry read failed")
+    } end if
+    if not registry.deleteValue(key, "probe") {
+        say("registry delete failed")
+    } end if
+    let pathKind = registry.valueKind("Environment", "Path")
+    if pathKind != "string" and pathKind != "expandString" {
+        say("current-user PATH registry access failed")
+    } end if
+
+    say("installer-platform-api-passed")
+} stop

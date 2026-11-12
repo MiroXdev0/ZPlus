@@ -1,23 +1,23 @@
 use zsqlite as sqlite
 use zjson as json
 
-start:
+start {
     let database = sqlite.open(":memory:")
     sqlite.execute(database, "CREATE TABLE things (name TEXT, count INTEGER)", "[]")
     sqlite.execute(database, "INSERT INTO things VALUES (?, ?)", "[\"widgets\",3]")
     let rows = sqlite.query(database, "SELECT name, count FROM things", "[]")
-    if json.getString(rows, "/0/name") == "widgets" and json.getNumber(rows, "/0/count") == 3:
+    if json.getString(rows, "/0/name") == "widgets" and json.getNumber(rows, "/0/count") == 3 {
         printz("sqlite-query-passed\n")
-    else:
+    } else {
         printz("sqlite-query-failed\n")
-    end
+    } end if
     sqlite.begin(database)
     sqlite.execute(database, "INSERT INTO things VALUES (?, ?)", "[\"temporary\",1]")
     sqlite.rollback(database)
-    if sqlite.query(database, "SELECT name FROM things WHERE name = ?", "[\"temporary\"]") == "[]":
+    if sqlite.query(database, "SELECT name FROM things WHERE name = ?", "[\"temporary\"]") == "[]" {
         printz("sqlite-rollback-passed\n")
-    else:
+    } else {
         printz("sqlite-rollback-failed\n")
-    end
+    } end if
     sqlite.close(database)
-stop
+} stop

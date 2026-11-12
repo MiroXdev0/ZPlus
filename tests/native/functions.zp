@@ -1,16 +1,16 @@
-fn twice(value: number) -> number:
+fn twice(value: number): number {
     return value * 2
-end
+} end fn
 
-fn combine(first: number, second: number, third: number, fourth: number) -> number:
+fn combine(first: number, second: number, third: number, fourth: number): number {
     return first + second + third + fourth
-end
+} end fn
 
-start:
+start {
     let result: number = combine(twice(10), 8, 1, 13)
-    if result == 42:
+    if result == 42 {
         say("function calls passed")
-    else:
+    } else {
         say("function calls failed")
-    end
-stop
+    } end if
+} stop

@@ -4,7 +4,7 @@ let count = zaudio.deviceCount()
 say("Playback devices:")
 say(count)
 
-if count > 0:
+if count > 0 {
     let selected = zaudio.defaultDevice()
     say("Default playback device:")
     say(selected)
@@ -22,6 +22,6 @@ if count > 0:
     say(zaudio.isMuted())
 
     zaudio.shutdown()
-else:
+} else {
     say("No playback device is available")
-end
+} end if

@@ -1,0 +1,43 @@
+pub fn platform() -> string:
+    return __zstdlib_system_platform()
+end
+
+pub fn architecture() -> string:
+    return __zstdlib_system_architecture()
+end
+
+pub fn osVersion() -> string:
+    return __zstdlib_system_osVersion()
+end
+
+pub fn executablePath() -> string:
+    return __zstdlib_system_executablePath()
+end
+
+pub fn availableSpace(path: string) -> number:
+    return __zstdlib_system_availableSpace(path)
+end
+
+pub fn selectFolder(title: string, initialPath: string) -> string:
+    return __zstdlib_system_selectFolder(title, initialPath)
+end
+
+pub fn messageBox(title: string, message: string, buttons: string, icon: string) -> number:
+    return __zstdlib_system_messageBox(title, message, buttons, icon)
+end
+
+pub fn createShortcut(path: string, target: string, arguments: string, workingDirectory: string) -> boolean:
+    return __zstdlib_system_createShortcut(path, target, arguments, workingDirectory)
+end
+
+pub fn shortcutTarget(path: string) -> string:
+    return __zstdlib_system_shortcutTarget(path)
+end
+
+pub fn shortcutArguments(path: string) -> string:
+    return __zstdlib_system_shortcutArguments(path)
+end
+
+pub fn removeShortcutIfMatches(path: string, target: string, arguments: string) -> boolean:
+    return __zstdlib_system_removeShortcutIfMatches(path, target, arguments)
+end

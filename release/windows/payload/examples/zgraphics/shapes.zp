@@ -1,6 +1,6 @@
 use zgraphics
 
-start:
+start {
     let app = zgraphics.createWindow("Z+ Shapes", 760, 520)
     zgraphics.background(app, "#151923")
     zgraphics.text(app, "Drawing with ZGraphics", 28, 24, "#FFFFFF", 28)
@@ -15,4 +15,4 @@ start:
     zgraphics.text(app, "Outlined circle", 505, 445, "#D1D5DB", 16)
     zgraphics.show(app)
     zgraphics.run(app)
-stop
+} stop

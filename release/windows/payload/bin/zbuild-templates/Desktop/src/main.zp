@@ -2,24 +2,24 @@ use zgraphics
 use "window.zh" as app_window
 use "ui/layout.zh" as layout
 
-start:
+start {
     let app = app_window.create("{{PROJECT_NAME}}")
     let clicks = 0
     zgraphics.show(app)
-    while zgraphics.isOpen(app):
+    while zgraphics.isOpen(app) {
         zgraphics.update(app)
-        if zgraphics.keyPressed(app, 27):
+        if zgraphics.keyPressed(app, 27) {
             zgraphics.close(app)
-        else:
-        end
-        if zgraphics.isOpen(app):
-            if zgraphics.mouseButtonPressed(app, 1):
+        } else {
+        } end if
+        if zgraphics.isOpen(app) {
+            if zgraphics.mouseButtonPressed(app, 1) {
                 clicks += 1
-            else:
-            end
+            } else {
+            } end if
             zgraphics.clear(app)
             app_window.drawFrame(app, clicks)
-        else:
-        end
-    end
-stop
+        } else {
+        } end if
+    } end while
+} stop

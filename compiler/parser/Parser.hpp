@@ -61,6 +61,11 @@ public:
 
 private:
 
+    enum class BlockSyntax {
+        Legacy,
+        Braced
+    };
+
     // ========================================================
     // Token navigation
     // ========================================================
@@ -194,6 +199,27 @@ private:
     >
     parseUntil(
         zplus::TokenType endToken
+    );
+
+    std::vector<
+        std::unique_ptr<zplus::ast::Statement>
+    >
+    parseBracedBody(
+        const zplus::Token& opening,
+        const std::string& blockName,
+        bool stopAtElse = false,
+        bool stopAtCatch = false
+    );
+
+    void consumeExplicitTerminator(
+        zplus::TokenType expected,
+        const std::string& blockName,
+        const zplus::Token& opening
+    );
+
+    void validateBlockSyntax(
+        BlockSyntax syntax,
+        const zplus::Token& opening
     );
 
     // ========================================================
@@ -391,6 +417,8 @@ private:
     std::vector<zplus::Token> tokens_;
 
     std::size_t current_ = 0;
+    std::size_t syntheticNameCounter_ = 0;
+    std::vector<BlockSyntax> blockSyntaxStack_;
 
     // ========================================================
     // Parser errors

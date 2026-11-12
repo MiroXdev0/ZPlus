@@ -1,15 +1,15 @@
 use zmath as math
 
-start:
+start {
     say(math.pi())
     say(math.sqrt(2))
     say(1 / 0)
     let nan: number = 0 / 0
     say(nan)
     say(-0.0)
-    if nan != nan:
+    if nan != nan {
         say("nan comparison passed")
-    else:
+    } else {
         say("nan comparison failed")
-    end
-stop
+    } end if
+} stop

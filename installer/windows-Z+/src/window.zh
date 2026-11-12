@@ -1,0 +1,9 @@
+use zgraphics as graphics
+
+pub fn create(): number {
+    let window = graphics.createWindow("Z+ Setup 1.1.2", 980, 700)
+    graphics.setTargetFPS(window, 30)
+    graphics.background(window, "#11171D")
+    graphics.show(window)
+    return window
+} end fn

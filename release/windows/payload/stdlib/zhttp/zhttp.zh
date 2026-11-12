@@ -1,51 +1,51 @@
-pub fn serverCreate(address: string, port: number) -> number:
+pub fn serverCreate(address: string, port: number): number {
     return __zhttp_serverCreate(address, port)
-end
+} end fn
 
-pub fn serverStart(server: number) -> boolean:
+pub fn serverStart(server: number): boolean {
     return __zhttp_serverStart(server)
-end
+} end fn
 
-pub fn serverRunning(server: number) -> boolean:
+pub fn serverRunning(server: number): boolean {
     return __zhttp_serverRunning(server)
-end
+} end fn
 
-pub fn serverPort(server: number) -> number:
+pub fn serverPort(server: number): number {
     return __zhttp_serverPort(server)
-end
+} end fn
 
-pub fn serverNext(server: number, timeoutMilliseconds: number) -> string:
+pub fn serverNext(server: number, timeoutMilliseconds: number): string {
     return __zhttp_serverNext(server, timeoutMilliseconds)
-end
+} end fn
 
-pub fn serverRespond(server: number, requestId: number, status: number, headersJson: string, body: string) -> boolean:
+pub fn serverRespond(server: number, requestId: number, status: number, headersJson: string, body: string): boolean {
     return __zhttp_serverRespond(server, requestId, status, headersJson, body)
-end
+} end fn
 
-pub fn serverStop(server: number):
+pub fn serverStop(server: number) {
     __zhttp_serverStop(server)
-end
+} end fn
 
-pub fn serverConfigure(server: number, maximumBodyBytes: number, timeoutMilliseconds: number):
+pub fn serverConfigure(server: number, maximumBodyBytes: number, timeoutMilliseconds: number) {
     __zhttp_serverConfigure(server, maximumBodyBytes, timeoutMilliseconds)
-end
+} end fn
 
-pub fn configureCors(server: number, origin: string, methods: string, headers: string):
+pub fn configureCors(server: number, origin: string, methods: string, headers: string) {
     __zhttp_configureCors(server, origin, methods, headers)
-end
+} end fn
 
-pub fn routeParams(path: string, pattern: string) -> string:
+pub fn routeParams(path: string, pattern: string): string {
     return __zhttp_routeParams(path, pattern)
-end
+} end fn
 
-pub fn queryValue(query: string, name: string) -> string:
+pub fn queryValue(query: string, name: string): string {
     return __zhttp_queryValue(query, name)
-end
+} end fn
 
-pub fn requestHeader(requestJson: string, name: string) -> string:
+pub fn requestHeader(requestJson: string, name: string): string {
     return __zhttp_requestHeader(requestJson, name)
-end
+} end fn
 
-pub fn request(method: string, url: string, headersJson: string, body: string, timeoutMilliseconds: number) -> string:
+pub fn request(method: string, url: string, headersJson: string, body: string, timeoutMilliseconds: number): string {
     return __zhttp_clientRequest(method, url, headersJson, body, timeoutMilliseconds)
-end
+} end fn

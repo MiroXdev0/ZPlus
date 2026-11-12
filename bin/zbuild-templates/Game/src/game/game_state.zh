@@ -1,13 +1,13 @@
 use zgraphics
 
-pub fn startX() -> number:
+pub fn startX(): number {
     return 80
-end
+} end fn
 
-pub fn startY() -> number:
+pub fn startY(): number {
     return 180
-end
+} end fn
 
-pub fn drawHud(window: number, score: number):
+pub fn drawHud(window: number, score: number) {
     zgraphics.text(window, "Score: " + zgraphics.numberText(score), 24, 386, "#F8FAFC", 16)
-end
+} end fn

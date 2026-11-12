@@ -1,51 +1,82 @@
-fn fail():
+fn fail() {
     throw "boom"
-end
+} end fn
 
-fn returnWithCleanup() -> number:
+fn failCleanup() {
+    throw "cleanup failure"
+} end fn
+
+fn rethrow(error: Error) {
+    throw error
+} end fn
+
+fn returnWithCleanup(): number {
     let message: string = "returned"
-    defer:
+    defer {
         say(message)
-    end
+    } end defer
     message = "changed"
-    defer:
+    defer {
         say("last")
-    end
+    } end defer
     return 7
-end
+} end fn
 
-start:
-    defer:
+start {
+    defer {
         say("outer")
-    end
+    } end defer
 
-    try:
-        try:
-            defer:
+    try {
+        try {
+            defer {
                 say("try cleanup")
-            end
+            } end defer
             fail()
-        catch (inner):
+        } catch (inner){
             say("inner: " + inner.message)
             throw "raised again"
-        end
-    catch (outer):
+        } end try
+    } catch (outer){
         say(outer.message)
-    end
+    } end try
 
-    if true:
-        defer:
+    if true {
+        defer {
             say("nested")
-        end
-    end
+        } end defer
+    } end if
 
     let value = returnWithCleanup()
     say(value)
 
-    try:
+    try {
         let empty: number[] = []
         pop(empty)
-    catch (runtime):
+    } catch runtime {
         say("runtime: " + runtime.message)
-    end
-stop
+    } end try
+
+    try {
+        try {
+            defer {
+                failCleanup()
+            } end defer
+            throw "original failure"
+        } catch inner {
+            say("inner handler should be bypassed")
+        } end try
+    } catch cleanup {
+        say("cleanup: " + cleanup.message)
+    } end try
+
+    try {
+        try {
+            fail()
+        } catch first {
+            rethrow(first)
+        } end try
+    } catch second {
+        say("rethrow: " + second.message)
+    } end try
+} stop

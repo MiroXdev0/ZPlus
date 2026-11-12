@@ -1,0 +1,21 @@
+[project]
+name = "Z+ installer"
+version = "1.1.2"
+description = "Official Z+ 1.1.2 Windows installer, implemented in Z+"
+entry = "src/main.zp"
+
+[build]
+backend = "native"
+mode = "release"
+output_dir = "dist"
+optimization = 0
+jobs = 0
+windows_gui = true
+
+[compiler]
+warnings = true
+debug_symbols = false
+
+[platform]
+windows = true
+linux = false

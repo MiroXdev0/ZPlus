@@ -25,6 +25,7 @@ public:
     void close(int);
     bool isOpen(int);
     void drawText(int, const std::string&, int, int, Color, int);
+    void drawImage(int, const std::string&, int, int, int, int);
     void drawLine(int, int, int, int, int, Color, int);
     void drawRectangle(int, int, int, int, int, Color, bool, int);
     void drawCircle(int, int, int, int, Color, bool, int);

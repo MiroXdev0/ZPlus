@@ -1,24 +1,24 @@
-start:
+start {
     let total: number = 0
-    for (let index: number = 0; index < 6; index++):
-        if index == 2:
+    for (let index: number = 0; index < 6; index++) {
+        if index == 2 {
             continue
-        else:
-        end
-        if index == 5:
+        } else {
+        } end if
+        if index == 5 {
             break
-        else:
-        end
+        } else {
+        } end if
         total += index
-    end
+    } end for
 
-    repeat(3):
+    repeat(3) {
         total += 10
-    end
+    } end repeat
 
-    if total == 38:
+    if total == 38 {
         say("loop control passed")
-    else:
+    } else {
         say("loop control failed")
-    end
-stop
+    } end if
+} stop

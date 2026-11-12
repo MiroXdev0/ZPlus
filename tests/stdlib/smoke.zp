@@ -10,7 +10,7 @@ use zargs as args
 use zlog as log
 use zmemory.management as memory
 
-start:
+start {
     let root: string = args.get(0)
     let settingsPath: string = path.join(root, "settings.txt")
     let logPath: string = path.join(root, "run.log")
@@ -118,4 +118,4 @@ start:
     log.setOutput("")
     say(text.contains(file.read(logPath), "warning: visible") ? "log-ok" : "log-fail")
     say(file.delete(settingsPath) ? "file-delete-ok" : "file-delete-fail")
-stop
+} stop

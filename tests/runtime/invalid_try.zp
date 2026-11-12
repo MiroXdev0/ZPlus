@@ -1,5 +1,5 @@
-start:
-    try:
+start {
+    try {
         throw "missing catch"
-    end
-stop
+    } end try
+} stop

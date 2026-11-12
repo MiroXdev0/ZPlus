@@ -1,9 +1,9 @@
-start:
+start {
     let left: number[] = [1]
     let right: number[] = [1]
-    if left == right:
+    if left == right {
         say("array comparison")
-    else:
+    } else {
         say("array comparison")
-    end
-stop
+    } end if
+} stop

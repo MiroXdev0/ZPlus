@@ -1,18 +1,18 @@
-pub fn debug(message: string):
+pub fn debug(message: string) {
     __zstdlib_log_debug(message)
-end
-pub fn info(message: string):
+} end fn
+pub fn info(message: string) {
     __zstdlib_log_info(message)
-end
-pub fn warning(message: string):
+} end fn
+pub fn warning(message: string) {
     __zstdlib_log_warning(message)
-end
-pub fn error(message: string):
+} end fn
+pub fn error(message: string) {
     __zstdlib_log_error(message)
-end
-pub fn setLevel(level: string):
+} end fn
+pub fn setLevel(level: string) {
     __zstdlib_log_setLevel(level)
-end
-pub fn setOutput(path: string):
+} end fn
+pub fn setOutput(path: string) {
     __zstdlib_log_setOutput(path)
-end
+} end fn

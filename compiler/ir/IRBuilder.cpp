@@ -537,6 +537,11 @@ void IRBuilder::buildStatement(
         return;
     }
 
+    if (const auto* node =
+            as<zplus::ast::BlockStatement>(&statement)) {
+        buildScopedStatements(node->statements, module, function, currentBlock);
+        return;
+    }
 
     if (const auto* node =
             as<zplus::ast::StartStatement>(
@@ -2011,7 +2016,7 @@ void IRBuilder::prepareFunction(
     Function& function = module.createFunction(functionName);
     function.location = statement.location;
     function.returnType = statement.returnType
-        ? statement.returnType->name
+        ? irTypeName(statement.returnType.get())
         : "void";
     for (const auto& parameter : statement.parameters) {
         if (!parameter) {
@@ -2021,7 +2026,7 @@ void IRBuilder::prepareFunction(
             parameter->bindingName.empty()
                 ? parameter->name
                 : parameter->bindingName,
-            parameter->type ? parameter->type->name : ""
+            irTypeName(parameter->type.get())
         );
     }
 
@@ -2037,9 +2042,7 @@ void IRBuilder::prepareFunction(
 
         Function& helper = module.createFunction(helperName);
         helper.location = parameter->location;
-        helper.returnType = parameter->type
-            ? parameter->type->name
-            : "";
+        helper.returnType = irTypeName(parameter->type.get());
         for (std::size_t preceding = 0; preceding < i; ++preceding) {
             const auto& previous = statement.parameters[preceding];
             if (!previous) {
@@ -2049,7 +2052,7 @@ void IRBuilder::prepareFunction(
                 previous->bindingName.empty()
                     ? previous->name
                     : previous->bindingName,
-                previous->type ? previous->type->name : ""
+                irTypeName(previous->type.get())
             );
         }
     }

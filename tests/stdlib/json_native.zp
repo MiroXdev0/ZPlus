@@ -1,18 +1,18 @@
 use zjson as json
 
-start:
+start {
     let payload = "{\"number\":42,\"flag\":true,\"items\":[\"first\",\"second\"]}"
-    if json.getNumber(payload, "/number") == 42:
+    if json.getNumber(payload, "/number") == 42 {
         printz("number-ok\n")
-    else:
+    } else {
         printz("number-bad\n")
-    end
-    if json.getBoolean(payload, "/flag"):
+    } end if
+    if json.getBoolean(payload, "/flag") {
         printz("boolean-ok\n")
-    else:
+    } else {
         printz("boolean-bad\n")
-    end
+    } end if
     printz(json.arrayGet(payload, "/items", 1), "\n")
     printz(json.kind(payload, "/items"), "\n")
     printz(json.compact(" { \"ok\" : true } "), "\n")
-stop
+} stop

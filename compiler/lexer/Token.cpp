@@ -190,6 +190,7 @@ const char* tokenTypeName(TokenType type) {
         case TokenType::Comma:     return "Comma";
         case TokenType::Colon:     return "Colon";
         case TokenType::Dot:       return "Dot";
+        case TokenType::Range:     return "Range";
         case TokenType::Semicolon: return "Semicolon";
 
 

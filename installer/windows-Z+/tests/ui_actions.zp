@@ -1,0 +1,35 @@
+use "../src/ui/layout.zh" as layout
+
+start {
+    if layout.actionAt(0, 830, 630) != 1 or layout.actionAt(0, 50, 630) != 2 {
+        throw "welcome actions are not mapped to their visible controls"
+    } end if
+    if layout.actionAt(1, 830, 630) != 3 or layout.actionAt(1, 180, 630) != 4 {
+        throw "license navigation actions are not mapped"
+    } end if
+    if layout.actionAt(1, 330, 525) != 5 {
+        throw "open-license action is not mapped"
+    } end if
+    if layout.actionAt(2, 800, 300) != 6 or layout.actionAt(2, 830, 630) != 7 {
+        throw "location browse or next action is not mapped"
+    } end if
+    if layout.actionAt(2, 180, 630) != 4 or layout.actionAt(2, 50, 630) != 2 {
+        throw "location back or cancel action is not mapped"
+    } end if
+    if layout.actionAt(3, 340, 360) != 8 or layout.actionAt(3, 340, 414) != 9 {
+        throw "component selection actions are not mapped"
+    } end if
+    if layout.actionAt(3, 830, 630) != 10 {
+        throw "install action is not mapped"
+    } end if
+    if layout.actionAt(4, 830, 630) != 2 {
+        throw "installation cancel action is not mapped"
+    } end if
+    if layout.actionAt(5, 310, 525) != 11 or layout.actionAt(5, 520, 525) != 12 {
+        throw "completion actions are not mapped"
+    } end if
+    if layout.actionAt(5, 830, 630) != 13 {
+        throw "finish action is not mapped"
+    } end if
+    say("installer-ui-actions-passed")
+} stop

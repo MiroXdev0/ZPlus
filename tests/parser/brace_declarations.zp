@@ -1,0 +1,19 @@
+struct MigratedPoint {
+    x: number
+    y: number
+} end struct
+
+class MigratedRecord {
+    value: number
+} end class
+
+enum MigratedState {
+    Ready
+    Running
+} end enum
+
+namespace MigratedNamespace {
+    fn value(): number {
+        return 1
+    } end fn
+} end namespace

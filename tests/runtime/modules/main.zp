@@ -1,5 +1,5 @@
 use "bad_module.zh" as bad
 
-fn main():
+fn main() {
     say(bad.readPastEnd())
-end
+} end fn

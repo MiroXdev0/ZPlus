@@ -1,4 +1,4 @@
-start:
+start {
     let values: number[] = [1, 2]
     values[2] = 3
-stop
+} stop

@@ -1,21 +1,21 @@
 use zmemory.management
 use "modules/memory_values.zh" as values
 
-fn collectWhileActive(items: number[][]) -> number:
+fn collectWhileActive(items: number[][]): number {
     zmemory.collect()
     return items[1][0]
-end
+} end fn
 
-fn allocateRepeatedly(count: number) -> number:
+fn allocateRepeatedly(count: number): number {
     let result: number = 0
-    for (let i: number = 0; i < count; i++):
+    for (let i: number = 0; i < count; i++) {
         let temporary: number[] = [i, i + 1]
         result += temporary[0]
-    end
+    } end for
     return result
-end
+} end fn
 
-start:
+start {
     let baseline: number = zmemory.heapObjects()
     let empty: number[] = []
     let nested: number[][] = [[10, 20], [30, 40]]
@@ -37,4 +37,4 @@ start:
     zmemory.collect()
     say(zmemory.heapObjects() < beforeCollect)
     say(length(nested))
-stop
+} stop

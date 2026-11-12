@@ -90,6 +90,7 @@ add_executable(zp
     runtime/Http.cpp
     runtime/SQLite.cpp
     runtime/StandardLibrary.cpp
+    runtime/installer/Platform.cpp
 )
 
 add_library(zplus_graphics STATIC
@@ -101,7 +102,7 @@ if(WIN32)
     target_sources(zplus_graphics PRIVATE
         ZGraphics/Platform/WindowsWindow.cpp
     )
-    target_link_libraries(zplus_graphics PUBLIC user32 gdi32)
+    target_link_libraries(zplus_graphics PUBLIC user32 gdi32 gdiplus)
 else()
     find_package(X11 REQUIRED)
     target_sources(zplus_graphics PRIVATE
@@ -184,7 +185,7 @@ if(CMAKE_DL_LIBS)
     target_link_libraries(zp PRIVATE ${CMAKE_DL_LIBS})
 endif()
 if(WIN32)
-    target_link_libraries(zp PRIVATE ws2_32)
+    target_link_libraries(zp PRIVATE ws2_32 shell32 ole32 advapi32 bcrypt)
 endif()
 target_compile_definitions(zp PRIVATE
     ZPLUS_STDLIB_DIR="${CMAKE_CURRENT_SOURCE_DIR}/stdlib"
@@ -217,13 +218,16 @@ if(WIN32)
         runtime/Http.cpp
         runtime/SQLite.cpp
         runtime/StandardLibrary.cpp
+        runtime/installer/Platform.cpp
     )
     target_compile_definitions(zplus_graphics_runtime PRIVATE ZPLUS_GRAPHICS_RUNTIME_EXPORTS)
     target_include_directories(zplus_graphics_runtime PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         runtime
     )
-    target_link_libraries(zplus_graphics_runtime PRIVATE zplus_graphics shell32)
+    target_link_libraries(zplus_graphics_runtime PRIVATE
+        zplus_graphics shell32 ole32 advapi32 bcrypt
+    )
     target_link_libraries(zplus_graphics_runtime PRIVATE Threads::Threads ws2_32)
     find_file(ZPLUS_SQLITE_RUNTIME_FILE
         NAMES sqlite3.dll libsqlite3-0.dll
@@ -563,6 +567,14 @@ if(BUILD_TESTING)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/parser/run_semantics.cmake"
     )
     add_test(
+        NAME parser_brace_syntax
+        COMMAND ${CMAKE_COMMAND}
+            "-DZP=$<TARGET_FILE:zp>"
+            "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/parser-brace-test-output"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/parser/run_brace_syntax.cmake"
+    )
+    add_test(
         NAME standard_library_integration
         COMMAND ${CMAKE_COMMAND}
             -DZP=$<TARGET_FILE:zp>
@@ -571,6 +583,42 @@ if(BUILD_TESTING)
             -DHOST_WINDOWS=$<BOOL:${WIN32}>
             -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/stdlib/run_stdlib_tests.cmake
     )
+    add_test(
+        NAME standard_library_module_imports
+        COMMAND $<TARGET_FILE:zp> run
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/stdlib/module_imports.zp
+    )
+    set_tests_properties(standard_library_module_imports PROPERTIES
+        PASS_REGULAR_EXPRESSION "all standard-library modules imported"
+    )
+    if(WIN32)
+        add_test(
+            NAME installer_platform_api
+            COMMAND ${CMAKE_COMMAND}
+                "-DZP=$<TARGET_FILE:zp>"
+                "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+                "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/installer-platform-api-test-output"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/installer/run_platform_api.cmake"
+        )
+        set_tests_properties(installer_platform_api PROPERTIES TIMEOUT 180)
+        add_test(
+            NAME zplus_installer_workflow
+            COMMAND ${CMAKE_COMMAND}
+                "-DZP=$<TARGET_FILE:zp>"
+                "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+                "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/zplus-installer-workflow-test-output"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/installer/windows-Z+/tests/run_workflow.cmake"
+        )
+        set_tests_properties(zplus_installer_workflow PROPERTIES TIMEOUT 180)
+        add_test(
+            NAME zplus_installer_ui_actions
+            COMMAND $<TARGET_FILE:zp> run
+                ${CMAKE_CURRENT_SOURCE_DIR}/installer/windows-Z+/tests/ui_actions.zp
+        )
+        set_tests_properties(zplus_installer_ui_actions PROPERTIES
+            PASS_REGULAR_EXPRESSION "installer-ui-actions-passed"
+        )
+    endif()
     add_executable(zgraphics_core_tests
         tests/graphics/core_tests.cpp
     )

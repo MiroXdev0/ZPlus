@@ -1,30 +1,30 @@
-pub fn now() -> number:
+pub fn now(): number {
     return __zstdlib_time_now()
-end
-pub fn format(timestamp: number, pattern: string) -> string:
+} end fn
+pub fn format(timestamp: number, pattern: string): string {
     return __zstdlib_time_format(timestamp, pattern)
-end
-pub fn parse(value: string, pattern: string) -> number:
+} end fn
+pub fn parse(value: string, pattern: string): number {
     return __zstdlib_time_parse(value, pattern)
-end
-pub fn year(timestamp: number) -> number:
+} end fn
+pub fn year(timestamp: number): number {
     return __zstdlib_time_year(timestamp)
-end
-pub fn month(timestamp: number) -> number:
+} end fn
+pub fn month(timestamp: number): number {
     return __zstdlib_time_month(timestamp)
-end
-pub fn day(timestamp: number) -> number:
+} end fn
+pub fn day(timestamp: number): number {
     return __zstdlib_time_day(timestamp)
-end
-pub fn hour(timestamp: number) -> number:
+} end fn
+pub fn hour(timestamp: number): number {
     return __zstdlib_time_hour(timestamp)
-end
-pub fn minute(timestamp: number) -> number:
+} end fn
+pub fn minute(timestamp: number): number {
     return __zstdlib_time_minute(timestamp)
-end
-pub fn second(timestamp: number) -> number:
+} end fn
+pub fn second(timestamp: number): number {
     return __zstdlib_time_second(timestamp)
-end
-pub fn sleep(milliseconds: number):
+} end fn
+pub fn sleep(milliseconds: number) {
     __zstdlib_time_sleep(milliseconds)
-end
+} end fn

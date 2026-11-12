@@ -1,3 +1,3 @@
-start:
+start {
     let value = (1 + 2]
-stop
+} stop

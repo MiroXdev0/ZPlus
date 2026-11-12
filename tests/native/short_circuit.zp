@@ -1,42 +1,42 @@
-fn sideEffect() -> boolean:
+fn sideEffect(): boolean {
     say("unexpected side effect")
     return true
-end
+} end fn
 
-start:
-    if false and sideEffect():
+start {
+    if false and sideEffect() {
         say("and failed")
-    else:
+    } else {
         say("and short-circuited")
-    end
+    } end if
 
-    if true or sideEffect():
+    if true or sideEffect() {
         say("or short-circuited")
-    else:
+    } else {
         say("or failed")
-    end
+    } end if
 
-    if false && sideEffect():
+    if false && sideEffect() {
         say("and symbol failed")
-    else:
+    } else {
         say("and symbol short-circuited")
-    end
+    } end if
 
-    if true || sideEffect():
+    if true || sideEffect() {
         say("or symbol short-circuited")
-    else:
+    } else {
         say("or symbol failed")
-    end
+    } end if
 
-    if true and sideEffect():
+    if true and sideEffect() {
         say("and evaluated right operand")
-    else:
+    } else {
         say("and skipped required operand")
-    end
+    } end if
 
-    if false or sideEffect():
+    if false or sideEffect() {
         say("or evaluated right operand")
-    else:
+    } else {
         say("or skipped required operand")
-    end
-stop
+    } end if
+} stop

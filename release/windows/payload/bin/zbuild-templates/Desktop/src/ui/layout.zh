@@ -1,6 +1,6 @@
 use zgraphics
 
-pub fn draw(window: number, clicks: number):
+pub fn draw(window: number, clicks: number) {
     zgraphics.rectangle(window, 0, 0, 720, 440, "#111827", true, 1)
     zgraphics.text(window, "Z+ Desktop Starter", 36, 34, "#F8FAFC", 30)
     zgraphics.text(window, "Text is drawn with the public ZGraphics API.", 38, 84, "#CBD5E1", 18)
@@ -8,4 +8,4 @@ pub fn draw(window: number, clicks: number):
     zgraphics.text(window, "Click anywhere", 58, 158, "#FFFFFF", 20)
     zgraphics.text(window, "Clicks: " + zgraphics.numberText(clicks), 38, 252, "#A7F3D0", 22)
     zgraphics.text(window, "Click to increment; press Escape to quit.", 38, 380, "#94A3B8", 16)
-end
+} end fn

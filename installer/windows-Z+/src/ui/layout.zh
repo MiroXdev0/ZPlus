@@ -1,0 +1,163 @@
+use zfile as file
+use zgraphics as graphics
+
+fn inside(x: number, y: number, left: number, top: number, width: number, height: number): boolean {
+    return x >= left and y >= top and x < left + width and y < top + height
+} end fn
+
+pub fn button(window: number, label: string, x: number, y: number, width: number, primary: boolean) {
+    let fill = "#202A32"
+    let border = "#3A4852"
+    let foreground = "#DDE7EC"
+    if primary {
+        fill = "#20BFAE"
+        border = "#20BFAE"
+        foreground = "#09201F"
+    } end if
+    graphics.rectangle(window, x, y, width, 46, fill, true, 1)
+    graphics.rectangle(window, x, y, width, 46, border, false, 1)
+    graphics.text(window, label, x + 18, y + 13, foreground, 15)
+} end fn
+
+pub fn actionAt(page: number, x: number, y: number): number {
+    if page == 0 {
+        if inside(x, y, 804, 612, 144, 46) {
+            return 1
+        } end if
+        if inside(x, y, 32, 612, 118, 46) {
+            return 2
+        } end if
+    } else {
+        if page == 1 {
+            if inside(x, y, 804, 612, 144, 46) {
+                return 3
+            } end if
+            if inside(x, y, 166, 612, 118, 46) {
+                return 4
+            } end if
+            if inside(x, y, 292, 520, 200, 46) {
+                return 5
+            } end if
+        } else {
+            if page == 2 {
+                if inside(x, y, 804, 612, 144, 46) {
+                    return 7
+                } end if
+                if inside(x, y, 774, 282, 152, 46) {
+                    return 6
+                } end if
+            } else {
+                if page == 3 {
+                    if inside(x, y, 804, 612, 144, 46) {
+                        return 10
+                    } end if
+                    if inside(x, y, 326, 354, 564, 48) {
+                        return 8
+                    } end if
+                    if inside(x, y, 326, 408, 564, 48) {
+                        return 9
+                    } end if
+                } else {
+                    if page == 4 {
+                        if inside(x, y, 804, 612, 144, 46) {
+                            return 2
+                        } end if
+                    } else {
+                        if page == 5 {
+                            if inside(x, y, 804, 612, 144, 46) {
+                                return 13
+                            } end if
+                            if inside(x, y, 292, 520, 200, 46) {
+                                return 11
+                            } end if
+                            if inside(x, y, 508, 520, 200, 46) {
+                                return 12
+                            } end if
+                        } end if
+                    } end if
+                } end if
+            } end if
+        } end if
+        if inside(x, y, 32, 612, 118, 46) {
+            return 2
+        } end if
+        if page >= 1 and page <= 3 and inside(x, y, 166, 612, 118, 46) {
+            return 4
+        } end if
+    } end if
+    return 0
+} end fn
+
+pub fn frame(window: number, page: number, title: string, subtitle: string, logoPath: string) {
+    graphics.clear(window)
+    graphics.background(window, "#11171D")
+    graphics.rectangle(window, 0, 0, 980, 78, "#171F26", true, 1)
+    graphics.line(window, 28, 78, 952, 78, "#2A353D", 1)
+    if file.exists(logoPath) {
+        graphics.image(window, logoPath, 30, 18, 42, 42)
+    } else {
+        graphics.text(window, "Z+", 31, 19, "#39D2C1", 29)
+    } end if
+    graphics.text(window, "Z+ SETUP", 86, 17, "#EAF1F4", 17)
+    graphics.text(window, "1.1.2  |  STABLE", 86, 42, "#8FA1AA", 12)
+
+    graphics.rectangle(window, 28, 102, 220, 488, "#171F26", true, 1)
+    graphics.text(window, "SETUP", 50, 124, "#758790", 11)
+    graphics.line(window, 50, 153, 226, 153, "#2A353D", 1)
+    drawStep(window, 0, page, "Welcome", 179)
+    drawStep(window, 1, page, "License", 232)
+    drawStep(window, 2, page, "Location", 285)
+    drawStep(window, 3, page, "Components", 338)
+    drawStep(window, 4, page, "Install", 391)
+    graphics.text(window, "Build by Miroslav Aleksandrov", 49, 546, "#35CDBD", 11)
+
+    graphics.rectangle(window, 268, 102, 684, 488, "#171F26", true, 1)
+    graphics.text(window, title, 298, 128, "#EAF1F4", 24)
+    graphics.text(window, subtitle, 298, 166, "#91A1AA", 13)
+    graphics.line(window, 296, 198, 924, 198, "#2A353D", 1)
+
+    graphics.line(window, 28, 598, 952, 598, "#2A353D", 1)
+    if page >= 1 and page <= 3 {
+        button(window, "Back", 166, 612, 118, false)
+    } end if
+    if page == 5 {
+        button(window, "Finish", 804, 612, 144, true)
+    } else {
+        if page <= 3 {
+            button(window, "Cancel", 32, 612, 118, false)
+        } end if
+    } end if
+} end fn
+
+fn drawStep(window: number, index: number, page: number, label: string, y: number) {
+    let marker = "#35434B"
+    let foreground = "#8FA1AA"
+    if index == page {
+        marker = "#20BFAE"
+        foreground = "#EAF1F4"
+        graphics.rectangle(window, 45, y - 10, 184, 40, "#222D34", true, 1)
+    } else {
+        if index < page {
+            marker = "#287A72"
+            foreground = "#C2D3D7"
+        } end if
+    } end if
+    graphics.circle(window, 62, y + 10, 12, marker, true, 1)
+    graphics.text(window, graphics.numberText(index + 1), 58, y + 3, "#0E1A1F", 12)
+    graphics.text(window, label, 84, y + 2, foreground, 14)
+} end fn
+
+pub fn progress(window: number, relativePath: string, copied: number, total: number, logoPath: string) {
+    frame(window, 4, "Installing Z+", "Copying and verifying the selected components.", logoPath)
+    graphics.rectangle(window, 298, 230, 624, 224, "#1D272F", true, 1)
+    graphics.text(window, "Verifying package contents", 326, 260, "#EAF1F4", 16)
+    graphics.text(window, relativePath, 326, 300, "#92A5AE", 12)
+    graphics.rectangle(window, 326, 354, 564, 12, "#303C45", true, 1)
+    let width = 0
+    if total > 0 {
+        width = 564 * copied / total
+    } end if
+    graphics.rectangle(window, 326, 354, width, 12, "#20BFAE", true, 1)
+    graphics.text(window, graphics.numberText(copied) + " of " + graphics.numberText(total) + " files verified", 326, 384, "#B8C6CC", 13)
+    button(window, "Cancel", 804, 612, 144, false)
+} end fn

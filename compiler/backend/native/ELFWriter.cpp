@@ -1,6 +1,8 @@
 #include "ELFWriter.hpp"
 
 #include <algorithm>
+#include <array>
+#include <filesystem>
 #include <limits>
 #include <map>
 #include <set>
@@ -16,7 +18,26 @@ constexpr std::uint64_t kPageSize = 0x1000;
 constexpr std::size_t kElfHeaderSize = 64;
 constexpr std::size_t kProgramHeaderSize = 56;
 constexpr std::size_t kCodeOffset = kPageSize;
-constexpr const char* kLinuxInterpreter = "/lib64/ld-linux-x86-64.so.2";
+
+std::string linuxInterpreter() {
+    constexpr std::array candidates{
+        "/lib64/ld-linux-x86-64.so.2",
+        "/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "/usr/lib64/ld-linux-x86-64.so.2",
+        "/lib/ld-linux-x86-64.so.2",
+        "/lib/ld-musl-x86_64.so.1",
+        "/lib/x86_64-linux-musl/libc.so",
+    };
+    for (const char* candidate : candidates) {
+        std::error_code error;
+        if (std::filesystem::is_regular_file(candidate, error) && !error) {
+            return candidate;
+        }
+    }
+    throw std::runtime_error(
+        "ELF writer: no supported x86-64 Linux dynamic loader was found; "
+        "native runtime imports require glibc or musl");
+}
 
 void put16(std::vector<std::uint8_t>& bytes, std::size_t offset, std::uint16_t value) {
     if (offset > bytes.size() || bytes.size() - offset < 2) {
@@ -97,7 +118,7 @@ std::vector<std::uint8_t> writeELF(const NativeImage& image) {
 
     const bool hasImports = !imports.empty();
     const std::size_t programHeaderCount = hasImports ? 5 : 3;
-    const std::string interpreter = kLinuxInterpreter;
+    const std::string interpreter = hasImports ? linuxInterpreter() : std::string{};
     const std::size_t interpreterOffset = alignTo(
         kElfHeaderSize + kProgramHeaderSize * programHeaderCount, 8);
     const std::size_t headerRegion = hasImports

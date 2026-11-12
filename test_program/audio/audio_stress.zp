@@ -1,12 +1,12 @@
 use zaudio
 
 zaudio.initialize()
-for (let cycle: number = 0; cycle < 200; cycle++):
+for (let cycle: number = 0; cycle < 200; cycle++) {
     let effect = zaudio.loadSound("assets/tone.wav")
     zaudio.setVolume(effect, 0.4)
     zaudio.play(effect)
     zaudio.unload(effect)
-end
+} end for
 
 zaudio.unloadAll()
 zaudio.shutdown()

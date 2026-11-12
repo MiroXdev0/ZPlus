@@ -38,7 +38,8 @@ public:
 
     void writeExecutable(
         const zplus::ir::Module& module,
-        const std::filesystem::path& output
+        const std::filesystem::path& output,
+        bool windowsGui = false
     ) const;
 };
 

@@ -877,14 +877,25 @@ void Lexer::lexOperatorOrPunctuation(
             break;
 
         case '.':
-            tokens.push_back(
-                makeToken(
-                    zplus::TokenType::Dot,
-                    ".",
-                    tokenLine,
-                    tokenColumn
-                )
-            );
+            if (match('.')) {
+                tokens.push_back(
+                    makeToken(
+                        zplus::TokenType::Range,
+                        "..",
+                        tokenLine,
+                        tokenColumn
+                    )
+                );
+            } else {
+                tokens.push_back(
+                    makeToken(
+                        zplus::TokenType::Dot,
+                        ".",
+                        tokenLine,
+                        tokenColumn
+                    )
+                );
+            }
             break;
 
         case ';':

@@ -1,5 +1,5 @@
 use zmath as math
 
-start:
+start {
     let result: number = math.sqrt(-1)
-stop
+} stop
