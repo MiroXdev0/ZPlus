@@ -1,0 +1,28 @@
+[project]
+name = "{{PROJECT_NAME}}"
+version = "{{PROJECT_VERSION}}"
+description = "Reusable Z+ source modules created in {{YEAR}}"
+entry = "tests/main.zp"
+
+[build]
+backend = "{{BUILD_BACKEND}}"
+mode = "{{BUILD_MODE}}"
+output_dir = "build"
+optimization = 0
+jobs = 0
+
+[compiler]
+warnings = true
+debug_symbols = false
+
+[platform]
+windows = true
+linux = true
+
+[tests]
+targets = ["{{PROJECT_NAME}}_tests"]
+
+[[target]]
+name = "{{PROJECT_NAME}}_tests"
+type = "test"
+entry = "tests/main.zp"

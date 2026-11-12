@@ -1,0 +1,27 @@
+pub fn clampX(value: number, worldWidth: number): number {
+    if value < 0 {
+        return 0
+    } else {
+    } end if
+    if value > worldWidth - 28 {
+        return worldWidth - 28
+    } else {
+    } end if
+    return value
+} end fn
+
+pub fn clampY(value: number, worldHeight: number): number {
+    if value < 72 {
+        return 72
+    } else {
+    } end if
+    if value > worldHeight - 30 {
+        return worldHeight - 30
+    } else {
+    } end if
+    return value
+} end fn
+
+pub fn overlaps(firstX: number, firstY: number, firstWidth: number, firstHeight: number, secondX: number, secondY: number, secondWidth: number, secondHeight: number): boolean {
+    return firstX < secondX + secondWidth and firstX + firstWidth > secondX and firstY < secondY + secondHeight and firstY + firstHeight > secondY
+} end fn

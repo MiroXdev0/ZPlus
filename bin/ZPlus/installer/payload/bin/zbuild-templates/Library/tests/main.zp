@@ -1,0 +1,16 @@
+use "../src/main.zh" as library
+
+start {
+    if library.greeting("Z+") == "Hello, Z+!" {
+        printz("Library greeting test passed\n")
+    } else {
+        printz("Library greeting test failed\n")
+        let failure = 1 / 0
+    } end if
+    if library.bounded(12, 0, 10) == 10 {
+        printz("Library utility test passed\n")
+    } else {
+        printz("Library utility test failed\n")
+        let failure = 1 / 0
+    } end if
+} stop

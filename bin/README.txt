@@ -8,7 +8,7 @@ Quick start
 1. Run setup-path.bat to add this directory to your current user's PATH.
 2. Open a new terminal.
 3. Check the tools with:
-       zp version
+       zp --version
        zbuild --version
 4. Create a Z+ source file and use:
        zp check hello.zp
@@ -30,5 +30,6 @@ stdlib\README.md. Starter projects are in zbuild-templates\. The examples\
 directory contains sample Z+ programs.
 
 The native compiler target is Windows x64. Some language APIs and features
-are interpreter-only or platform-specific; see docs\syntax.md and
-docs\BACKEND.md for the current limits.
+are interpreter-only or platform-specific; see NATIVE_BACKEND.md and
+docs\BACKEND.md for current limits. Native try/catch/throw/defer are not
+supported and are rejected during native compilation.

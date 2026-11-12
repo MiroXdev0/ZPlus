@@ -1,0 +1,27 @@
+use zgraphics
+
+start {
+    let app = zgraphics.createWindow("Z+ Text Input", 640, 300)
+    let value = ""
+    zgraphics.background(app, "#151923")
+    zgraphics.text(app, "Type into this window", 32, 30, "#FFFFFF", 26)
+    zgraphics.rectangle(app, 32, 105, 560, 56, "#252D3A", true, 1)
+    zgraphics.text(app, value, 44, 119, "#A7F3D0", 22)
+    zgraphics.text(app, "Text events are delivered as UTF-8 strings.", 32, 205, "#B8C7D9", 16)
+    zgraphics.show(app)
+
+    while true {
+        let event = zgraphics.waitEvent(app)
+        if event == 1 {
+            break
+        } else {
+        } end if
+        if event == 6 {
+            value += zgraphics.eventText(app)
+            say(zgraphics.eventText(app))
+            zgraphics.rectangle(app, 32, 105, 560, 56, "#252D3A", true, 1)
+            zgraphics.text(app, value, 44, 119, "#A7F3D0", 22)
+        } else {
+        } end if
+    } end while
+} stop

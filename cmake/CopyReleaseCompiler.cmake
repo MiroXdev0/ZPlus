@@ -80,3 +80,10 @@ if(DEFINED PHYSICS_RUNTIME_FILE AND NOT PHYSICS_RUNTIME_FILE STREQUAL "")
         "physics runtime"
     )
 endif()
+
+if(DEFINED STDLIB_SOURCE_DIR AND NOT STDLIB_SOURCE_DIR STREQUAL "")
+    if(NOT IS_DIRECTORY "${STDLIB_SOURCE_DIR}")
+        message(FATAL_ERROR "Release standard library directory is missing: ${STDLIB_SOURCE_DIR}")
+    endif()
+    file(COPY "${STDLIB_SOURCE_DIR}/" DESTINATION "${DESTINATION_DIR}/stdlib")
+endif()

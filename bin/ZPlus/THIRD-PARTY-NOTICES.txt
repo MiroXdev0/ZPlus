@@ -1,0 +1,37 @@
+Z+ Windows Release — Third-Party Notices
+
+Z+ is proprietary software. The following separately licensed materials are
+included in or distributed with the Windows x64 compiler/runtime and setup:
+
+1. Box2D v3.1.1 — physics runtime
+   The upstream MIT license is included as
+   THIRD-PARTY-NOTICES/Box2D-LICENSE.txt. Copyright (c) 2022 Erin Catto.
+
+2. miniaudio v0.11.26 — audio runtime
+   The upstream license alternatives are included verbatim as
+   THIRD-PARTY-NOTICES/miniaudio-LICENSE.txt. The miniaudio implementation in
+   this build is distributed under its MIT No Attribution alternative.
+
+3. stb_vorbis v1.22 — Ogg Vorbis decoder
+   The upstream source identifies stb_vorbis as public domain. This notice is
+   included as THIRD-PARTY-NOTICES/stb_vorbis-NOTICE.txt.
+
+4. SQLite — dynamically loaded SQLite runtime
+   The SQLite runtime bundled by the current Windows build was discovered at
+   the MSYS2 UCRT64 SQLite package path. SQLite's upstream public-domain notice
+   is included as THIRD-PARTY-NOTICES/SQLite-LICENSE.txt. The specific SQLite
+   DLL version is not reported by its Windows version resource.
+
+5. Microsoft .NET 10 runtime — self-contained setup application
+   The .NET runtime license and bundled component notices are included at the
+   root of the release archive as LICENSE-DOTNET.txt and
+   THIRD-PARTY-NOTICES-DOTNET.txt. These notices do not apply to the Z+
+   compiler/runtime files.
+
+6. Windows system APIs
+   The compiler and runtimes link to Windows system libraries. Windows itself
+   and its system components remain governed by their own Microsoft terms.
+
+These components are not owned by Miroslav Aleksandrov. Their respective
+licenses apply independently and are not changed by LICENSE.txt. See the
+named files in THIRD-PARTY-NOTICES/ and the release-root .NET notices.

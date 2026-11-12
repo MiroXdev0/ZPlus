@@ -1,0 +1,119 @@
+pub fn initialize() {
+    __zaudio_initialize()
+} end fn
+
+pub fn initialized(): boolean {
+    return __zaudio_initialized()
+} end fn
+
+pub fn shutdown() {
+    __zaudio_shutdown()
+} end fn
+
+pub fn loadMusic(path: string): number {
+    return __zaudio_loadMusic(path)
+} end fn
+
+pub fn loadSound(path: string): number {
+    return __zaudio_loadSound(path)
+} end fn
+
+pub fn unload(handle: number) {
+    __zaudio_unload(handle)
+} end fn
+
+pub fn unloadAll() {
+    __zaudio_unloadAll()
+} end fn
+
+pub fn play(handle: number) {
+    __zaudio_play(handle)
+} end fn
+
+pub fn pause(handle: number) {
+    __zaudio_pause(handle)
+} end fn
+
+pub fn resume(handle: number) {
+    __zaudio_resume(handle)
+} end fn
+
+pub fn stop(handle: number) {
+    __zaudio_stop(handle)
+} end fn
+
+pub fn isPlaying(handle: number): boolean {
+    return __zaudio_isPlaying(handle)
+} end fn
+
+pub fn isPaused(handle: number): boolean {
+    return __zaudio_isPaused(handle)
+} end fn
+
+pub fn isStopped(handle: number): boolean {
+    return __zaudio_isStopped(handle)
+} end fn
+
+pub fn setVolume(handle: number, volume: number) {
+    __zaudio_setVolume(handle, volume)
+} end fn
+
+pub fn getVolume(handle: number): number {
+    return __zaudio_getVolume(handle)
+} end fn
+
+pub fn setLooping(handle: number, looping: boolean) {
+    __zaudio_setLooping(handle, looping)
+} end fn
+
+pub fn isLooping(handle: number): boolean {
+    return __zaudio_isLooping(handle)
+} end fn
+
+pub fn setPlaybackPosition(handle: number, seconds: number) {
+    __zaudio_setPlaybackPosition(handle, seconds)
+} end fn
+
+pub fn getPlaybackPosition(handle: number): number {
+    return __zaudio_getPlaybackPosition(handle)
+} end fn
+
+pub fn getDuration(handle: number): number {
+    return __zaudio_getDuration(handle)
+} end fn
+
+pub fn setMasterVolume(volume: number) {
+    __zaudio_setMasterVolume(volume)
+} end fn
+
+pub fn getMasterVolume(): number {
+    return __zaudio_getMasterVolume()
+} end fn
+
+pub fn mute() {
+    __zaudio_mute()
+} end fn
+
+pub fn unmute() {
+    __zaudio_unmute()
+} end fn
+
+pub fn isMuted(): boolean {
+    return __zaudio_isMuted()
+} end fn
+
+pub fn deviceCount(): number {
+    return __zaudio_deviceCount()
+} end fn
+
+pub fn deviceName(index: number): string {
+    return __zaudio_deviceName(index)
+} end fn
+
+pub fn defaultDevice(): string {
+    return __zaudio_defaultDevice()
+} end fn
+
+pub fn selectDevice(name: string) {
+    __zaudio_selectDevice(name)
+} end fn

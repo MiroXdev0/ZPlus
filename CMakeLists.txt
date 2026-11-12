@@ -51,19 +51,25 @@ add_library(zbuild_engine STATIC
 target_include_directories(zbuild_engine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/zbuild
 )
-target_compile_definitions(zbuild_engine PRIVATE
-    ZBUILD_STDLIB_DIR="${CMAKE_CURRENT_SOURCE_DIR}/stdlib"
-    ZBUILD_BUILTIN_TEMPLATE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/zbuild/templates"
-)
-
 add_executable(zbuild zbuild/main.cpp)
 target_link_libraries(zbuild PRIVATE zbuild_engine)
+add_custom_command(TARGET zbuild POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/zbuild/templates"
+        "$<TARGET_FILE_DIR:zbuild>/zbuild-templates"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/stdlib"
+        "$<TARGET_FILE_DIR:zbuild>/stdlib"
+    VERBATIM
+    COMMENT "Packaging adjacent ZBuild resources"
+)
 add_custom_command(TARGET zbuild POST_BUILD
     COMMAND ${CMAKE_COMMAND}
         "-DCONFIG=$<CONFIG>"
         "-DSOURCE_FILE=$<TARGET_FILE:zbuild>"
         "-DDESTINATION_DIR=${ZPLUS_RELEASE_BIN_DIR}"
         "-DTEMPLATE_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/zbuild/templates"
+        "-DSTDLIB_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/stdlib"
         -P "${CMAKE_SOURCE_DIR}/cmake/CopyReleaseZBuild.cmake"
     VERBATIM
     COMMENT "Installing the Release zbuild executable into bin/"
@@ -187,10 +193,6 @@ endif()
 if(WIN32)
     target_link_libraries(zp PRIVATE ws2_32 shell32 ole32 advapi32 bcrypt)
 endif()
-target_compile_definitions(zp PRIVATE
-    ZPLUS_STDLIB_DIR="${CMAKE_CURRENT_SOURCE_DIR}/stdlib"
-)
-
 target_include_directories(zp PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     compiler
@@ -275,10 +277,18 @@ if(WIN32)
 endif()
 
 add_custom_command(TARGET zp POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/stdlib"
+        "$<TARGET_FILE_DIR:zp>/stdlib"
+    VERBATIM
+    COMMENT "Packaging the compiler standard library beside zp"
+)
+add_custom_command(TARGET zp POST_BUILD
     COMMAND ${CMAKE_COMMAND}
         "-DCONFIG=$<CONFIG>"
         "-DSOURCE_FILE=$<TARGET_FILE:zp>"
         "-DDESTINATION_DIR=${ZPLUS_RELEASE_BIN_DIR}"
+        "-DSTDLIB_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/stdlib"
         ${ZPLUS_GRAPHICS_RUNTIME_ARGUMENT}
         ${ZPLUS_SQLITE_RUNTIME_ARGUMENT}
         ${ZPLUS_AUDIO_RUNTIME_ARGUMENT}
