@@ -1,4 +1,5 @@
 use zgraphics as graphics
+start {
 
 pub fn create(): number {
     let window = graphics.createWindow("Z+ Setup 1.1.2", 980, 700)
@@ -7,3 +8,4 @@ pub fn create(): number {
     graphics.show(window)
     return window
 } end fn
+} stop

@@ -1,3 +1,4 @@
+start {
 pub fn createWindow(title: string, width: number, height: number): number {
     return __zgraphics_createWindow(title, width, height)
 } end fn
@@ -174,3 +175,4 @@ pub fn circlesIntersect(firstX: number, firstY: number, firstRadius: number, sec
     let combinedRadius: number = firstRadius + secondRadius
     return deltaX * deltaX + deltaY * deltaY <= combinedRadius * combinedRadius
 } end fn
+} stop

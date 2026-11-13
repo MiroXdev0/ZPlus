@@ -1,11 +1,12 @@
 use zmemory.management
 
+start {
+
 struct Player {
     name: string
     score: number
 } end struct
 
-start {
     let players: Player[] = []
     for (let i: number = 0; i < 1500; i++) {
         let player = Player("kept", i)

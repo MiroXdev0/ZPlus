@@ -1,7 +1,8 @@
-1use zgraphics
 use zmath as math
 
 start {
+1use zgraphics
+
     let app = zgraphics.createWindow("Geometry Dash", 640, 480)
     zgraphics.background(app, "#0B1020")
     zgraphics.setTargetFPS(app, 60)

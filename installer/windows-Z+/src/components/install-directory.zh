@@ -1,6 +1,7 @@
 use zenv as env
 use zpath as path
 use zstring as text
+start {
 
 pub fn defaultDirectory(): string {
     let local = env.get("LOCALAPPDATA")
@@ -27,3 +28,4 @@ pub fn isSafe(value: string): boolean {
     } end if
     return true
 } end fn
+} stop

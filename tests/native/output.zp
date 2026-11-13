@@ -3,4 +3,8 @@ start {
     printz(prefix, "backend éЖ🙂 ")
     printm("legacy ")
     say("output")
+    say(true)
+    say(false)
+    let enabled: boolean = true
+    say(enabled)
 } stop

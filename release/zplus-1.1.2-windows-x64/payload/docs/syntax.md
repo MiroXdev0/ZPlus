@@ -47,30 +47,44 @@ start {
 
 ## 3. Program Structure
 
-The compiler accepts top-level declarations and statements. A `start {` / `} stop` block is supported, but not mandatory; top-level executable statements are also placed in the generated program entry function. Functions are declared outside or alongside the entry block.
+Every `.zp` program has exactly one top-level `start { ... } stop` block.
+Functions, namespaces, classes, enums, and structs belong directly inside that
+block (or inside a namespace). Executable statements cannot appear at file
+scope. `use` and legacy `import` directives remain at file scope so module
+dependencies can be resolved before semantic analysis.
 
 ```zp
-fn announce(message: string) {
-    say(message)
-} end fn
-
 start {
+    fn announce(message: string) {
+        say(message)
+    } end fn
+
     announce("Ready")
 } stop
 ```
 
-Brace blocks with explicit typed terminators are the official syntax. The older colon/`end` syntax remains accepted for existing programs, but a block cannot mix the two styles. Newlines and indentation are not block delimiters. The compiler creates an internal entry function for top-level code. If a zero-parameter function named `main` is declared, `zp run` and `zp build` use it as the entry point; otherwise they use top-level code. **Implemented; legacy syntax remains available.**
+Nested functions and type declarations inside executable blocks are rejected.
+Namespace members can contain declarations; namespace functions are called by
+their qualified name. Direct declarations in `start` are registered before
+entry statements are analyzed and lowered, so function forward references are
+supported. A zero-parameter function named `main` inside `start` remains the
+entry point when present; otherwise the statements in `start` execute.
+
+Imported `.zh` files use the same declaration container: one `start` block
+containing declarations only. The loader extracts those declarations as module
+members; it does not execute the module's block. `use` directives stay outside
+that block.
 
 ### Official brace syntax and migration
 
 `{` opens a block and `}` closes its body. The matching terminator is required after the closing brace: functions use `end fn`, conditionals use `end if`, loops use their corresponding `end while`, `end for`, or `end repeat`, switch uses `end switch`, and `start` uses `stop`. `else` and `else if` continue the same `if` and do not have their own terminator. Semicolons are not required between ordinary statements.
 
 ```zp
-fn calculate(a: number, b: number): number {
-    return a + b
-} end fn
-
 start {
+    fn calculate(a: number, b: number): number {
+        return a + b
+    } end fn
+
     let score = calculate(40, 50)
     if score >= 90 {
         say("Excellent")
@@ -97,7 +111,7 @@ start {
 
 Range iteration is start-inclusive and end-exclusive (`0..3` visits 0, 1, and 2). The start and end expressions are evaluated once. Array iteration evaluates the collection once and visits its elements in index order. C-style `for (initializer; condition; increment) { ... } end for` remains supported as well. `switch` retains its existing `case`/`default` behavior; `match` is not implemented. `try`/`catch` and `defer` support braces and require `end try` and `end defer`, respectively.
 
-Each block must use one style throughout: do not nest colon/`end` blocks inside brace blocks or vice versa. Struct, class, enum, and namespace declarations use braces and matching explicit terminators as well. Terminator mismatches and missing braces/terminators are parser errors that identify the opened block where available.
+Each block must use one style throughout: do not nest colon/`end` blocks inside brace blocks or vice versa. Struct, class, enum, and namespace declarations use braces and matching explicit terminators as well. Terminator mismatches and missing braces/terminators are parser errors that identify the opened block where available. Declarations outside `start` and multiple or missing top-level `start` blocks are compile-time errors.
 
 Migration is structural, not a text replacement. For each old block, replace its colon with `{`, its matching generic `end` with `} end <block-kind>`, and keep `else` within the `if`. Replace `start:` / `stop` with `start {` / `} stop`. Keep old syntax unchanged when not migrating; both forms remain accepted, but not mixed within one block.
 
@@ -155,12 +169,12 @@ The built-in type spellings are:
 Custom type annotations use an identifier, such as `Player`. Array and pointer type spellings are `elementType[]` and `elementType*`, respectively. Array suffixes can be repeated for nested arrays; the parser accepts one pointer suffix.
 
 ```zp
-struct Player {
-    name: string
-    score: number
-} end struct
-
 start {
+    struct Player {
+        name: string
+        score: number
+    } end struct
+
     let count: number = 3
     let active: bool = true
     let initial: character = 'A'
@@ -170,7 +184,12 @@ start {
 } stop
 ```
 
-Primitive annotations are checked by the analyzer. Struct annotations support runtime construction and member access in the interpreter and Windows x64 native backend; classes and enums still have no general runtime object model. `void` is a recognized annotation, not a value type. **Primitive types: implemented; structs: interpreter and Windows x64 implemented with documented limits; Linux native custom aggregates: unsupported.**
+Primitive annotations are checked by the analyzer. Structs and classes support
+construction, typed fields, member access, and function arguments/returns in
+the interpreter and Windows x64 native backend. Enums are typed numeric values
+with member access and function argument/return support in those backends.
+Custom aggregates and enum operations are not supported by Linux native code
+generation. `void` is a recognized annotation, not a value type.
 
 ### Literals
 
@@ -231,7 +250,10 @@ Logical `and` / `or` and `&&` / `||` short-circuit: the right operand is evaluat
 
 Assignment targets must be identifiers, member accesses, or index expressions. Assignment is right-associative. Binary operators at a given parser tier group left-to-right.
 
-`is` performs a runtime type check for interpreter struct instances, for example `player is Player`. Native execution of `is` is not implemented. It is not a general primitive, class, or enum reflection system.
+`is` performs a runtime type check for struct instances in the interpreter and
+Windows x64 native backend, for example `player is Player`. It is not a
+general primitive, class, or enum reflection system; Linux native aggregate
+checks are unsupported.
 
 ### Strings
 
@@ -258,15 +280,15 @@ fn name(parameter [: type] [= default], ...) [: returnType] {
 Parentheses are required, including for a zero-parameter function. Parameter type annotations and the return annotation are optional. Missing parameter types become `unknown`; a missing return annotation means `void`—return types are not inferred. The legacy `-> returnType` spelling remains accepted. Trailing parameters may have default expressions; later parameters must also have defaults. Defaults are evaluated when the call omits those arguments, in parameter order, and can refer to earlier parameters. `return` can provide an expression or no value and is only valid inside a function. Explicit returned values are checked against the declared return type, but the analyzer does not require every control-flow path to return.
 
 ```zp
-fn add(left: number, right: number): number {
-    return left + right
-} end fn
-
-fn greet(name: string = "friend"): string {
-    return "Hello, " + name
-} end fn
-
 start {
+    fn add(left: number, right: number): number {
+        return left + right
+    } end fn
+
+    fn greet(name: string = "friend"): string {
+        return "Hello, " + name
+    } end fn
+
     say(add(2, 3))
     say(greet("Z+"))
 } stop
@@ -372,11 +394,11 @@ scope are attempted; if one or more fail, the first cleanup failure is
 propagated after the remaining calls have run and may replace the error that
 started unwinding.
 
-The interpreter implements these behaviors. The Windows x64 and Linux native
-backends do not yet implement `try`, `catch`, `throw`, or `defer` and report
-them as unsupported with the source location when available; ordinary programs
-without these constructs remain supported. Native `scope_push`/`scope_pop`
-markers are ignored only when the module has no deferred calls.
+The interpreter and Windows x64 native backend implement these behaviors.
+Native parity for nested handlers, function-call propagation, rethrowing,
+early returns, cleanup order, and cleanup during exception propagation is
+covered by regression tests. Linux native exception/defer behavior has not
+been validated on a Linux host and is not claimed as supported.
 
 ## 8. Data Structures
 
@@ -417,37 +439,38 @@ enum Name {
 ```
 
 ```zp
-struct Player {
-    name: string = "Ari"
-    health: number = 100
-} end struct
-
-class Counter {
-    value: number = 0
-    fn current(): number {
-        return 0
-    } end fn
-} end class
-
-enum State {
-    Ready
-    Done = 1
-} end enum
-
 start {
-    say("Declarations are accepted")
+    struct Player {
+        name: string = "Ari"
+        health: number = 100
+    } end struct
+
+    enum State {
+        Ready
+        Done = 1
+    } end enum
+
+    class Counter {
+        value: number = 0
+        fn current(): number {
+            return this.value
+        } end fn
+    } end class
+
+    let counter = Counter()
+    say(counter.current())
 } stop
 ```
 
 Structs support positional construction, typed fields, literal defaults, field reads and writes, nested structs, arrays in fields, arrays of structs, and passing/returning instances through functions. Struct values use reference semantics in both the interpreter and Windows x64 native backend. The `is` operator recognizes struct instances in both execution modes. For example:
 
 ```zp
-struct Player {
-    name: string
-    health: number = 100
-} end struct
-
 start {
+    struct Player {
+        name: string
+        health: number = 100
+    } end struct
+
     let player = Player("Ari")
     player.health -= 5
     say(player.health)
@@ -456,7 +479,14 @@ start {
 
 Fields without defaults are required constructor arguments. Constructor arguments fill fields in declaration order, so required fields must precede defaulted fields. Current field defaults must be literals. Assignment, array insertion, and function argument/return passing preserve object identity; mutating an alias changes the same instance. Interpreter structs are traced by the interpreter's managed heap. Windows native structs are tagged managed references in the existing native tracing heap; collection traces references in arrays and struct fields. Fields are public; per-field visibility is not implemented.
 
-Windows x64 native programs support struct allocation, fields, identity, `is` checks, arrays and function argument/return references. Native struct execution and tracing under allocation pressure are covered by regression tests. Native `try`, `catch`, `throw`, and `defer` support nested handlers, function-call propagation, rethrowing, early returns, and scoped LIFO cleanup; the interpreter/native regression fixture checks output parity. Linux native struct operations remain explicitly unsupported, and native `.zh` struct imports have not yet been validated. Classes/methods, enums, and function values have no general runtime model. **Structs: interpreter and Windows x64 implemented; Linux and native module-import parity incomplete. Classes/enums: partial declarations only.**
+Classes use typed fields, literal field initializers, implicit positional
+construction, instance methods, and `this` for field access. Enums assign
+successive numeric values unless a member specifies a numeric literal. Enum
+members retain the declared enum type for assignment, comparisons, and
+function parameters/returns. Class and enum interpreter/native behavior is
+covered by regression tests on Windows x64. Inheritance, explicit
+constructors, member visibility modifiers, and function values are not
+implemented. Linux native aggregate operations remain unsupported.
 
 ### Pointers and references
 
@@ -476,9 +506,11 @@ The parser and analyzer accept the pointer type and address-of expression, but I
 
 ```zp
 // math.zh
-pub fn twice(value: number): number {
-    return value * 2
-} end fn
+start {
+    pub fn twice(value: number): number {
+        return value * 2
+    } end fn
+} stop
 ```
 
 ```zp
@@ -496,7 +528,15 @@ The default module name comes from the filename stem with non-identifier charact
 
 Declarations in `.zh` files are private by default. Prefix declarations with `pub` to expose them outside the module. Private functions and variables cannot be referenced by an importer; private custom types cannot be used from another module. Public custom types are currently referenced by their unqualified type name because dotted type annotations are not implemented. Duplicate declarations and ambiguous public unqualified names are errors.
 
-Imported files may contain declarations only. A `start` block (also nested in another declaration) or executable top-level statement is rejected. Module-scope variables/constants initialize once in deterministic dependency-first order before the entry function. They share interpreter storage and can be emitted as native globals when the operations fit the native scalar subset. Unsupported native IR remains an error; `zp build` never falls back to interpretation. Aggregate runtime behavior retains the limitations described in Data Structures. Legacy `import` and `export` are parsed constructs, not file loading or the 0.5.0 visibility mechanism; namespaces do not create module names.
+Imported files require one `start` block containing declarations only; the
+loader extracts declarations from the block and does not execute it. Module
+directives remain at file scope. Module-scope variables/constants initialize
+once in deterministic dependency-first order before the entry function. They
+share interpreter storage and can be emitted as native globals when the
+operations fit the native scalar subset. Unsupported native IR remains an
+error; `zp build` never falls back to interpretation. Legacy `import` and
+`export` are parsed constructs, not file loading or the 0.5.0 visibility
+mechanism.
 
 Diagnostics from lexing, parsing, semantic analysis, and module resolution include the owning source file, line, and column in `--diagnostics=json` output. The VS Code extension recognizes both `.zp` and `.zh`, resolves unsaved entry buffers from their on-disk directory, and routes module diagnostics to the relevant header file.
 
@@ -585,7 +625,7 @@ Keywords are case-sensitive and lowercase. Keyword spellings cannot generally be
 | Literals | `true`, `false`, `null`, `nullptr` |
 | Logical / type relation | `and`, `or`, `not`, `is` |
 
-All listed words are lexed as keywords, but not all have a supported parser construct. `pub` precedes module declarations to make them externally visible; `public`, `private`, `protected`, and `this` are not usable in class bodies. `as` supports module aliases (and the older import alias syntax). `printz` is a working output built-in; `printm` remains an identifier-based deprecated alias. `repeat`, `number`, and `boolean` are specially allowed as qualified member or function names for the standard library. `stop` is also allowed as a qualified member or function name, so `zaudio.stop(handle)` works despite `stop` closing a `start:` block. Identifiers start with a letter or `_` and continue with letters, digits, or `_`. Matching is case-sensitive (`score` and `Score` are different names).
+All listed words are lexed as keywords, but not all have a supported parser construct. `pub` precedes module declarations to make them externally visible; `this` is supported in class methods, while `public`, `private`, and `protected` do not implement member visibility. `as` supports module aliases (and the older import alias syntax). `printz` is a working output built-in; `printm` remains an identifier-based deprecated alias. `repeat`, `number`, and `boolean` are specially allowed as qualified member or function names for the standard library. `stop` is also allowed as a qualified member or function name, so `zaudio.stop(handle)` works despite `stop` closing a `start:` block. Identifiers start with a letter or `_` and continue with letters, digits, or `_`. Matching is case-sensitive (`score` and `Score` are different names).
 
 ## 13. Operator Precedence
 
@@ -617,22 +657,24 @@ Bitwise operators follow the tiers shown above. The parser does not recognize `a
 |---|---|---|
 | Variables, constants, primitive values | Supported | Executable; ordinary `number` values are IEEE-754 doubles in the interpreter and native arithmetic; nested scopes are flattened at runtime |
 | Functions, calls, returns | Supported | Executable; trailing default arguments are applied in interpreter and native calls |
-| Arithmetic, comparisons, logical and bitwise operators | Supported | Generally executable; logical operators short-circuit; `is` is reserved and produces a semantic diagnostic |
+| Arithmetic, comparisons, logical and bitwise operators | Supported | Generally executable; logical operators short-circuit; `is` checks struct instances in the interpreter and Windows x64 native backend |
 | `if` / optional `else`, loops, switch | Supported with noted `break` restrictions | Executable |
 | Strings and concatenation | Supported | Executable |
 | Binary, hexadecimal, decimal, scientific numeric literals | Supported | Parsed and represented as doubles; Windows x64 native execution supports fractions and IEEE-754 division/comparison |
 | Arrays and indexing | Parsed, semantically checked | Nested arrays, indexing, mutation, and length execute in the interpreter and Windows x64 native backend and are tracing-GC managed; Linux native compilation rejects them |
 | Managed memory | `use zmemory.management` and public APIs | Interpreter arrays/dynamic strings and Windows x64 native arrays/dynamic strings use mark-and-sweep; other interpreter strings remain value-owned |
 | Structs | Parsed, semantically checked | Interpreter and Windows x64 runtime values; Linux native unsupported |
-| Classes, enums, namespaces | Braced declarations parsed | No general runtime class/enum or namespace-qualified lookup |
-| Member access and `->` | Parsed; member types remain unresolved | IR generated; interpreter throws for member operations |
+| Classes | Braced declarations inside `start`; typed fields and methods checked | Interpreter and Windows x64: construction, fields, `this`, instance calls |
+| Enums | Braced declarations inside `start`; numeric members and type checks | Interpreter and Windows x64: member values, comparisons, function arguments/returns |
+| Namespaces | Braced declaration containers inside `start` | Qualified namespace function calls; namespace types and dynamic values are not supported |
+| Member access and `->` | Struct/class fields and class methods are checked | Struct/class fields and methods execute in the interpreter and Windows x64 native backend; arbitrary member operations and `->` are unsupported |
 | Pointer types and address-of | Parsed; pointer types accepted | Address-of fails IR generation; no runtime pointers |
-| `use` with `.zh` declarations | Parsed by compiler and extension | Canonical-path dependency graph; public/private visibility, aliases, qualified function/variable/constant access; globals initialize in interpreter and native supported scalar subset |
+| `use` with `.zh` declarations | Parsed by compiler and extension; imported declarations belong in the module's declaration-only `start` block | Canonical-path dependency graph; public/private visibility, aliases, qualified function/variable/constant access; globals initialize in interpreter and native supported scalar subset |
 | `zaudio` standard module | `use zaudio` and its documented API pass checking | Interpreter and native Windows x64 integrations are tested; native Linux x86-64 imports and runtime staging are implemented but not validated on Linux |
 | `zphysics` standard module | `use zphysics` and its documented API pass checking | Box2D engine and Windows native runtime are implemented; Linux native execution is not validated |
-| `import`, `export`, namespaces | Parsed and analyzed | Legacy `import` does not load files; `export` wraps declarations; namespaces have no qualified lookup |
+| `import`, `export`, namespaces | Parsed and analyzed | Legacy `import` does not load files; `export` wraps declarations; namespace functions use qualified names |
 | `pub` | Parsed for module functions, variables/constants, structs, classes, and enums | Enforced for imported references |
-| `public`, `private`, `protected`, `this` | Lexed as keywords | No supported class-member visibility syntax |
+| `public`, `private`, `protected`, `this` | `this` is supported in class methods; visibility keywords are lexed | Class-member visibility syntax is not implemented |
 | Casts (`as`), scope resolution (`::`), braces, `#`, `@` | Some are tokenized | No corresponding parser implementation |
 | Native `zp build` | Not a source-language feature | Generates a native executable for its supported IR subset; see [NATIVE_BACKEND.md](./NATIVE_BACKEND.md) for platform support and limitations |
 
@@ -778,36 +820,41 @@ This program passes both `zp check` and `zp run` with the current compiler. It e
 ### Declaration and module-syntax example
 
 ```zp
-struct Player {
-    name: string = "A"
-    health: number = 100
-} end struct
-
-class Counter {
-    value: number = 0
-    fn current(): number {
-        return 0
-    } end fn
-} end class
-
-enum State {
-    Ready
-    Done = 1
-} end enum
-
-namespace Data {
-    let count: number = 1
-} end namespace
-
-import "math" as math
-
-export fn twice(x: number): number {
-    return x * 2
-} end fn
+use "math.zh" as math
 
 start {
-    say("syntax passes")
+    struct Player {
+        name: string = "A"
+        health: number = 100
+    } end struct
+
+    class Counter {
+        value: number = 0
+        fn current(): number {
+            return this.value
+        } end fn
+    } end class
+
+    enum State {
+        Ready
+        Done = 1
+    } end enum
+
+    namespace Data {
+        fn twice(x: number): number {
+            return x * 2
+        } end fn
+    } end namespace
+
+    let player = Player()
+    let counter = Counter()
+    let state: State = State.Done
+    say(math.twice(Data.twice(player.health)))
+    say(counter.current())
+    say(state == State.Done)
 } stop
 ```
 
-This program passes `zp check`; it demonstrates accepted declaration and module syntax, not working runtime objects or module loading. These limitations are detailed above.
+`math.zh` must put its exported declarations inside its own declaration-only
+`start` block, as shown above. Unlike the earlier parser-only example, this
+sample exercises runtime class, enum, namespace, and module behavior.

@@ -1,7 +1,7 @@
+start {
 fn invalidArray(): number[] {
     return ["not a number"]
 } end fn
 
-start {
     say(length(invalidArray()))
 } stop

@@ -1,3 +1,5 @@
+start {
 fn incomplete() {
     say("body")
 }
+} stop

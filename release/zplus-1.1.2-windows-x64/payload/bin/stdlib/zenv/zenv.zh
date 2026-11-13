@@ -1,3 +1,4 @@
+start {
 pub fn get(name: string): string {
     return __zstdlib_env_get(name)
 } end fn
@@ -16,3 +17,4 @@ pub fn currentDirectory(): string {
 pub fn arguments(): string[] {
     return __zstdlib_args_all()
 } end fn
+} stop

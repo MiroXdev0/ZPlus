@@ -605,6 +605,10 @@ private:
         std::string,
         const zplus::ast::StructDeclaration*
     > structDeclarations_;
+    std::unordered_map<std::string, const zplus::ast::ClassDeclaration*>
+        classDeclarations_;
+    std::unordered_map<std::string, const zplus::ast::EnumDeclaration*>
+        enumDeclarations_;
 
     std::unordered_map<std::string, std::string> moduleNamesByFile_;
 

@@ -1,4 +1,5 @@
 use zgraphics
+start {
 
 pub fn draw(window: number, clicks: number) {
     zgraphics.rectangle(window, 0, 0, 720, 440, "#111827", true, 1)
@@ -9,3 +10,4 @@ pub fn draw(window: number, clicks: number) {
     zgraphics.text(window, "Clicks: " + zgraphics.numberText(clicks), 38, 252, "#A7F3D0", 22)
     zgraphics.text(window, "Click to increment; press Escape to quit.", 38, 380, "#94A3B8", 16)
 } end fn
+} stop

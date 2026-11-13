@@ -111,6 +111,33 @@ if(NOT printz_check_status EQUAL 0 OR printz_check_stderr MATCHES "\"severity\":
     message(FATAL_ERROR "printz unexpectedly emitted a diagnostic warning\n${printz_check_stdout}${printz_check_stderr}")
 endif()
 
+execute_process(
+    COMMAND "${ZP}" check "${SOURCE_DIR}/tests/runtime/array_assignment_type_mismatch.zp" --diagnostics=json
+    RESULT_VARIABLE type_diagnostic_status
+    OUTPUT_VARIABLE type_diagnostic_stdout
+    ERROR_VARIABLE type_diagnostic_stderr
+    TIMEOUT 10
+)
+if(type_diagnostic_status EQUAL 0 OR
+   NOT type_diagnostic_stderr MATCHES "\"category\":\"Type error\"" OR
+   NOT type_diagnostic_stderr MATCHES "\"sourceLine\":\".*values = \\[.*\"" OR
+   NOT type_diagnostic_stderr MATCHES "\"suggestion\":\"\"")
+    message(FATAL_ERROR "type diagnostic is missing its category or source excerpt\n${type_diagnostic_stdout}${type_diagnostic_stderr}")
+endif()
+
+execute_process(
+    COMMAND "${ZP}" check "${SOURCE_DIR}/tests/runtime/array_assignment_type_mismatch.zp"
+    RESULT_VARIABLE type_text_status
+    OUTPUT_VARIABLE type_text_stdout
+    ERROR_VARIABLE type_text_stderr
+    TIMEOUT 10
+)
+if(type_text_status EQUAL 0 OR
+   NOT type_text_stderr MATCHES "Type error" OR
+   NOT type_text_stderr MATCHES "\\^")
+    message(FATAL_ERROR "text diagnostic is missing its category or caret\n${type_text_stdout}${type_text_stderr}")
+endif()
+
 run_success("tests/runtime/printz_only.zp" "official")
 run_success(
     "tests/native/dynamic_arrays.zp"

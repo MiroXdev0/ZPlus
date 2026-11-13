@@ -1,0 +1,7 @@
+start {
+    fn duplicate() {
+    } end fn
+
+    fn duplicate() {
+    } end fn
+} stop

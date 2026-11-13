@@ -1,6 +1,7 @@
 use zstring as text
 
 start {
+
     let index: number = 0
     while index < 1000 {
         let generated: string = text.repeat("abcd", 4096)

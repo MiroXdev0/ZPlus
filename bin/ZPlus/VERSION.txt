@@ -1,2 +1,0 @@
-Z+ Compiler 1.1.2
-ZBuild 0.1.0

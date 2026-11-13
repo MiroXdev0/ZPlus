@@ -1,7 +1,7 @@
+start {
 fn invalid(first: number = 1, second: number): number {
     return first + second
 } end fn
 
-start {
     say(invalid())
 } stop

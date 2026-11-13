@@ -1,3 +1,4 @@
+start {
 pub fn abs(value: number): number {
     if value < 0 {
         return -value
@@ -25,3 +26,4 @@ pub fn max(left: number, right: number): number {
 pub fn clamp(value: number, lower: number, upper: number): number {
     return max(lower, min(value, upper))
 } end fn
+} stop

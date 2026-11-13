@@ -1,3 +1,4 @@
+start {
 pub fn now(): number {
     return __zstdlib_time_now()
 } end fn
@@ -28,3 +29,4 @@ pub fn second(timestamp: number): number {
 pub fn sleep(milliseconds: number) {
     __zstdlib_time_sleep(milliseconds)
 } end fn
+} stop

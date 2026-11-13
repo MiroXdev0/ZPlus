@@ -1,9 +1,9 @@
+start {
 fn sideEffect(): boolean {
     say("unexpected side effect")
     return true
 } end fn
 
-start {
     if false and sideEffect() {
         say("and failed")
     } else {

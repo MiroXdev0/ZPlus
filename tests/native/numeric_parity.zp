@@ -1,5 +1,7 @@
 use zcollections as collections
 
+start {
+
 let globalValue: number = 2.5
 
 fn fractional(value: number, offset: number = 0.25): number {
@@ -14,7 +16,6 @@ fn mixed(first: number, label: string, second: number): number {
     return first + second
 } end fn
 
-start {
     globalValue += 0.25
     say(globalValue)
     let arithmetic: number = fractional(2.0)

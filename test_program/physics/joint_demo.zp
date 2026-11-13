@@ -1,6 +1,7 @@
 use zphysics
 
 start {
+
     let world = zphysics.createWorld(0, 160)
     let anchor = zphysics.createBody(world, "static", 140, 100)
     let first = zphysics.createBody(world, "dynamic", 220, 100)

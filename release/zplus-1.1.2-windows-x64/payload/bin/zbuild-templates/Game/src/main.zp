@@ -6,6 +6,7 @@ use "systems/input.zh" as input
 use "systems/collision.zh" as collision
 
 start {
+
     let app = zgraphics.createWindow("{{PROJECT_NAME}}", 720, 420)
     zgraphics.background(app, "#18202B")
     zgraphics.setTargetFPS(app, 60)

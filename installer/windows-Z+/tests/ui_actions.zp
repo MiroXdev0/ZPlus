@@ -1,6 +1,7 @@
 use "../src/ui/layout.zh" as layout
 
 start {
+
     if layout.actionAt(0, 830, 630) != 1 or layout.actionAt(0, 50, 630) != 2 {
         throw "welcome actions are not mapped to their visible controls"
     } end if

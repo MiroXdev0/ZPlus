@@ -6,6 +6,7 @@ use zpath as path
 use zregistry as registry
 use zstring as text
 use zsystem as system
+start {
 
 fn integrationSamePath(left: string, right: string): boolean {
     let first = text.lower(text.trim(path.normalize(left)))
@@ -140,3 +141,4 @@ pub fn remove(installDirectory: string): string {
     file.delete(metadata)
     return ""
 } end fn
+} stop

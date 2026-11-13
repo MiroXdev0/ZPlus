@@ -107,7 +107,8 @@ std::vector<std::uint8_t> writeELF(const NativeImage& image) {
             throw std::runtime_error("ELF writer: invalid import fixup");
         }
         if ((fixup.library != "libzaudio_runtime.so" &&
-             fixup.library != "libzphysics_runtime.so") || fixup.name.empty()) {
+             fixup.library != "libzphysics_runtime.so" &&
+             fixup.library != "libzplus_input_runtime.so") || fixup.name.empty()) {
             throw std::runtime_error(
                 "ELF writer: unsupported import '" + fixup.library + "!" +
                 fixup.name + "'");

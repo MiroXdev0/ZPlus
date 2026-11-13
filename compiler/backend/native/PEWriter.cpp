@@ -133,7 +133,8 @@ std::vector<std::uint8_t> writePE(const NativeImage& image, bool windowsGui) {
     std::size_t thunkCount = 0;
     for (const auto& [library, names] : imports) {
         if (library != "KERNEL32.dll" && library != "zgraphics_runtime.dll" &&
-            library != "zaudio_runtime.dll" && library != "zphysics_runtime.dll") {
+            library != "zaudio_runtime.dll" && library != "zphysics_runtime.dll" &&
+            library != "zplus_input_runtime.dll") {
             throw std::runtime_error("PE writer: unsupported import library '" + library + "'");
         }
         if (library == "KERNEL32.dll") {

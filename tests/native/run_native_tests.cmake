@@ -107,6 +107,177 @@ function(run_check_failure name expected_message)
     endif()
 endfunction()
 
+function(run_input_case name input_text expected_output)
+    set(source "${SOURCE_DIR}/tests/native/${name}.zp")
+    set(input_file "${WORK_DIR}/${name}.stdin")
+    set(executable "${WORK_DIR}/${name}.native")
+    file(WRITE "${input_file}" "${input_text}")
+
+    execute_process(
+        COMMAND "${ZP}" run "${source}"
+        INPUT_FILE "${input_file}"
+        RESULT_VARIABLE interpreter_result
+        OUTPUT_VARIABLE interpreter_output
+        ERROR_VARIABLE interpreter_error
+        TIMEOUT 15
+    )
+    if(NOT interpreter_result EQUAL 0 OR
+       NOT "${interpreter_output}" STREQUAL "${expected_output}")
+        message(FATAL_ERROR
+            "${name}: interpreter input mismatch (${interpreter_result})\n"
+            "expected: [${expected_output}]\nactual: [${interpreter_output}]\n"
+            "${interpreter_error}")
+    endif()
+
+    execute_process(
+        COMMAND "${ZP}" build "${source}" -o "${executable}"
+        RESULT_VARIABLE build_result
+        OUTPUT_VARIABLE build_stdout
+        ERROR_VARIABLE build_stderr
+        TIMEOUT 20
+    )
+    if(NOT build_result EQUAL 0)
+        message(FATAL_ERROR
+            "${name}: native build failed (${build_result})\n${build_stdout}${build_stderr}")
+    endif()
+
+    execute_process(
+        COMMAND "${executable}"
+        INPUT_FILE "${input_file}"
+        RESULT_VARIABLE native_result
+        OUTPUT_VARIABLE native_output
+        ERROR_VARIABLE native_error
+        TIMEOUT 15
+    )
+    if(NOT native_result EQUAL 0 OR
+       NOT "${native_output}" STREQUAL "${expected_output}")
+        message(FATAL_ERROR
+            "${name}: native input mismatch (${native_result})\n"
+            "expected: [${expected_output}]\nactual: [${native_output}]\n"
+            "${native_error}")
+    endif()
+    if(NOT "${native_output}" STREQUAL "${interpreter_output}")
+        message(FATAL_ERROR "${name}: interpreter/native input output differs")
+    endif()
+endfunction()
+
+function(run_input_failure name input_text expected_message)
+    set(source "${SOURCE_DIR}/tests/native/${name}.zp")
+    set(input_file "${WORK_DIR}/${name}.stdin")
+    set(executable "${WORK_DIR}/${name}.native")
+    file(WRITE "${input_file}" "${input_text}")
+
+    execute_process(
+        COMMAND "${ZP}" run "${source}"
+        INPUT_FILE "${input_file}"
+        RESULT_VARIABLE interpreter_result
+        OUTPUT_VARIABLE interpreter_output
+        ERROR_VARIABLE interpreter_error
+        TIMEOUT 15
+    )
+    if(interpreter_result EQUAL 0 OR
+       NOT "${interpreter_output}${interpreter_error}" MATCHES "${expected_message}")
+        message(FATAL_ERROR
+            "${name}: interpreter did not report [${expected_message}]\n"
+            "${interpreter_output}${interpreter_error}")
+    endif()
+
+    execute_process(
+        COMMAND "${ZP}" build "${source}" -o "${executable}"
+        RESULT_VARIABLE build_result
+        OUTPUT_VARIABLE build_stdout
+        ERROR_VARIABLE build_stderr
+        TIMEOUT 20
+    )
+    if(NOT build_result EQUAL 0)
+        message(FATAL_ERROR
+            "${name}: native build failed (${build_result})\n${build_stdout}${build_stderr}")
+    endif()
+
+    execute_process(
+        COMMAND "${executable}"
+        INPUT_FILE "${input_file}"
+        RESULT_VARIABLE native_result
+        OUTPUT_VARIABLE native_output
+        ERROR_VARIABLE native_error
+        TIMEOUT 15
+    )
+    if(native_result EQUAL 0 OR
+       NOT "${native_output}${native_error}" MATCHES "${expected_message}")
+        message(FATAL_ERROR
+            "${name}: native did not report [${expected_message}]\n"
+            "${native_output}${native_error}")
+    endif()
+endfunction()
+
+function(run_input_arity_check)
+    set(source "${SOURCE_DIR}/tests/native/terminal_input_bad_arity.zp")
+    execute_process(
+        COMMAND "${ZP}" check "${source}"
+        RESULT_VARIABLE check_result
+        OUTPUT_VARIABLE check_output
+        ERROR_VARIABLE check_error
+        TIMEOUT 15
+    )
+    string(REGEX MATCHALL "too many arguments" arity_errors
+        "${check_output}${check_error}")
+    list(LENGTH arity_errors arity_error_count)
+    if(check_result EQUAL 0 OR NOT arity_error_count EQUAL 4)
+        message(FATAL_ERROR
+            "terminal input built-ins did not diagnose all extra arguments\n"
+            "${check_output}${check_error}")
+    endif()
+endfunction()
+
+set(terminal_input_data
+    "Ada Lovelace\npunctuation: !?.,\n\n +42 \n-17\n3.125\n1.25e2\nTrUe\nfAlSe\ntrue\nloop one\nloop two\nUTF-8: Ζ+ 🙂")
+set(terminal_input_expected
+    "Ada Lovelace\npunctuation: !?.,\nempty line passed\ninteger input passed\ndecimal input passed\nexponent input passed\nmixed-case true passed\nmixed-case false passed\nconditional input passed\nloop one\nloop two\nUTF-8: Ζ+ 🙂\n")
+run_input_case(terminal_input "${terminal_input_data}" "${terminal_input_expected}")
+run_input_case(terminal_input_line "line with CRLF\r\n" "line with CRLF\n")
+run_input_case(terminal_input_line "final line without newline" "final line without newline\n")
+run_input_case(terminal_input_eof "" "string EOF is empty\n")
+
+string(REPEAT "x" 131072 terminal_input_large_data)
+run_input_case(
+    terminal_input_large
+    "${terminal_input_large_data}"
+    "${terminal_input_large_data}\n")
+
+run_input_failure(
+    terminal_input_invalid_integer
+    "12x\n"
+    "read_integer: invalid integer input")
+run_input_failure(
+    terminal_input_invalid_integer
+    "+-12\n"
+    "read_integer: invalid integer input")
+run_input_failure(
+    terminal_input_invalid_integer
+    ""
+    "read_integer: end of input")
+run_input_failure(
+    terminal_input_invalid_number
+    "1.2.3\n"
+    "read_number: invalid numeric input")
+run_input_failure(
+    terminal_input_invalid_number
+    "+-1.25\n"
+    "read_number: invalid numeric input")
+run_input_failure(
+    terminal_input_invalid_number
+    ""
+    "read_number: end of input")
+run_input_failure(
+    terminal_input_invalid_boolean
+    "yes\n"
+    "read_boolean: invalid boolean input")
+run_input_failure(
+    terminal_input_invalid_boolean
+    ""
+    "read_boolean: end of input")
+run_input_arity_check()
+
 run_case(empty 0 "")
 run_case(main_exit_code 42 "native main returned 42\n")
 run_case(integer_return 0 "integer constant passed\n")
@@ -131,7 +302,12 @@ run_case(control_flow 0 "control flow passed\n")
 run_case(loop_control 0 "loop control passed\n")
 run_case(functions 0 "function calls passed\n")
 run_case(switch 0 "switch passed\n")
-run_case(output 0 "native backend éЖ🙂 legacy output\n")
+run_case(output 0 "native backend éЖ🙂 legacy output\ntrue\nfalse\ntrue\n")
+run_interpreter_case(output "native backend éЖ🙂 legacy output\ntrue\nfalse\ntrue\n")
+run_case(classes 0 "2\n5\n5\n10\n")
+run_interpreter_case(classes "2\n5\n5\n10\n")
+run_case(enums 0 "true\n4\ntrue\n")
+run_interpreter_case(enums "true\n4\ntrue\n")
 run_case(
     string_comparison
     0
@@ -153,6 +329,7 @@ run_interpreter_case(
     string_comparison
     "string equality passed\nstring inequality passed\ndynamic string equality passed\ndynamic string inequality passed\ndynamic conjunction passed\n"
 )
+run_native_build_error(unsupported_say_type "unsupported_say_type.zp:3:8")
 run_interpreter_case(
     arrays
     "empty array passed\ninitialized array read and write passed\narray argument mutation passed\nnested array mutation passed\narrays\nboolean array passed\narray references survived collection\nnative \nunreachable arrays reclaimed\nmanaged array collection passed\n"
@@ -162,6 +339,8 @@ run_interpreter_case(
     "push and aliases passed\ninsert remove and pop passed\ncontains passed\nsmall integer contains passed\nfunction mutation and return passed\ninsert at end passed\nnested array mutation passed\nstring array passed\nglobal array passed\ngeometric growth passed\nheap accounting passed\nclear and reuse passed\nreachable arrays and strings survived collection\nunreachable arrays reclaimed\n"
 )
 run_check_failure(invalid_default_parameters "parameters without defaults cannot follow")
+run_check_failure(invalid_enum_member "enum 'Status' has no member 'Unknown'")
+run_check_failure(invalid_class_member "class 'Counter' has no field or method 'missing'")
 run_check_failure(
     dynamic_array_type_mismatch
     "push value has type 'string', expected 'number'"

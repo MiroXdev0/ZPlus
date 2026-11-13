@@ -11,6 +11,7 @@ use zlog as log
 use zmemory.management as memory
 
 start {
+
     let root: string = args.get(0)
     let settingsPath: string = path.join(root, "settings.txt")
     let logPath: string = path.join(root, "run.log")
@@ -92,6 +93,19 @@ start {
     say(file.size(settingsPath) == 10 ? "file-size-ok" : "file-size-fail")
     file.append(settingsPath, "\nmode=test")
     say(text.contains(file.read(settingsPath), "mode=test") ? "file-append-ok" : "file-append-fail")
+    let linesPath: string = path.join(root, "lines.txt")
+    file.writeLines(linesPath, ["first", "", "third"])
+    let storedLines: string[] = file.readLines(linesPath)
+    say(file.read(linesPath) == "first\n\nthird\n" ? "file-lines-write-ok" : "file-lines-write-fail")
+    say(length(storedLines) == 3 and storedLines[0] == "first" and storedLines[1] == "" and storedLines[2] == "third" ? "file-lines-read-ok" : "file-lines-read-fail")
+    file.write(linesPath, "without newline")
+    say(length(file.readLines(linesPath)) == 1 and file.readLines(linesPath)[0] == "without newline" ? "file-lines-final-line-ok" : "file-lines-final-line-fail")
+    file.write(linesPath, "one\r\ntwo\r\n")
+    let crlfLines: string[] = file.readLines(linesPath)
+    say(length(crlfLines) == 2 and crlfLines[0] == "one" and crlfLines[1] == "two" ? "file-lines-crlf-ok" : "file-lines-crlf-fail")
+    file.writeLines(linesPath, [])
+    say(file.exists(linesPath) and file.size(linesPath) == 0 and length(file.readLines(linesPath)) == 0 ? "file-lines-empty-ok" : "file-lines-empty-fail")
+    say(file.delete(linesPath) ? "file-lines-delete-ok" : "file-lines-delete-fail")
     say(length(file.listDirectory(root)) >= 1 ? "directory-list-ok" : "directory-list-fail")
     let nestedPath: string = path.join(root, "nested")
     file.createDirectory(nestedPath)

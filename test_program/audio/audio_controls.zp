@@ -1,5 +1,7 @@
 use zaudio
 
+start {
+
 let count = zaudio.deviceCount()
 say("Playback devices:")
 say(count)
@@ -25,3 +27,4 @@ if count > 0 {
 } else {
     say("No playback device is available")
 } end if
+} stop

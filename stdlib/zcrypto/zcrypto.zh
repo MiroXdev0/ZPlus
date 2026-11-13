@@ -1,3 +1,5 @@
+start {
 pub fn sha256File(path: string): string {
     return __zstdlib_crypto_sha256File(path)
 } end fn
+} stop

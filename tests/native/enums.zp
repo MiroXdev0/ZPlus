@@ -1,0 +1,22 @@
+start {
+    enum Status {
+        Ready,
+        Running = 4,
+        Finished
+    } end enum
+
+    fn advance(current: Status): Status {
+        if current == Status.Ready {
+            return Status.Running
+        } else {
+            return Status.Finished
+        } end if
+    } end fn
+
+    let current: Status = Status.Ready
+    say(current == Status.Ready)
+    say(advance(current))
+    current = advance(current)
+    current = advance(current)
+    say(current == Status.Finished)
+} stop

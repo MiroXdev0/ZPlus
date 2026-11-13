@@ -1,0 +1,17 @@
+start {
+    class Counter {
+        value: number = 2
+
+        fn add(amount: number): number {
+            this.value += amount
+            return this.value
+        } end fn
+    } end class
+
+    let counter = Counter()
+    say(counter.value)
+    say(counter.add(3))
+    say(counter.value)
+    counter.value = 9
+    say(counter.add(1))
+} stop

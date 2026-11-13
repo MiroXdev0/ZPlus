@@ -1,5 +1,6 @@
 use zmath as math
 
 start {
+
     say(math.pi() > 3 and math.pi() < 4 and math.e() > 2 and math.e() < 3 ? "constants-ok" : "constants-fail")
 } stop

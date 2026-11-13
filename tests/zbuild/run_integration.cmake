@@ -6,6 +6,7 @@ file(REMOVE_RECURSE "${WORK_DIR}")
 file(MAKE_DIRECTORY "${WORK_DIR}")
 file(COPY "${SOURCE_DIR}/test_program/zbuild_multi" DESTINATION "${WORK_DIR}")
 set(project_dir "${WORK_DIR}/zbuild_multi")
+file(REMOVE_RECURSE "${project_dir}/build")
 file(TO_CMAKE_PATH "${ZP}" compiler_path)
 file(READ "${project_dir}/zproject.toml" project_config)
 string(REPLACE "[compiler]" "[compiler]\npath = \"${compiler_path}\""
@@ -159,6 +160,25 @@ execute_process(
 )
 if(NOT run_result EQUAL 0 OR NOT run_stdout MATCHES "Hello, Z\\+ developer!")
     message(FATAL_ERROR "executable template failed to build and run\n${run_stdout}${run_stderr}")
+endif()
+
+foreach(process_output IN ITEMS
+    "${project_dir}/build/cache/app.log"
+    "${project_dir}/build/cache/other.log"
+    "${project_dir}/build/cache/interpreter_app.log"
+    "${project_dir}/build/cache/app_tests.log"
+    "${project_dir}/build/debug/run.log"
+    "${project_dir}/build/debug/cache/app_tests.test.log")
+    if(EXISTS "${process_output}")
+        message(FATAL_ERROR "ZBuild left an unnecessary process-output file: ${process_output}")
+    endif()
+endforeach()
+
+file(GLOB_RECURSE temporary_artifacts
+    "${project_dir}/build/*.zbuild-tmp"
+    "${project_dir}/build/*.sha256.tmp")
+if(temporary_artifacts)
+    message(FATAL_ERROR "ZBuild left temporary build artifacts: ${temporary_artifacts}")
 endif()
 
 message(STATUS "ZBuild integration tests passed")

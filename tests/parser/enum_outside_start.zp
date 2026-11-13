@@ -1,0 +1,3 @@
+enum Outside {
+    Value
+} end enum

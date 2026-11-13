@@ -1,5 +1,7 @@
 use zgraphics
 
+start {
+
 fn calculate(left: number, right: number, operation: number): number {
     if operation == 1 {
         return left + right
@@ -25,7 +27,6 @@ fn drawKey(app: number, x: number, y: number, label: string) {
     zgraphics.text(app, label, x + 20, y + 9, "#FFFFFF", 18)
 } end fn
 
-start {
     let app = zgraphics.createWindow("Z+ Pocket Calculator", 300, 400)
     let current = 0
     let total = 0

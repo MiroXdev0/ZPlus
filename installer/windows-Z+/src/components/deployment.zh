@@ -5,6 +5,7 @@ use zgraphics as graphics
 use zpath as path
 use zstring as text
 use "../ui/layout.zh" as layout
+start {
 
 fn isSelected(relativePath: string, docs: boolean, examples: boolean): boolean {
     if text.startsWith(relativePath, "docs\\") and not docs {
@@ -228,3 +229,4 @@ pub fn uninstall(installDirectory: string): string {
     } end if
     return "Z+ files recorded by this installer were removed."
 } end fn
+} stop

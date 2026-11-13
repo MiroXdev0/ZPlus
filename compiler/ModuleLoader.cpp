@@ -89,68 +89,6 @@ bool isModuleDeclaration(const ast::Statement& statement) {
         dynamic_cast<const ast::ImportDeclaration*>(&statement);
 }
 
-const ast::StartStatement* findStartBlock(const std::vector<ast::Stmt>& statements);
-
-const ast::StartStatement* findStartBlock(const ast::Statement& statement) {
-    if (const auto* node = dynamic_cast<const ast::StartStatement*>(&statement)) return node;
-    if (const auto* node = dynamic_cast<const ast::FunctionDeclaration*>(&statement)) {
-        return findStartBlock(node->body);
-    }
-    if (const auto* node = dynamic_cast<const ast::NamespaceDeclaration*>(&statement)) {
-        return findStartBlock(node->body);
-    }
-    if (const auto* node = dynamic_cast<const ast::ClassDeclaration*>(&statement)) {
-        for (const auto& method : node->methods) {
-            if (method) {
-                if (const auto* start = findStartBlock(method->body)) return start;
-            }
-        }
-    }
-    if (const auto* node = dynamic_cast<const ast::ExportDeclaration*>(&statement)) {
-        return node->declaration ? findStartBlock(*node->declaration) : nullptr;
-    }
-    if (const auto* node = dynamic_cast<const ast::IfStatement*>(&statement)) {
-        if (const auto* start = findStartBlock(node->thenBody)) return start;
-        return findStartBlock(node->elseBody);
-    }
-    if (const auto* node = dynamic_cast<const ast::WhileStatement*>(&statement)) {
-        return findStartBlock(node->body);
-    }
-    if (const auto* node = dynamic_cast<const ast::ForStatement*>(&statement)) {
-        if (node->initializer) {
-            if (const auto* start = findStartBlock(*node->initializer)) return start;
-        }
-        return findStartBlock(node->body);
-    }
-    if (const auto* node = dynamic_cast<const ast::RepeatStatement*>(&statement)) {
-        return findStartBlock(node->body);
-    }
-    if (const auto* node = dynamic_cast<const ast::SwitchStatement*>(&statement)) {
-        for (const auto& branch : node->cases) {
-            if (branch) {
-                if (const auto* start = findStartBlock(branch->body)) return start;
-            }
-        }
-        return findStartBlock(node->defaultBody);
-    }
-    if (const auto* node = dynamic_cast<const ast::CaseStatement*>(&statement)) {
-        return findStartBlock(node->body);
-    }
-    if (const auto* node = dynamic_cast<const ast::BlockStatement*>(&statement)) {
-        return findStartBlock(node->statements);
-    }
-    return nullptr;
-}
-
-const ast::StartStatement* findStartBlock(const std::vector<ast::Stmt>& statements) {
-    for (const auto& statement : statements) {
-        if (statement) {
-            if (const auto* start = findStartBlock(*statement)) return start;
-        }
-    }
-    return nullptr;
-}
-
 bool hasDrivePrefix(const std::string& path) {
     return path.size() >= 2 &&
         std::isalpha(static_cast<unsigned char>(path[0])) &&
@@ -171,7 +109,10 @@ std::string moduleIdentifier(std::string name) {
 
 } // namespace
 
-LoadedProgram ModuleLoader::load(const std::filesystem::path& entryPath) {
+LoadedProgram ModuleLoader::load(
+    const std::filesystem::path& entryPath,
+    const std::string* entrySource
+) {
     result_ = {};
     moduleStatements_.clear();
     loadedPaths_.clear();
@@ -179,7 +120,9 @@ LoadedProgram ModuleLoader::load(const std::filesystem::path& entryPath) {
     modulePathsByName_.clear();
 
     std::error_code error;
-    entryPath_ = std::filesystem::canonical(entryPath, error);
+    entryPath_ = entrySource
+        ? std::filesystem::weakly_canonical(entryPath, error)
+        : std::filesystem::canonical(entryPath, error);
     if (error) {
         addDiagnostic(
             "cannot resolve entry source file '" + entryPath.string() + "'",
@@ -187,11 +130,18 @@ LoadedProgram ModuleLoader::load(const std::filesystem::path& entryPath) {
         );
         return std::move(result_);
     }
+    if (entrySource && !std::filesystem::is_directory(entryPath_.parent_path(), error)) {
+        addDiagnostic(
+            "cannot resolve entry source directory '" + entryPath_.parent_path().string() + "'",
+            entryPath_.string()
+        );
+        return std::move(result_);
+    }
     std::string entryExtension = entryPath_.extension().string();
     std::transform(entryExtension.begin(), entryExtension.end(), entryExtension.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));
     });
-    if (entryExtension != ".zp") {
+    if (entryExtension != ".zp" && !(entrySource && entryExtension == ".zh")) {
         addDiagnostic(
             "entry source file must use the .zp extension",
             entryPath_.string()
@@ -200,7 +150,7 @@ LoadedProgram ModuleLoader::load(const std::filesystem::path& entryPath) {
     }
 
     std::vector<std::string> activePaths;
-    if (!loadModule(entryPath_, true, activePaths)) {
+    if (!loadModule(entryPath_, true, activePaths, {}, entrySource)) {
         return std::move(result_);
     }
 
@@ -218,10 +168,13 @@ bool ModuleLoader::loadModule(
     const std::filesystem::path& requestedPath,
     bool entryModule,
     std::vector<std::string>& activePaths,
-    const std::string& requestedName
+    const std::string& requestedName,
+    const std::string* sourceOverride
 ) {
     std::error_code pathError;
-    const auto canonicalPath = std::filesystem::canonical(requestedPath, pathError);
+    const auto canonicalPath = entryModule && sourceOverride
+        ? std::filesystem::weakly_canonical(requestedPath, pathError)
+        : std::filesystem::canonical(requestedPath, pathError);
     if (pathError) {
         addDiagnostic(
             "module file '" + requestedPath.string() + "' does not exist or cannot be read",
@@ -272,17 +225,22 @@ bool ModuleLoader::loadModule(
         }
     }
 
-    std::ifstream input(canonicalPath, std::ios::binary);
-    if (!input) {
-        addDiagnostic(
-            "cannot open module file '" + canonicalPath.string() + "'",
-            canonicalPath.string()
-        );
-        return false;
+    std::string source;
+    if (entryModule && sourceOverride) {
+        source = *sourceOverride;
+    } else {
+        std::ifstream input(canonicalPath, std::ios::binary);
+        if (!input) {
+            addDiagnostic(
+                "cannot open module file '" + canonicalPath.string() + "'",
+                canonicalPath.string()
+            );
+            return false;
+        }
+        std::ostringstream buffer;
+        buffer << input.rdbuf();
+        source = buffer.str();
     }
-    std::ostringstream buffer;
-    buffer << input.rdbuf();
-    const std::string source = buffer.str();
 
     lexer::Lexer lexer(source, canonicalPath.string());
     auto tokens = lexer.tokenize();
@@ -325,18 +283,6 @@ bool ModuleLoader::loadModule(
         }
         modulePathsByName_[moduleName] = identity;
         moduleNamesByPath_[identity] = moduleName;
-    }
-
-    if (!entryModule) {
-        if (const auto* start = findStartBlock(program->statements)) {
-            addDiagnostic(
-                "module '" + canonicalPath.string() + "' cannot contain a start block",
-                canonicalPath.string(),
-                start->location.line,
-                start->location.column
-            );
-            return false;
-        }
     }
 
     activePaths.push_back(identity);
@@ -422,33 +368,70 @@ bool ModuleLoader::loadModule(
 
     std::vector<ast::Stmt> statements;
     statements.reserve(program->statements.size());
+    const auto tagModuleDeclaration = [&](ast::Statement& declaration) {
+        ast::Statement* current = &declaration;
+        if (auto* exported = dynamic_cast<ast::ExportDeclaration*>(current)) {
+            current = exported->declaration.get();
+        }
+        if (auto* function = dynamic_cast<ast::FunctionDeclaration*>(current)) {
+            function->moduleName = moduleName;
+            function->internalName = moduleName + "::" + function->name;
+        } else if (auto* variable = dynamic_cast<ast::VariableDeclaration*>(current)) {
+            variable->moduleName = moduleName;
+            variable->internalName = moduleName + "::" + variable->name;
+        } else if (auto* structure = dynamic_cast<ast::StructDeclaration*>(current)) {
+            structure->moduleName = moduleName;
+        } else if (auto* klass = dynamic_cast<ast::ClassDeclaration*>(current)) {
+            klass->moduleName = moduleName;
+            const std::string className = moduleName + "::" + klass->name;
+            for (auto& method : klass->methods) {
+                if (!method) continue;
+                method->moduleName = moduleName;
+                method->ownerClass = className;
+                method->internalName = className + "::" + method->name;
+            }
+        } else if (auto* enumeration = dynamic_cast<ast::EnumDeclaration*>(current)) {
+            enumeration->moduleName = moduleName;
+        }
+    };
+
     for (auto& statement : program->statements) {
         if (!statement || dynamic_cast<ast::UseDeclaration*>(statement.get())) continue;
 
-        if (!entryModule && !isModuleDeclaration(*statement)) {
+        if (entryModule) {
+            statements.push_back(std::move(statement));
+            continue;
+        }
+
+        if (auto* start = dynamic_cast<ast::StartStatement*>(statement.get())) {
+            for (auto& declaration : start->body) {
+                if (!declaration || !isModuleDeclaration(*declaration)) {
+                    if (declaration) {
+                        addDiagnostic(
+                            "module '" + canonicalPath.string() +
+                                "' start block may contain declarations only",
+                            canonicalPath.string(),
+                            declaration->location.line,
+                            declaration->location.column
+                        );
+                    }
+                    return false;
+                }
+                tagModuleDeclaration(*declaration);
+                statements.push_back(std::move(declaration));
+            }
+            continue;
+        }
+
+        if (!dynamic_cast<ast::ImportDeclaration*>(statement.get())) {
             addDiagnostic(
                 "module '" + canonicalPath.string() +
-                    "' may contain declarations only; executable statements belong in the .zp entry file",
+                    "' may contain only module directives and declarations in its start block",
                 canonicalPath.string(),
                 statement->location.line,
                 statement->location.column
             );
             return false;
-        }
-        if (!entryModule) {
-            if (auto* function = dynamic_cast<ast::FunctionDeclaration*>(statement.get())) {
-                function->moduleName = moduleName;
-                function->internalName = moduleName + "::" + function->name;
-            } else if (auto* variable = dynamic_cast<ast::VariableDeclaration*>(statement.get())) {
-                variable->moduleName = moduleName;
-                variable->internalName = moduleName + "::" + variable->name;
-            } else if (auto* structure = dynamic_cast<ast::StructDeclaration*>(statement.get())) {
-                structure->moduleName = moduleName;
-            } else if (auto* klass = dynamic_cast<ast::ClassDeclaration*>(statement.get())) {
-                klass->moduleName = moduleName;
-            } else if (auto* enumeration = dynamic_cast<ast::EnumDeclaration*>(statement.get())) {
-                enumeration->moduleName = moduleName;
-            }
         }
         statements.push_back(std::move(statement));
     }

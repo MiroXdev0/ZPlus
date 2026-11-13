@@ -2,6 +2,8 @@ if(NOT CONFIG STREQUAL "Release")
     return()
 endif()
 
+include("${CMAKE_CURRENT_LIST_DIR}/CopyDirectoryIfDifferent.cmake")
+
 if(NOT EXISTS "${SOURCE_FILE}")
     message(FATAL_ERROR "Release compiler executable was not produced: ${SOURCE_FILE}")
 endif()
@@ -81,9 +83,18 @@ if(DEFINED PHYSICS_RUNTIME_FILE AND NOT PHYSICS_RUNTIME_FILE STREQUAL "")
     )
 endif()
 
+if(DEFINED INPUT_RUNTIME_FILE AND NOT INPUT_RUNTIME_FILE STREQUAL "")
+    get_filename_component(input_runtime_name "${INPUT_RUNTIME_FILE}" NAME)
+    install_release_file(
+        "${INPUT_RUNTIME_FILE}"
+        "${DESTINATION_DIR}/${input_runtime_name}"
+        "terminal input runtime"
+    )
+endif()
+
 if(DEFINED STDLIB_SOURCE_DIR AND NOT STDLIB_SOURCE_DIR STREQUAL "")
     if(NOT IS_DIRECTORY "${STDLIB_SOURCE_DIR}")
         message(FATAL_ERROR "Release standard library directory is missing: ${STDLIB_SOURCE_DIR}")
     endif()
-    file(COPY "${STDLIB_SOURCE_DIR}/" DESTINATION "${DESTINATION_DIR}/stdlib")
+    copy_directory_if_different("${STDLIB_SOURCE_DIR}" "${DESTINATION_DIR}/stdlib")
 endif()

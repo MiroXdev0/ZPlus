@@ -1,6 +1,8 @@
 use zmemory.management
 use "modules/memory_values.zh" as values
 
+start {
+
 fn collectWhileActive(items: number[][]): number {
     zmemory.collect()
     return items[1][0]
@@ -15,7 +17,6 @@ fn allocateRepeatedly(count: number): number {
     return result
 } end fn
 
-start {
     let baseline: number = zmemory.heapObjects()
     let empty: number[] = []
     let nested: number[][] = [[10, 20], [30, 40]]

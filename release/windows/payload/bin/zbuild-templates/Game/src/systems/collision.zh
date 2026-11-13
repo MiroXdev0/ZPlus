@@ -1,3 +1,4 @@
+start {
 pub fn clampX(value: number, worldWidth: number): number {
     if value < 0 {
         return 0
@@ -25,3 +26,4 @@ pub fn clampY(value: number, worldHeight: number): number {
 pub fn overlaps(firstX: number, firstY: number, firstWidth: number, firstHeight: number, secondX: number, secondY: number, secondWidth: number, secondHeight: number): boolean {
     return firstX < secondX + secondWidth and firstX + firstWidth > secondX and firstY < secondY + secondHeight and firstY + firstHeight > secondY
 } end fn
+} stop

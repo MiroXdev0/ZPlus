@@ -1,3 +1,4 @@
+start {
 pub fn valid(source: string): boolean {
     return __zjson_valid(source)
 } end fn
@@ -37,3 +38,4 @@ pub fn arrayGet(source: string, pointer: string, index: number): string {
 pub fn kind(source: string, pointer: string): string {
     return __zjson_kind(source, pointer)
 } end fn
+} stop

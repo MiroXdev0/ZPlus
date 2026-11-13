@@ -1,6 +1,7 @@
 use zphysics
 
 start {
+
     let world = zphysics.createWorld(0, 320)
     let floor = zphysics.createBody(world, "static", 320, 430)
     zphysics.createBox(world, floor, 620, 24)

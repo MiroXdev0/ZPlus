@@ -1,5 +1,7 @@
 use zaudio
 
+start {
+
 zaudio.initialize()
 let firstEffect = zaudio.loadSound("assets/tone.wav")
 let secondEffect = zaudio.loadSound("assets/tone.mp3")
@@ -15,3 +17,4 @@ zaudio.stop(firstEffect)
 zaudio.stop(secondEffect)
 zaudio.unloadAll()
 zaudio.shutdown()
+} stop

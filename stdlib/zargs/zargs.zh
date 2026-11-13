@@ -1,3 +1,4 @@
+start {
 pub fn count(): number {
     return __zstdlib_args_count()
 } end fn
@@ -10,3 +11,4 @@ pub fn has(value: string): boolean {
 pub fn all(): string[] {
     return __zstdlib_args_all()
 } end fn
+} stop

@@ -38,7 +38,7 @@ function resolveCompilerPath(configuredPath, env = process.env, platform = proce
 
 function executeCompiler(executable, args, options = {}) {
     return new Promise((resolve, reject) => {
-        childProcess.execFile(
+        const child = childProcess.execFile(
             executable,
             args,
             {
@@ -57,6 +57,12 @@ function executeCompiler(executable, args, options = {}) {
                 resolve(result);
             }
         );
+        if (options.input !== undefined) {
+            child.stdin.on("error", error => {
+                if (error.code !== "EPIPE") reject(error);
+            });
+            child.stdin.end(options.input, "utf8");
+        }
     });
 }
 

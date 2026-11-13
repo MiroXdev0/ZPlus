@@ -28,13 +28,15 @@ start {
 Declarations in a `.zh` module are private by default. `pub` makes functions, variables/constants, structs, classes, and enums accessible outside their declaring module:
 
 ```zp
-pub fn add(left: number, right: number): number {
-    return left + right
-} end fn
+start {
+    pub fn add(left: number, right: number): number {
+        return left + right
+    } end fn
 
-fn internalHelper(): number {
-    return 1
-} end fn
+    fn internalHelper(): number {
+        return 1
+    } end fn
+} stop
 ```
 
 An importer can reference public functions, constants, and variables with the module name or alias, such as `math.add(1, 2)` or `math.answer`. Public declarations also remain available by unqualified name for backward-compatible convenience when that name is unambiguous. Private declarations are only accessible inside their declaring module; external qualified or unqualified access is diagnosed. Public types can be used by their unqualified type name. Type syntax does not currently support dotted/qualified custom type names.
@@ -45,7 +47,11 @@ The loader preserves the source location and owning module on declarations. Dupl
 
 ## Module initialization and backends
 
-Modules are declaration-only. A `.zh` file containing a `start` block (including one nested in another declaration) or executable top-level statements is rejected. Imported modules do not get independent entry points.
+Modules are declaration-only. Every `.zh` file must contain one `start` block
+whose contents are declarations only; the loader extracts those declarations
+and does not execute the block. `use` directives remain at file scope.
+Executable statements in a module block are rejected. Imported modules do not
+get independent entry points.
 
 Module-scope variables and constants are initialized once in deterministic dependency-first order before the entry function. They share storage with imported functions in the interpreter and are emitted as native globals when their initializer and use fit the native backend's supported scalar subset. Unsupported native IR is an error; `zp build` never falls back to interpretation. See [NATIVE_BACKEND.md](./NATIVE_BACKEND.md).
 
@@ -97,17 +103,21 @@ Project/
 `header.zh`:
 
 ```zp
-pub fn greet(name: string) {
-    say("Hello " + name)
-} end fn
+start {
+    pub fn greet(name: string) {
+        say("Hello " + name)
+    } end fn
+} stop
 ```
 
 `modules/math.zh`:
 
 ```zp
-pub fn add(left: number, right: number): number {
-    return left + right
-} end fn
+start {
+    pub fn add(left: number, right: number): number {
+        return left + right
+    } end fn
+} stop
 ```
 
 `main.zp`:

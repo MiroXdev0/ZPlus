@@ -1,5 +1,6 @@
 use zgraphics
 use "ui/layout.zh" as layout
+start {
 
 pub fn create(title: string): number {
     let window = zgraphics.createWindow(title, 720, 440)
@@ -11,3 +12,4 @@ pub fn create(title: string): number {
 pub fn drawFrame(window: number, clicks: number) {
     layout.draw(window, clicks)
 } end fn
+} stop

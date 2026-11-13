@@ -1,3 +1,4 @@
+start {
 pub fn platform(): string {
     return __zstdlib_system_platform()
 } end fn
@@ -41,3 +42,4 @@ pub fn shortcutArguments(path: string): string {
 pub fn removeShortcutIfMatches(path: string, target: string, arguments: string): boolean {
     return __zstdlib_system_removeShortcutIfMatches(path, target, arguments)
 } end fn
+} stop

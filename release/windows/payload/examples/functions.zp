@@ -1,7 +1,7 @@
+start {
 fn add(left: number, right: number): number {
     return left + right
 } end fn
 
-start {
     say(add(20, 22))
 } stop

@@ -1,6 +1,7 @@
 use zjson as json
 
 start {
+
     let payload = "{\"number\":42,\"flag\":true,\"items\":[\"first\",\"second\"]}"
     if json.getNumber(payload, "/number") == 42 {
         printz("number-ok\n")

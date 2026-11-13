@@ -1,0 +1,5 @@
+start {
+    if read_boolean() {
+        say("unexpected boolean")
+    } end if
+} stop

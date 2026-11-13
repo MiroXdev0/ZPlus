@@ -1,3 +1,4 @@
+start {
 pub fn readString(keyPath: string, valueName: string): string {
     return __zstdlib_registry_read(keyPath, valueName)
 } end fn
@@ -13,3 +14,4 @@ pub fn writeString(keyPath: string, valueName: string, value: string, kind: stri
 pub fn deleteValue(keyPath: string, valueName: string): boolean {
     return __zstdlib_registry_deleteValue(keyPath, valueName)
 } end fn
+} stop

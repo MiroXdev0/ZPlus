@@ -87,10 +87,19 @@ not implemented.
 `unique` return new arrays and do not mutate their input. `contains` and
 `count` compare numbers by value. These operations are available in the
 interpreter and Windows x64 native runtime; native numbers are integer-only.
+Z+ arrays are mutable dynamic arrays: `push(values, value)`, `insert(values,
+index, value)`, `pop(values)`, `remove(values, index)`, `contains(values,
+value)`, `clear(values)`, and `length(values)` provide insertion, removal,
+membership, clearing, and size operations. Arrays can be iterated with `for`.
+These core operations support typed arrays in both the interpreter and
+Windows x64 native runtime. Dedicated map and set types are not currently
+provided.
 
 ### `zfile as file`
 
 `read(path: string) -> string`, `write(path: string, contents: string) -> void`,
+`readLines(path: string) -> string[]`,
+`writeLines(path: string, lines: string[]) -> void`,
 `append(path: string, contents: string) -> void`,
 `exists(path: string) -> boolean`, `delete(path: string) -> boolean`,
 `createDirectory(path: string) -> boolean`,
@@ -100,9 +109,13 @@ and `isDirectory(path: string) -> boolean`.
 Reads and writes are byte-preserving file operations represented as Z+ strings;
 write truncates and append preserves existing content. Errors are raised for
 failed I/O rather than represented as empty successful results. Directory
-entries are returned as sorted file names. Filesystem paths follow the host
-platform. The module is supported by the interpreter and Windows x64 native
-runtime.
+entries are returned as sorted file names. `readLines` removes LF or CRLF
+terminators and does not add an extra empty item for a final newline;
+`writeLines` writes one LF after each element and rejects elements containing
+line breaks. `exists`, `size`, and `isDirectory` provide file metadata checks.
+Filesystem paths follow the host platform. All listed functions are supported
+by the interpreter and Windows x64 native runtime; filesystem and validation
+failures raise runtime errors in both.
 
 ### `zpath as path`
 

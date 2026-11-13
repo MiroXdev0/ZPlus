@@ -1,5 +1,7 @@
 use zaudio
 
+start {
+
 if zaudio.deviceCount() > 0 {
     zaudio.initialize()
     let music = zaudio.loadMusic("tone.mp3")
@@ -20,3 +22,4 @@ if zaudio.deviceCount() > 0 {
 } else {
     say("Audio native integration skipped: no playback device")
 } end if
+} stop

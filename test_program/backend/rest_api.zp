@@ -2,6 +2,7 @@ use zhttp as http
 use zjson as json
 
 start {
+
     let server = http.serverCreate("127.0.0.1", 8081)
     http.serverConfigure(server, 1048576, 30000)
     http.configureCors(server, "*", "GET, POST, PUT, PATCH, DELETE, OPTIONS", "Content-Type, Authorization")

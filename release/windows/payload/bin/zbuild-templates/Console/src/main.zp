@@ -3,6 +3,7 @@ use zstring as text
 use "commands/greeting.zh" as greeting
 
 start {
+
     if args.count() > 0 {
         let name = text.trim(args.get(0))
         printz(greeting.message(name), "\n")

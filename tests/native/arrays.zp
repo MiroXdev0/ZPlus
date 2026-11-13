@@ -1,5 +1,7 @@
 use zmemory.management
 
+start {
+
 let shared: number[] = [2, 4]
 
 fn mutate(values: number[]): number[] {
@@ -15,7 +17,6 @@ fn allocateTransient() {
     let discarded: number[][] = [[5], [6]]
 } end fn
 
-start {
     let empty: number[] = []
     if length(empty) == 0 {
         say("empty array passed")

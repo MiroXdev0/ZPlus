@@ -1,3 +1,4 @@
+start {
 fn replaceFirst(values: number[], replacement: number): number[] {
     values[0] = replacement
     return values
@@ -11,7 +12,6 @@ fn nestedValue(values: number[][]): number {
     return values[1][0]
 } end fn
 
-start {
     let empty: number[] = []
     say(length(empty))
 

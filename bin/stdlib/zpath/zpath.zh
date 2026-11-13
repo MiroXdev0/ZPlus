@@ -1,3 +1,4 @@
+start {
 pub fn join(left: string, right: string): string {
     return __zstdlib_path_join(left, right)
 } end fn
@@ -19,3 +20,4 @@ pub fn absolute(value: string): string {
 pub fn isAbsolute(value: string): boolean {
     return __zstdlib_path_isAbsolute(value)
 } end fn
+} stop

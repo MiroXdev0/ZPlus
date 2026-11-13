@@ -1,6 +1,7 @@
 use zjson as json
 
 start {
+
     let payload = "{\"user\":{\"name\":\"Mira \\uD83D\\uDE80\",\"active\":true},\"items\":[3,{\"ok\":true}]}"
     if json.valid(payload) {
         printz("json-valid\n")

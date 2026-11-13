@@ -1,3 +1,4 @@
+start {
 struct MigratedPoint {
     x: number
     y: number
@@ -17,3 +18,4 @@ namespace MigratedNamespace {
         return 1
     } end fn
 } end namespace
+} stop

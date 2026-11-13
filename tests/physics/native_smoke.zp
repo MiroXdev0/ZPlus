@@ -1,6 +1,7 @@
 use zphysics
 
 start {
+
     let world = zphysics.createWorld(0, 0)
     zphysics.setGravity(world, 0.25, -0.5)
     let body = zphysics.createBody(world, "static", 10, 10)

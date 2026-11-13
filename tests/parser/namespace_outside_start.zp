@@ -1,0 +1,5 @@
+namespace Outside {
+    fn value(): number {
+        return 1
+    } end fn
+} end namespace

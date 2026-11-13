@@ -29,6 +29,18 @@ if(NOT declaration_result EQUAL 0)
 endif()
 
 execute_process(
+    COMMAND "${ZP}" run "${SOURCE_DIR}/tests/parser/declaration_structure.zp"
+    RESULT_VARIABLE declaration_structure_result
+    OUTPUT_VARIABLE declaration_structure_output
+    ERROR_VARIABLE declaration_structure_error
+    TIMEOUT 20
+)
+if(NOT declaration_structure_result EQUAL 0 OR
+   NOT "${declaration_structure_output}" STREQUAL "2\n7\n")
+    message(FATAL_ERROR "declarations inside start failed\n${declaration_structure_output}${declaration_structure_error}")
+endif()
+
+execute_process(
     COMMAND "${ZP}" run "${SOURCE_DIR}/tests/parser/legacy_syntax.zp"
     RESULT_VARIABLE legacy_result
     OUTPUT_VARIABLE legacy_output
@@ -79,11 +91,18 @@ set(invalid_cases
     "brace_missing_terminator|expected 'stop' to close 'start'"
     "brace_unexpected_close|unexpected closing brace"
     "brace_mixed_syntax|cannot mix legacy colon-based block syntax"
-    "brace_unexpected_terminator|unexpected 'end'"
-    "brace_duplicate_terminator|unexpected 'end'"
+    "brace_unexpected_terminator|unexpected block terminator 'end while'"
+    "brace_duplicate_terminator|unexpected block terminator"
     "brace_invalid_nesting|block opened as 'while'.*closed with 'end if'"
     "brace_missing_fn_terminator|expected 'end fn'"
     "brace_missing_loop_terminator|expected 'end while'"
+    "function_outside_start|fn.*declarations must be inside the program's start block"
+    "namespace_outside_start|namespace.*declarations must be inside the program's start block"
+    "class_outside_start|class.*declarations must be inside the program's start block"
+    "enum_outside_start|enum.*declarations must be inside the program's start block"
+    "struct_outside_start|struct.*declarations must be inside the program's start block"
+    "nested_declaration|fn.*declarations may only appear directly inside"
+    "duplicate_declaration|duplicate declaration 'duplicate'"
 )
 foreach(case IN LISTS invalid_cases)
     string(REPLACE "|" ";" parts "${case}")

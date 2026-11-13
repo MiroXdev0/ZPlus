@@ -1,6 +1,7 @@
 use zgraphics
 
 start {
+
     let app = zgraphics.createWindow("ZGraphics runtime test", 320, 240)
     zgraphics.background(app, "#152030")
     zgraphics.text(app, "Interpreter smoke test", 12, 12, "#FFFFFF", 18)

@@ -10,6 +10,7 @@ use zsystem as system
 use zstring as text
 
 start {
+
     let root = env.currentDirectory()
     let testDirectory = path.join(root, "installer-platform-api")
     file.createDirectory(testDirectory)

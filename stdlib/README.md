@@ -87,10 +87,19 @@ not implemented.
 `unique` return new arrays and do not mutate their input. `contains` and
 `count` compare numbers by value. These operations are available in the
 interpreter and Windows x64 native runtime; native numbers are integer-only.
+Z+ arrays are mutable dynamic arrays: `push(values, value)`, `insert(values,
+index, value)`, `pop(values)`, `remove(values, index)`, `contains(values,
+value)`, `clear(values)`, and `length(values)` provide insertion, removal,
+membership, clearing, and size operations. Arrays can be iterated with `for`.
+These core operations support typed arrays in both the interpreter and
+Windows x64 native runtime. Dedicated map and set types are not currently
+provided.
 
 ### `zfile as file`
 
 `read(path: string) -> string`, `write(path: string, contents: string) -> void`,
+`readLines(path: string) -> string[]`,
+`writeLines(path: string, lines: string[]) -> void`,
 `append(path: string, contents: string) -> void`,
 `exists(path: string) -> boolean`, `delete(path: string) -> boolean`,
 `createDirectory(path: string) -> boolean`,
@@ -100,9 +109,14 @@ and `isDirectory(path: string) -> boolean`.
 Reads and writes are byte-preserving file operations represented as Z+ strings;
 write truncates and append preserves existing content. Errors are raised for
 failed I/O rather than represented as empty successful results. Directory
-entries are returned as sorted file names. Filesystem paths follow the host
-platform. The module is supported by the interpreter and Windows x64 native
-runtime.
+entries are returned as sorted file names. `readLines` removes LF or CRLF
+terminators and does not add an extra empty item for a final newline;
+an empty file reads as an empty array. `writeLines` writes one LF after each
+element and rejects elements containing line breaks. `exists`, `size`, and
+`isDirectory` provide file metadata checks.
+Filesystem paths follow the host platform. All listed functions are supported
+by the interpreter and Windows x64 native runtime; filesystem and validation
+failures raise runtime errors in both.
 
 ### `zpath as path`
 
@@ -156,16 +170,128 @@ append-mode file. File and console write failures are errors.
 
 ## Additional modules
 
-The standard-library tree also contains source modules for `zjson`, `zhttp`,
-`zsqlite`, `zcrypto`, `zfilesystem`, `zprocess`, `zregistry`, and `zsystem`.
-These provide string-based JSON helpers, HTTP client/server calls, SQLite
-operations, SHA-256 file hashing, filesystem operations, process execution,
-Windows registry integration, and platform/system helpers. Their wrappers
-are real APIs, not placeholder modules; individual runtime operations may
-still be platform-specific or unsupported by a given backend. For JSON,
-objects are exchanged as JSON strings rather than a dynamic object value.
-Modules such as `zregex`, `zcompression`, `zencoding`, `zoption`, and
-`zresult` are not currently provided; there are no empty stubs for them.
+These modules are source-backed public APIs. Their signatures below match the
+current `.zh` wrappers. Invalid arguments and underlying operation failures
+raise runtime errors unless a function explicitly returns a status or
+validation result. Native support is per operation; see the support summary
+and integration tests before relying on a platform-specific call.
+
+### `zjson as json`
+
+| Function | Signature | Purpose |
+|---|---|---|
+| `valid` | `(source: string) -> boolean` | Validate JSON text. |
+| `compact` | `(source: string) -> string` | Parse and compact JSON text. |
+| `quote` | `(value: string) -> string` | Encode a string as a JSON string literal. |
+| `get` | `(source: string, pointer: string) -> string` | Get a JSON value at a JSON Pointer as JSON text. |
+| `getString` | `(source: string, pointer: string) -> string` | Read a string value. |
+| `getNumber` | `(source: string, pointer: string) -> number` | Read a numeric value. |
+| `getBoolean` | `(source: string, pointer: string) -> boolean` | Read a boolean value. |
+| `arrayLength` | `(source: string, pointer: string) -> number` | Get an array's length. |
+| `arrayGet` | `(source: string, pointer: string, index: number) -> string` | Get an array item as JSON text. |
+| `kind` | `(source: string, pointer: string) -> string` | Return the JSON value kind. |
+
+`valid` returns `false` for invalid JSON. Other accessors report malformed
+JSON, invalid pointers, missing values, type mismatches, and invalid indexes.
+Values cross the API as JSON strings; Z+ does not expose a dynamic JSON object.
+
+```zp
+use zjson as json
+start {
+    let name: string = json.getString("{\"name\":\"Mira\"}", "/name")
+    say(name)
+} stop
+```
+
+### `zfilesystem as fs`
+
+`copyFile(source: string, destination: string, overwrite: boolean) -> boolean`,
+`moveFile(source: string, destination: string, overwrite: boolean) -> boolean`,
+`removeEmptyDirectory(path: string) -> boolean`,
+`exists(path: string) -> boolean`, `isDirectory(path: string) -> boolean`,
+`createDirectory(path: string) -> boolean`, `listDirectory(path: string) -> string[]`,
+`deleteFile(path: string) -> boolean`,
+`scheduleDeleteOnReboot(path: string) -> boolean`, and
+`size(path: string) -> number`.
+
+These operations report filesystem errors rather than treating failed I/O as
+success. `scheduleDeleteOnReboot` is Windows-specific. The remaining APIs use
+the host filesystem; native support follows the packaged runtime's platform
+coverage.
+
+### `zprocess as process`
+
+`run(executable: string, arguments: string[], workingDirectory: string,
+timeoutMilliseconds: number) -> string` starts a child process and returns its
+captured output. Invalid arguments, process startup failures, and timeouts are
+runtime errors. Use a fully qualified executable path when portability or
+search-path behavior matters.
+
+### `zcrypto as crypto`
+
+`sha256File(path: string) -> string` returns the lowercase SHA-256 digest of a
+file. File access and hashing failures are runtime errors.
+
+### `zhttp as http`
+
+| Function | Signature |
+|---|---|
+| `serverCreate` | `(address: string, port: number) -> number` |
+| `serverStart` | `(server: number) -> boolean` |
+| `serverRunning` | `(server: number) -> boolean` |
+| `serverPort` | `(server: number) -> number` |
+| `serverNext` | `(server: number, timeoutMilliseconds: number) -> string` |
+| `serverRespond` | `(server: number, requestId: number, status: number, headersJson: string, body: string) -> boolean` |
+| `serverStop` | `(server: number) -> void` |
+| `serverConfigure` | `(server: number, maximumBodyBytes: number, timeoutMilliseconds: number) -> void` |
+| `configureCors` | `(server: number, origin: string, methods: string, headers: string) -> void` |
+| `routeParams` | `(path: string, pattern: string) -> string` |
+| `queryValue` | `(query: string, name: string) -> string` |
+| `requestHeader` | `(requestJson: string, name: string) -> string` |
+| `request` | `(method: string, url: string, headersJson: string, body: string, timeoutMilliseconds: number) -> string` |
+
+Server and client operations may report invalid handles, malformed JSON,
+network, bind, and timeout errors. Request and response objects are exchanged
+as JSON strings. Networking support depends on the platform runtime.
+
+### `zsqlite as sqlite`
+
+`open(path: string) -> number`, `close(database: number) -> void`,
+`execute(database: number, sql: string, parametersJson: string) -> number`,
+`query(database: number, sql: string, parametersJson: string) -> string`,
+`changes(database: number) -> number`, `begin(database: number) -> number`,
+`commit(database: number) -> number`, and
+`rollback(database: number) -> number`.
+
+Database handles and SQL failures are reported as runtime errors. Parameters
+are supplied as a JSON array, and query results are JSON text. The interpreter
+and Windows x64 runtime are covered by SQLite integration tests.
+
+### `zregistry as registry`
+
+`readString(keyPath: string, valueName: string) -> string`,
+`valueKind(keyPath: string, valueName: string) -> string`,
+`writeString(keyPath: string, valueName: string, value: string, kind: string) -> boolean`,
+and `deleteValue(keyPath: string, valueName: string) -> boolean`.
+
+These APIs access the Windows registry and are unavailable on other platforms.
+Access and type failures are runtime errors; write/delete return whether an
+operation changed a value.
+
+### `zsystem as system`
+
+`platform() -> string`, `architecture() -> string`, `osVersion() -> string`,
+`executablePath() -> string`, `availableSpace(path: string) -> number`,
+`selectFolder(title: string, initialPath: string) -> string`,
+`messageBox(title: string, message: string, buttons: string, icon: string) -> number`,
+`createShortcut(path: string, target: string, arguments: string, workingDirectory: string) -> boolean`,
+`shortcutTarget(path: string) -> string`,
+`shortcutArguments(path: string) -> string`, and
+`removeShortcutIfMatches(path: string, target: string, arguments: string) -> boolean`.
+
+System-information and filesystem queries use the host platform. Folder
+selection, message boxes, and shortcut operations are platform-dependent
+(Windows UI/shell integrations); unsupported operations report runtime errors.
 
 `zaudio` and `zphysics` provide the APIs documented in
 [AUDIO.md](../docs/AUDIO.md) and [PHYSICS.md](../docs/PHYSICS.md).
@@ -173,6 +299,29 @@ Modules such as `zregex`, `zcompression`, `zencoding`, `zoption`, and
 `zmemory.management` in [managed memory](../docs/memory-management.md).
 `stdlib/math/math.zh` retains the source-level `abs`, `min`, `max`, and
 `clamp` helpers.
+
+## User modules and runtime errors
+
+Imports such as `use "storage/tasks.zh" as tasks` resolve relative to the
+importing source file, not the current working directory. Imported source
+files use `.zh`; the entry program uses `.zp`. Nested paths, repeated imports,
+and cycle detection are supported. Mark declarations `pub` to expose them
+outside their module; unmarked declarations remain private. Module imports
+can be qualified through an alias, and standard-library imports keep the same
+resolution rules. For example:
+
+```zp
+use "storage/tasks.zh" as tasks
+start {
+    say(tasks.count())
+} stop
+```
+
+`try`/`catch` catches runtime failures and exposes an `Error` value with a
+`message: string` field. `throw "message"` raises a catchable error; rethrowing
+the caught `Error` preserves its message. `defer` cleanup runs when leaving a
+scope and before a pending error reaches an outer handler. Error subtypes and
+stable error codes are not currently part of the language API.
 
 ## Compatibility and backend support
 

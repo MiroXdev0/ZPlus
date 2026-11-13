@@ -1,3 +1,4 @@
+start {
 pub fn pi(): number {
     return __zstdlib_math_pi()
 } end fn
@@ -56,3 +57,4 @@ pub fn log10(value: number): number {
 pub fn exp(value: number): number {
     return __zstdlib_math_exp(value)
 } end fn
+} stop

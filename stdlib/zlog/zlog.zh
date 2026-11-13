@@ -1,3 +1,4 @@
+start {
 pub fn debug(message: string) {
     __zstdlib_log_debug(message)
 } end fn
@@ -16,3 +17,4 @@ pub fn setLevel(level: string) {
 pub fn setOutput(path: string) {
     __zstdlib_log_setOutput(path)
 } end fn
+} stop

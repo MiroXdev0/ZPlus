@@ -54,12 +54,14 @@ target_include_directories(zbuild_engine PUBLIC
 add_executable(zbuild zbuild/main.cpp)
 target_link_libraries(zbuild PRIVATE zbuild_engine)
 add_custom_command(TARGET zbuild POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_CURRENT_SOURCE_DIR}/zbuild/templates"
-        "$<TARGET_FILE_DIR:zbuild>/zbuild-templates"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_CURRENT_SOURCE_DIR}/stdlib"
-        "$<TARGET_FILE_DIR:zbuild>/stdlib"
+    COMMAND ${CMAKE_COMMAND}
+        "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/zbuild/templates"
+        "-DDESTINATION_DIR=$<TARGET_FILE_DIR:zbuild>/zbuild-templates"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CopyDirectoryIfDifferent.cmake"
+    COMMAND ${CMAKE_COMMAND}
+        "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/stdlib"
+        "-DDESTINATION_DIR=$<TARGET_FILE_DIR:zbuild>/stdlib"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CopyDirectoryIfDifferent.cmake"
     VERBATIM
     COMMENT "Packaging adjacent ZBuild resources"
 )
@@ -187,6 +189,15 @@ set(ZPLUS_PHYSICS_RUNTIME_ARGUMENT
     "-DPHYSICS_RUNTIME_FILE=$<TARGET_FILE:zphysics_runtime>"
 )
 
+add_library(zplus_input_runtime SHARED runtime/InputRuntime.cpp)
+target_include_directories(zplus_input_runtime PRIVATE runtime)
+set_target_properties(zplus_input_runtime PROPERTIES OUTPUT_NAME zplus_input_runtime)
+add_dependencies(zp zplus_input_runtime)
+
+set(ZPLUS_INPUT_RUNTIME_ARGUMENT
+    "-DINPUT_RUNTIME_FILE=$<TARGET_FILE:zplus_input_runtime>"
+)
+
 if(CMAKE_DL_LIBS)
     target_link_libraries(zp PRIVATE ${CMAKE_DL_LIBS})
 endif()
@@ -277,11 +288,15 @@ if(WIN32)
 endif()
 
 add_custom_command(TARGET zp POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_CURRENT_SOURCE_DIR}/stdlib"
-        "$<TARGET_FILE_DIR:zp>/stdlib"
+    COMMAND ${CMAKE_COMMAND}
+        "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/stdlib"
+        "-DDESTINATION_DIR=$<TARGET_FILE_DIR:zp>/stdlib"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CopyDirectoryIfDifferent.cmake"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE:zplus_input_runtime>"
+        "$<TARGET_FILE_DIR:zp>"
     VERBATIM
-    COMMENT "Packaging the compiler standard library beside zp"
+    COMMENT "Packaging compiler runtime resources beside zp"
 )
 add_custom_command(TARGET zp POST_BUILD
     COMMAND ${CMAKE_COMMAND}
@@ -293,6 +308,7 @@ add_custom_command(TARGET zp POST_BUILD
         ${ZPLUS_SQLITE_RUNTIME_ARGUMENT}
         ${ZPLUS_AUDIO_RUNTIME_ARGUMENT}
         ${ZPLUS_PHYSICS_RUNTIME_ARGUMENT}
+        ${ZPLUS_INPUT_RUNTIME_ARGUMENT}
         -P "${CMAKE_SOURCE_DIR}/cmake/CopyReleaseCompiler.cmake"
     VERBATIM
     COMMENT "Installing the Release zp executable into bin/"
@@ -307,6 +323,7 @@ add_custom_target(zp_release_bin_copy ALL
         ${ZPLUS_SQLITE_RUNTIME_ARGUMENT}
         ${ZPLUS_AUDIO_RUNTIME_ARGUMENT}
         ${ZPLUS_PHYSICS_RUNTIME_ARGUMENT}
+        ${ZPLUS_INPUT_RUNTIME_ARGUMENT}
         -P "${CMAKE_SOURCE_DIR}/cmake/CopyReleaseCompiler.cmake"
     DEPENDS zp
     VERBATIM
@@ -336,6 +353,13 @@ if(BUILD_TESTING)
     )
     target_link_libraries(zbuild_unit_tests PRIVATE zbuild_engine)
     add_test(NAME zbuild_unit COMMAND zbuild_unit_tests)
+    add_test(
+        NAME resource_copy_incremental
+        COMMAND ${CMAKE_COMMAND}
+            "-DCOPY_HELPER=${CMAKE_CURRENT_SOURCE_DIR}/cmake/CopyDirectoryIfDifferent.cmake"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/resource-copy-test"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/test_copy_directory_if_different.cmake"
+    )
     add_test(
         NAME zbuild_integration
         COMMAND ${CMAKE_COMMAND}
@@ -567,6 +591,15 @@ if(BUILD_TESTING)
             "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
             "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/error-handling-test-output"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime/run_error_handling.cmake"
+    )
+    add_test(
+        NAME feature_tour_integration
+        COMMAND ${CMAKE_COMMAND}
+            "-DZP=$<TARGET_FILE:zp>"
+            "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/feature-tour-test-output"
+            "-DHOST_WINDOWS=$<BOOL:${WIN32}>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/integration/run_feature_tour.cmake"
     )
     add_test(
         NAME parser_semantics_parity

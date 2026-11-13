@@ -59,7 +59,7 @@ The extension follows the syntax described in the project's `SYNTAX.md`. This in
 
 `zp run` uses the interpreter. `zp build` uses the x86-64 native backend and supports only a subset of Z+. Unsupported IR produces the compiler's actual error; the extension never falls back to the interpreter. See the project's `NATIVE_BACKEND.md` for the subset and platform validation status.
 
-The checker uses the compiler's `--diagnostics=json` option. This option is supported by the compiler version in this repository; use a current compiler build if diagnostics are missing or shown only in the output channel.
+Live checks pass the current editor contents to the compiler over standard input, so unsaved edits are analyzed without creating source snapshots in the project. The compiler uses the real source path for relative `.zh` imports and diagnostics. The checker uses the compiler's `--source-stdin` and `--diagnostics=json` options; use a current compiler build if diagnostics are missing or shown only in the output channel.
 
 ZGraphics editor suggestions describe the source wrappers, not native-link support. Run graphics examples with `zp run`; `zp build` currently rejects graphics calls. The compiler source repository's `../ZGraphics/README.md` documents platform requirements and runtime limitations.
 

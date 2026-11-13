@@ -1,0 +1,3 @@
+fn outside(): number {
+    return 1
+} end fn

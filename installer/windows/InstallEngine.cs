@@ -17,20 +17,10 @@ internal sealed class InstallEngine(
         IProgress<InstallProgress>? progress,
         CancellationToken cancellationToken)
     {
-        string target = ValidateDestination(options.InstallPath);
-        string? registeredInstall = WindowsIntegration.ExistingInstallPath();
-        if (!string.IsNullOrWhiteSpace(registeredInstall) &&
-            !PathEquals(registeredInstall, target))
-            throw new InvalidOperationException(
-                $"An existing Z+ installation is registered at '{registeredInstall}'. " +
-                "Choose that location to update it, or uninstall it first.");
-
+        ValidatedInstallLocation location = ValidateLocation(options.InstallPath);
+        string target = location.Path;
+        InstallRecord? previous = location.ExistingRecord;
         string markerPath = Path.Combine(target, PackageInfo.MarkerFileName);
-        InstallRecord? previous = ReadExistingRecord(target, markerPath);
-        if (Directory.Exists(target) && previous is null &&
-            Directory.EnumerateFileSystemEntries(target).Any())
-            throw new InvalidOperationException(
-                $"The destination is not empty and is not a recognized Z+ installation: {target}");
 
         IReadOnlyList<PackageFile> files = package.SelectFiles(options);
         if (!files.Any(file => file.Path.Equals("bin/zp.exe", StringComparison.OrdinalIgnoreCase)))
@@ -466,6 +456,60 @@ internal sealed class InstallEngine(
             throw new ArgumentException("Choose a writable local drive for installation.");
         EnsureNoReparsePoints(root, target);
         return Path.TrimEndingDirectorySeparator(target);
+    }
+
+    internal static ValidatedInstallLocation ValidateLocation(string path)
+    {
+        string target = ValidateDestination(path);
+        string? registeredInstall = WindowsIntegration.ExistingInstallPath();
+        if (!string.IsNullOrWhiteSpace(registeredInstall) &&
+            !PathEquals(registeredInstall, target))
+            throw new InvalidOperationException(
+                $"An existing Z+ installation is registered at '{registeredInstall}'. " +
+                "Choose that location to update it, or uninstall it first.");
+
+        string markerPath = Path.Combine(target, PackageInfo.MarkerFileName);
+        InstallRecord? previous = ReadExistingRecord(target, markerPath);
+        if (Directory.Exists(target) && previous is null &&
+            Directory.EnumerateFileSystemEntries(target).Any())
+            throw new InvalidOperationException(
+                $"The destination is not empty and is not a recognized Z+ installation: {target}");
+
+        EnsureWritableInstallDirectory(target);
+        return new ValidatedInstallLocation(target, previous);
+    }
+
+    private static void EnsureWritableInstallDirectory(string target)
+    {
+        string candidate = target;
+        while (true)
+        {
+            try
+            {
+                FileAttributes attributes = File.GetAttributes(candidate);
+                if ((attributes & FileAttributes.Directory) == 0)
+                    throw new IOException(
+                        $"An existing file cannot be used as the installation directory: {candidate}");
+                break;
+            }
+            catch (FileNotFoundException)
+            {
+                candidate = Path.GetDirectoryName(candidate)
+                    ?? throw new IOException(
+                        $"Cannot find an existing parent directory for '{target}'.");
+            }
+            catch (DirectoryNotFoundException)
+            {
+                candidate = Path.GetDirectoryName(candidate)
+                    ?? throw new IOException(
+                        $"Cannot find an existing parent directory for '{target}'.");
+            }
+        }
+
+        string probePath = Path.Combine(candidate, $".zplus-write-test-{Guid.NewGuid():N}.tmp");
+        using var probe = new FileStream(
+            probePath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+            bufferSize: 1, FileOptions.DeleteOnClose);
     }
 
     private static void CheckDiskSpace(

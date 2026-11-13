@@ -6,6 +6,7 @@ use "../src/components/deployment.zh" as deployment
 use "../src/components/verification.zh" as verification
 
 start {
+
     let payload = env.get("ZPLUS_TEST_PAYLOAD")
     let manifest = env.get("ZPLUS_TEST_MANIFEST")
     let destination = env.get("ZPLUS_TEST_INSTALL_ROOT")

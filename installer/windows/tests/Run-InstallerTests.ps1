@@ -131,6 +131,31 @@ function Assert-UserPathContains([string]$Entry, [bool]$Expected) {
 }
 
 try {
+    foreach ($case in @(
+        @{
+            Path = [IO.Path]::GetPathRoot($env:SystemRoot)
+            ExpectedMessage = 'drive roots and network paths are not valid destinations'
+        },
+        @{
+            Path = Join-Path $env:SystemRoot 'ZPlusInstaller-Invalid-Location-Test'
+            ExpectedMessage = 'Installing inside the Windows directory is not permitted'
+        },
+        @{
+            Path = '\\localhost\C$\ZPlusInstaller-Invalid-Location-Test'
+            ExpectedMessage = 'drive roots and network paths are not valid destinations'
+        }
+    )) {
+        $validationExit = Invoke-Setup @('--install-dir', $case.Path, '--quiet') `
+            $testLog -AllowFailure
+        if ($validationExit -eq 0) {
+            throw "Installer accepted an invalid location: '$($case.Path)'."
+        }
+        $validationLog = Get-Content -LiteralPath $testLog -Raw
+        if (-not $validationLog.Contains($case.ExpectedMessage)) {
+            throw "Invalid-location diagnostic was missing for '$($case.Path)':`n$validationLog"
+        }
+    }
+
     Invoke-Setup @('--install-dir', $firstInstall, '--quiet', '--desktop-shortcut') $testLog
     $compiler = Join-Path $firstInstall 'bin\zp.exe'
     $stdlibFile = Join-Path $firstInstall 'stdlib\zmath\zmath.zh'

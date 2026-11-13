@@ -1,4 +1,5 @@
 use zgraphics
+start {
 
 pub fn horizontal(window: number): number {
     if zgraphics.keyDown(window, 65) or zgraphics.keyDown(window, 97) {
@@ -23,3 +24,4 @@ pub fn vertical(window: number): number {
     } end if
     return 0
 } end fn
+} stop

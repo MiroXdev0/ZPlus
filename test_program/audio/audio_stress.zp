@@ -1,5 +1,7 @@
 use zaudio
 
+start {
+
 zaudio.initialize()
 for (let cycle: number = 0; cycle < 200; cycle++) {
     let effect = zaudio.loadSound("assets/tone.wav")
@@ -11,3 +13,4 @@ for (let cycle: number = 0; cycle < 200; cycle++) {
 zaudio.unloadAll()
 zaudio.shutdown()
 say("Completed 200 audio load/play/unload cycles")
+} stop

@@ -1,3 +1,4 @@
+start {
 pub fn clamp(value: number, lower: number, upper: number): number {
     if value < lower {
         return lower
@@ -9,3 +10,4 @@ pub fn clamp(value: number, lower: number, upper: number): number {
     } end if
     return value
 } end fn
+} stop

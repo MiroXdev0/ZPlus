@@ -3,6 +3,7 @@ use zjson as json
 use zgraphics as graphics
 
 start {
+
     let response = http.request("GET", "http://127.0.0.1:8080/health", "{}", "", 5000)
     let status = json.getNumber(response, "/status")
     if status == 200 {

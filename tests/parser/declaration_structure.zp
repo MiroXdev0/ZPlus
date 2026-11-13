@@ -1,0 +1,27 @@
+start {
+    namespace Utilities {
+        fn unused(value: number): number {
+            return value + 1
+        } end fn
+    } end namespace
+
+    class Marker {
+        value: number = 1
+    } end class
+
+    enum State {
+        Ready,
+        Running
+    } end enum
+
+    fn first(): number {
+        return second()
+    } end fn
+
+    fn second(): number {
+        return 7
+    } end fn
+
+    say(Utilities.unused(1))
+    say(first())
+} stop

@@ -1,9 +1,11 @@
 #include "Process.hpp"
 
+#include <array>
 #include <cstdlib>
-#include <fstream>
-#include <sstream>
+#include <exception>
 #include <stdexcept>
+#include <thread>
+#include <utility>
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -12,7 +14,6 @@
 #include <windows.h>
 #else
 #include <cerrno>
-#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -20,15 +21,6 @@
 
 namespace zbuild {
 namespace {
-
-std::string readFile(const std::filesystem::path& path) {
-    std::ifstream input(path, std::ios::binary);
-    if (!input) throw std::runtime_error("cannot read process output file: " + path.string());
-    std::ostringstream contents;
-    contents << input.rdbuf();
-    if (input.bad()) throw std::runtime_error("failed reading process output file: " + path.string());
-    return contents.str();
-}
 
 #ifdef _WIN32
 std::wstring widen(const std::string& value) {
@@ -73,13 +65,9 @@ std::wstring quoteWindowsArgument(const std::wstring& argument) {
 
 ProcessResult runProcess(
     const std::vector<std::string>& arguments,
-    const std::filesystem::path& workingDirectory,
-    const std::filesystem::path& outputFile
+    const std::filesystem::path& workingDirectory
 ) {
     if (arguments.empty()) throw std::invalid_argument("process arguments cannot be empty");
-    if (!outputFile.parent_path().empty()) {
-        std::filesystem::create_directories(outputFile.parent_path());
-    }
 #ifdef _WIN32
     std::wstring commandLine;
     for (const std::string& argument : arguments) {
@@ -89,17 +77,26 @@ ProcessResult runProcess(
     std::vector<wchar_t> mutableCommand(commandLine.begin(), commandLine.end());
     mutableCommand.push_back(L'\0');
     SECURITY_ATTRIBUTES security{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
-    HANDLE output = CreateFileW(
-        outputFile.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
-        &security, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (output == INVALID_HANDLE_VALUE) {
-        throw std::runtime_error("cannot create process output file: " + outputFile.string());
+    HANDLE outputRead = nullptr;
+    HANDLE outputWrite = nullptr;
+    if (!CreatePipe(&outputRead, &outputWrite, &security, 0)) {
+        throw std::runtime_error(
+            "cannot create process output pipe (Windows error " +
+            std::to_string(GetLastError()) + ")");
+    }
+    if (!SetHandleInformation(outputRead, HANDLE_FLAG_INHERIT, 0)) {
+        const DWORD error = GetLastError();
+        CloseHandle(outputRead);
+        CloseHandle(outputWrite);
+        throw std::runtime_error(
+            "cannot configure process output pipe (Windows error " +
+            std::to_string(error) + ")");
     }
     STARTUPINFOW startup{};
     startup.cb = sizeof(startup);
     startup.dwFlags = STARTF_USESTDHANDLES;
-    startup.hStdOutput = output;
-    startup.hStdError = output;
+    startup.hStdOutput = outputWrite;
+    startup.hStdError = outputWrite;
     startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
     PROCESS_INFORMATION process{};
     const std::wstring directory = workingDirectory.empty()
@@ -110,15 +107,58 @@ ProcessResult runProcess(
         CREATE_NO_WINDOW, nullptr, directory.empty() ? nullptr : directory.c_str(),
         &startup, &process);
     const DWORD createError = created ? ERROR_SUCCESS : GetLastError();
-    CloseHandle(output);
+    CloseHandle(outputWrite);
     if (!created) {
+        CloseHandle(outputRead);
         throw std::runtime_error(
             "cannot launch '" + arguments.front() + "' (Windows error " +
             std::to_string(createError) + ")");
     }
+
+    std::string output;
+    std::exception_ptr readException;
+    std::thread reader;
+    try {
+        reader = std::thread([&] {
+            try {
+                std::array<char, 8192> buffer{};
+                for (;;) {
+                    DWORD bytesRead = 0;
+                    if (!ReadFile(
+                            outputRead, buffer.data(),
+                            static_cast<DWORD>(buffer.size()), &bytesRead, nullptr)) {
+                        const DWORD error = GetLastError();
+                        if (error != ERROR_BROKEN_PIPE) {
+                            throw std::runtime_error(
+                                "failed reading process output (Windows error " +
+                                std::to_string(error) + ")");
+                        }
+                        break;
+                    }
+                    if (bytesRead == 0) break;
+                    output.append(buffer.data(), static_cast<std::size_t>(bytesRead));
+                }
+            } catch (...) {
+                readException = std::current_exception();
+                TerminateProcess(process.hProcess, 1);
+            }
+            CloseHandle(outputRead);
+        });
+    } catch (...) {
+        CloseHandle(outputRead);
+        TerminateProcess(process.hProcess, 1);
+        WaitForSingleObject(process.hProcess, INFINITE);
+        CloseHandle(process.hThread);
+        CloseHandle(process.hProcess);
+        throw;
+    }
+
     const DWORD waitResult = WaitForSingleObject(process.hProcess, INFINITE);
     if (waitResult != WAIT_OBJECT_0) {
         const DWORD waitError = GetLastError();
+        TerminateProcess(process.hProcess, 1);
+        WaitForSingleObject(process.hProcess, INFINITE);
+        reader.join();
         CloseHandle(process.hThread);
         CloseHandle(process.hProcess);
         throw std::runtime_error(
@@ -128,25 +168,36 @@ ProcessResult runProcess(
     DWORD exitCode = 1;
     if (!GetExitCodeProcess(process.hProcess, &exitCode)) {
         const DWORD exitError = GetLastError();
+        reader.join();
         CloseHandle(process.hThread);
         CloseHandle(process.hProcess);
         throw std::runtime_error(
             "cannot read exit code for '" + arguments.front() +
             "' (Windows error " + std::to_string(exitError) + ")");
     }
+    reader.join();
     CloseHandle(process.hThread);
     CloseHandle(process.hProcess);
-    return {static_cast<int>(exitCode), readFile(outputFile)};
+    if (readException) std::rethrow_exception(readException);
+    return {static_cast<int>(exitCode), std::move(output)};
 #else
+    int outputPipe[2];
+    if (pipe(outputPipe) != 0) {
+        throw std::runtime_error("cannot create build process output pipe");
+    }
     const pid_t child = fork();
-    if (child < 0) throw std::runtime_error("cannot create build process");
+    if (child < 0) {
+        close(outputPipe[0]);
+        close(outputPipe[1]);
+        throw std::runtime_error("cannot create build process");
+    }
     if (child == 0) {
-        const int output = open(outputFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
-        if (output < 0 || dup2(output, STDOUT_FILENO) < 0 ||
-            dup2(output, STDERR_FILENO) < 0) {
+        close(outputPipe[0]);
+        if (dup2(outputPipe[1], STDOUT_FILENO) < 0 ||
+            dup2(outputPipe[1], STDERR_FILENO) < 0) {
             _exit(126);
         }
-        close(output);
+        close(outputPipe[1]);
         if (!workingDirectory.empty() && chdir(workingDirectory.c_str()) != 0) _exit(126);
         std::vector<char*> argv;
         argv.reserve(arguments.size() + 1);
@@ -157,14 +208,41 @@ ProcessResult runProcess(
         execvp(argv.front(), argv.data());
         _exit(errno == ENOENT ? 127 : 126);
     }
+    close(outputPipe[1]);
+    std::string output;
+    std::array<char, 8192> buffer{};
+    int readError = 0;
+    std::exception_ptr captureException;
+    for (;;) {
+        const ssize_t bytesRead = read(outputPipe[0], buffer.data(), buffer.size());
+        if (bytesRead > 0) {
+            try {
+                output.append(buffer.data(), static_cast<std::size_t>(bytesRead));
+            } catch (...) {
+                captureException = std::current_exception();
+                break;
+            }
+        } else if (bytesRead == 0) {
+            break;
+        } else if (errno != EINTR) {
+            readError = errno;
+            break;
+        }
+    }
+    close(outputPipe[0]);
     int status = 0;
     while (waitpid(child, &status, 0) < 0) {
         if (errno == EINTR) continue;
         throw std::runtime_error("failed while waiting for build process");
     }
+    if (captureException) std::rethrow_exception(captureException);
+    if (readError != 0) {
+        throw std::runtime_error(
+            "failed reading process output: " + std::to_string(readError));
+    }
     const int exitCode = WIFEXITED(status) ? WEXITSTATUS(status)
         : WIFSIGNALED(status) ? 128 + WTERMSIG(status) : 1;
-    return {exitCode, readFile(outputFile)};
+    return {exitCode, std::move(output)};
 #endif
 }
 

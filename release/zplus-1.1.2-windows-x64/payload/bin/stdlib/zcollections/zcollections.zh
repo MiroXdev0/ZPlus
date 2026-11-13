@@ -1,3 +1,4 @@
+start {
 pub fn sum(values: number[]): number {
     return __zstdlib_collections_sum(values)
 } end fn
@@ -34,3 +35,4 @@ pub fn last(values: number[]): number {
 pub fn isEmpty(values: number[]): boolean {
     return __zstdlib_collections_isEmpty(values)
 } end fn
+} stop

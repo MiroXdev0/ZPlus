@@ -4,7 +4,7 @@ endif()
 
 file(MAKE_DIRECTORY "${WORK_DIR}/interpreter")
 set(source "${SOURCE_DIR}/tests/stdlib/smoke.zp")
-set(expected "sqrt-ok\npow-ok\nabs-ok\nmin-max-ok\nrounding-ok\ntrig-ok\ninverse-trig-ok\nlog-exp-ok\nALICE\nalpha,beta\nbcd\nxxx\nlower-ok\nreplace-ok\nprefix-suffix-ok\nstring-reverse-ok\nstring-length-ok\nrepeat-zero-ok\nsubstring-end-ok\nunicode-length-ok\nЖ\n🙂Жé\nÉЖ\néж\né\né🙂Ж\néя\nreverse-ok\nsort-ok\ncollections-copy-ok\nsum-ok\naverage-ok\ncollection-min-max-ok\nunique-ok\ncollection-search-ok\nfirst-last-ok\nempty-ok\nrandom-ok\nrandom-seed-ok\nchoice-ok\nrandom-boolean-ok\nshuffle-ok\nreport.txt\nnormalize-ok\nextension-ok\ndirectory-ok\nabsolute-ok\nvisible\nenv-exists\ntime-ok\ndate-parts-ok\nclock-parts-ok\nname=alice\nfile-exists-ok\nfile-size-ok\nfile-append-ok\ndirectory-list-ok\nnested-dir-ok\nroot-dir-ok\nargs-count-ok\nargs-has-ok\nargs-all-ok\nenv-args-ok\nhome-dir-ok\ncurrent-dir-ok\nstdlib-gc-string-ok\nstdlib-gc-array-ok\nlog-ok\nfile-delete-ok\n")
+set(expected "sqrt-ok\npow-ok\nabs-ok\nmin-max-ok\nrounding-ok\ntrig-ok\ninverse-trig-ok\nlog-exp-ok\nALICE\nalpha,beta\nbcd\nxxx\nlower-ok\nreplace-ok\nprefix-suffix-ok\nstring-reverse-ok\nstring-length-ok\nrepeat-zero-ok\nsubstring-end-ok\nunicode-length-ok\nЖ\n🙂Жé\nÉЖ\néж\né\né🙂Ж\néя\nreverse-ok\nsort-ok\ncollections-copy-ok\nsum-ok\naverage-ok\ncollection-min-max-ok\nunique-ok\ncollection-search-ok\nfirst-last-ok\nempty-ok\nrandom-ok\nrandom-seed-ok\nchoice-ok\nrandom-boolean-ok\nshuffle-ok\nreport.txt\nnormalize-ok\nextension-ok\ndirectory-ok\nabsolute-ok\nvisible\nenv-exists\ntime-ok\ndate-parts-ok\nclock-parts-ok\nname=alice\nfile-exists-ok\nfile-size-ok\nfile-append-ok\nfile-lines-write-ok\nfile-lines-read-ok\nfile-lines-final-line-ok\nfile-lines-crlf-ok\nfile-lines-empty-ok\nfile-lines-delete-ok\ndirectory-list-ok\nnested-dir-ok\nroot-dir-ok\nargs-count-ok\nargs-has-ok\nargs-all-ok\nenv-args-ok\nhome-dir-ok\ncurrent-dir-ok\nstdlib-gc-string-ok\nstdlib-gc-array-ok\nlog-ok\nfile-delete-ok\n")
 
 execute_process(
     COMMAND "${ZP}" run "${source}" -- "${WORK_DIR}/interpreter" "test-flag"
@@ -72,6 +72,7 @@ expect_interpreter_error(invalid_math_domain "sqrt requires a non-negative numbe
 expect_interpreter_error(invalid_split_delimiter "split delimiter must not be empty")
 expect_interpreter_error(invalid_args_index "command-line argument index is out of range")
 expect_interpreter_error(invalid_average_empty "average cannot be computed for an empty array")
+expect_interpreter_error(invalid_file_lines "writeLines entries must not contain line breaks")
 
 set(fractional_math_source "${SOURCE_DIR}/tests/stdlib/native_fractional_math.zp")
 set(fractional_math_expected "3.141592653589793\n1.4142135623730951\ninf\nnan\n-0\nnan comparison passed\n")
@@ -209,6 +210,7 @@ if(HOST_WINDOWS)
     expect_native_error(invalid_split_delimiter "split delimiter must not be empty")
     expect_native_error(invalid_args_index "command-line argument index is out of range")
     expect_native_error(invalid_average_empty "average cannot be computed for an empty array")
+    expect_native_error(invalid_file_lines "writeLines entries must not contain line breaks")
     expect_native_output(
         native_fractional_math
         "${fractional_math_expected}"

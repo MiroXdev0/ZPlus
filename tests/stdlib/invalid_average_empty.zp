@@ -1,6 +1,7 @@
 use zcollections as collections
 
 start {
+
     let values: number[] = []
     let result: number = collections.average(values)
 } stop

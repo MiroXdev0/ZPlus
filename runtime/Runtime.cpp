@@ -2,6 +2,7 @@
 
 #include "../compiler/NumericLiteral.hpp"
 #include "../compiler/ir/IR.hpp"
+#include "Input.hpp"
 #include "NumericFormat.hpp"
 #include "../ZGraphics/ZGraphics.hpp"
 #include "audio/Audio.hpp"
@@ -1798,6 +1799,32 @@ static RuntimeValue executeStandardLibraryBuiltin(
     }
     if (operation.rfind("file_", 0) == 0) {
         const std::string name = operation.substr(5);
+        if (name == "readLines") {
+            if (count != 1) failArity();
+            const auto lines = zplus::stdlib::fileReadLines(text(0));
+            std::vector<RuntimeValue> values;
+            values.reserve(lines.size());
+            ManagedHeap& heap = managedHeap();
+            for (const auto& line : lines) {
+                values.emplace_back(heap.makeString(
+                    line, std::span<const RuntimeValue>(values)));
+            }
+            return heap.makeArray(std::move(values));
+        }
+        if (name == "writeLines") {
+            if (count != 2) failArity();
+            RuntimeArray& lines = array(1);
+            std::vector<std::string> contents;
+            contents.reserve(lines.elements.size());
+            for (const RuntimeValue& line : lines.elements) {
+                if (!isString(line)) {
+                    throw std::invalid_argument("writeLines expects an array of strings");
+                }
+                contents.push_back(stringValue(line));
+            }
+            zplus::stdlib::fileWriteLines(text(0), contents);
+            return false;
+        }
         if (name == "write" || name == "append") {
             if (count != 2) failArity();
             zplus::stdlib::fileWrite(text(0), text(1), name == "append");
@@ -2296,6 +2323,33 @@ static RuntimeValue executeCall(
             instruction,
             environment
         );
+    }
+
+    if (!function && (
+        *callee == "read" ||
+        *callee == "read_number" ||
+        *callee == "read_integer" ||
+        *callee == "read_boolean")) {
+        if (instruction.operands.size() != 1) {
+            throw std::runtime_error(*callee + " expects no arguments");
+        }
+        zplus::runtime::input::ensureUtf8ConsoleInput();
+
+        if (*callee == "read") {
+            const std::optional<std::string> line =
+                zplus::runtime::input::readLine(std::cin);
+            return managedHeap().makeString(line ? *line : std::string{});
+        }
+        if (*callee == "read_number") {
+            return zplus::runtime::input::parseNumber(
+                zplus::runtime::input::readRequiredLine(std::cin, "read_number"));
+        }
+        if (*callee == "read_integer") {
+            return zplus::runtime::input::parseInteger(
+                zplus::runtime::input::readRequiredLine(std::cin, "read_integer"));
+        }
+        return zplus::runtime::input::parseBoolean(
+            zplus::runtime::input::readRequiredLine(std::cin, "read_boolean"));
     }
 
 

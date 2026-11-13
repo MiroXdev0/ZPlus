@@ -1,6 +1,7 @@
 use zgraphics
 
 start {
+
     let app = zgraphics.createWindow("ZGraphics rendering smoke", 480, 300)
     let x: number = 24
     let direction: number = 1

@@ -1,0 +1,30 @@
+start {
+    say("What is your name?")
+    let name = read()
+
+    say("How old are you?")
+    let age = read_integer()
+
+    say("Enter a decimal number:")
+    let value = read_number()
+
+    say("Are you a Z+ developer? (true/false)")
+    let answer = read_boolean()
+
+    say("Hello, " + name)
+    if age >= 0 {
+        say("Age accepted.")
+    } else {
+        say("Age is negative.")
+    } end if
+    if value > 0 {
+        say("The decimal value is positive.")
+    } else {
+        say("The decimal value is not positive.")
+    } end if
+    if answer {
+        say("You answered true.")
+    } else {
+        say("You answered false.")
+    } end if
+} stop

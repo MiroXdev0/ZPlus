@@ -1,3 +1,4 @@
+start {
 fn fail() {
     throw "boom"
 } end fn
@@ -22,7 +23,6 @@ fn returnWithCleanup(): number {
     return 7
 } end fn
 
-start {
     defer {
         say("outer")
     } end defer

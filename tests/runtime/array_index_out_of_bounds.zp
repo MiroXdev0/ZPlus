@@ -1,3 +1,4 @@
+start {
 fn readPastEnd(): number {
     let values: number[] = [1, 2]
     return values[4]
@@ -6,3 +7,4 @@ fn readPastEnd(): number {
 fn main() {
     say(readPastEnd())
 } end fn
+} stop

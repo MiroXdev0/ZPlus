@@ -2,6 +2,7 @@ use zsqlite as sqlite
 use zjson as json
 
 start {
+
     let database = sqlite.open(":memory:")
     sqlite.execute(database, "CREATE TABLE events (message TEXT)", "[]")
     sqlite.execute(database, "INSERT INTO events VALUES (?)", "[\"zbuild-native\"]")
@@ -12,4 +13,10 @@ start {
         printz("zbuild-backend-runtime-failed\n")
     } end if
     sqlite.close(database)
+
+    if read() == "zbuild-terminal-input" {
+        printz("zbuild-terminal-input-passed\n")
+    } else {
+        printz("zbuild-terminal-input-failed\n")
+    } end if
 } stop

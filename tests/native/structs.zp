@@ -1,5 +1,7 @@
 use zmemory.management
 
+start {
+
 struct Player {
     name: string
     score: number = 4
@@ -14,7 +16,6 @@ fn preserve(player: Player): Player {
     return player
 } end fn
 
-start {
     let player = Player("native")
     let alias = preserve(player)
     if player is Player {

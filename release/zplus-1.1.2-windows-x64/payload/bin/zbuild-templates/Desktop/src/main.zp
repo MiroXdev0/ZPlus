@@ -3,6 +3,7 @@ use "window.zh" as app_window
 use "ui/layout.zh" as layout
 
 start {
+
     let app = app_window.create("{{PROJECT_NAME}}")
     let clicks = 0
     zgraphics.show(app)

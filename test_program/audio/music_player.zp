@@ -1,5 +1,7 @@
 use zaudio
 
+start {
+
 zaudio.initialize()
 let music = zaudio.loadMusic("assets/tone.ogg")
 
@@ -24,3 +26,4 @@ say(zaudio.isStopped(music))
 
 zaudio.unload(music)
 zaudio.shutdown()
+} stop

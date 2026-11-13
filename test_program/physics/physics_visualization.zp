@@ -2,6 +2,7 @@ use zphysics
 use zgraphics
 
 start {
+
     let window = zgraphics.createWindow("ZPhysics visualization", 640, 480)
     zgraphics.background(window, "#101820")
     zgraphics.setTargetFPS(window, 60)

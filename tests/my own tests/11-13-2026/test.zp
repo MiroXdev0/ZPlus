@@ -1,0 +1,91 @@
+use zpath as path
+use zstring as text
+use zenv as env
+
+
+start {
+    let todoPath: string = path.join(env.currentDirectory(), "todo_tasks.txt")
+    if not __zstdlib_file_exists(todoPath) {
+        __zstdlib_file_write(todoPath, "")
+    } end if
+    let todoContents: string = __zstdlib_file_read(todoPath)
+    let running: boolean = true
+
+    printz("Z+ TODO list\n")
+    printz("Tasks are saved in: ", todoPath, "\n")
+    printz("Build by Miro\n")
+
+    while running {
+        printz("\nCommands: add, list, done, exit\n> ")
+        let command: string = text.lower(text.trim(read()))
+
+        if command == "add" or command == "1" {
+            printz("Task: ")
+            let task: string = text.trim(read())
+            if text.length(task) == 0 {
+                say("Task cannot be empty.")
+            } else {
+                if text.length(todoContents) > 0 {
+                    todoContents = todoContents + "\n"
+                    __zstdlib_file_append(todoPath, "\n")
+                } end if
+                todoContents = todoContents + "[ ] " + task
+                __zstdlib_file_append(todoPath, "[ ] " + task)
+                say("Task added.")
+            } end if
+        } else if command == "list" or command == "2" {
+            if text.length(todoContents) == 0 {
+                say("No tasks yet.")
+            } else {
+                let tasks: string[] = text.split(todoContents, "\n")
+                let taskCount: number = 0
+                for task in tasks {
+                    if text.length(task) > 0 {
+                        taskCount += 1
+                        printz(taskCount, ". ", task, "\n")
+                    } end if
+                } end for
+                if taskCount == 0 {
+                    say("No tasks yet.")
+                } end if
+            } end if
+        } else if command == "done" or command == "3" {
+            printz("Task to complete: ")
+            let requestedTask: string = text.trim(read())
+            let tasks: string[] = text.split(todoContents, "\n")
+            let updatedContents: string = ""
+            let found: boolean = false
+
+            for task in tasks {
+                if text.length(task) > 0 {
+                    let updatedTask: string = task
+                    if not found and text.startsWith(task, "[ ] ") {
+                        let taskName: string = text.substring(task, 4, text.length(task) - 4)
+                        if taskName == requestedTask {
+                            updatedTask = "[x] " + taskName
+                            found = true
+                        } end if
+                    } end if
+
+                    if text.length(updatedContents) > 0 {
+                        updatedContents = updatedContents + "\n"
+                    } end if
+                    updatedContents = updatedContents + updatedTask
+                } end if
+            } end for
+
+            if found {
+                todoContents = updatedContents
+                __zstdlib_file_write(todoPath, todoContents)
+                say("Task marked complete.")
+            } else {
+                say("No open task found with that name.")
+            } end if
+        } else if command == "exit" or command == "quit" or command == "4" {
+            running = false
+            say("Goodbye.")
+        } else {
+            say("Unknown command. Choose add, list, done, or exit.")
+        } end if
+    } end while
+} stop

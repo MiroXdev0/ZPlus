@@ -94,7 +94,10 @@ foreach(case unsupported_is malformed_binary_literal invalid_escape expected_tok
             TIMEOUT 20
         )
         if(json_result EQUAL 0 OR
-           NOT "${json_output}${json_error}" MATCHES "\"code\":\"E1001\"")
+           NOT "${json_output}${json_error}" MATCHES "\"code\":\"E1001\"" OR
+           NOT "${json_output}${json_error}" MATCHES "\"category\":\"Syntax error\"" OR
+           NOT "${json_output}${json_error}" MATCHES "\"sourceLine\":\".*let value.*\"" OR
+           NOT "${json_output}${json_error}" MATCHES "\"suggestion\":\"Replace")
             message(FATAL_ERROR "expected_token: missing structured syntax diagnostic\n${json_output}${json_error}")
         endif()
         string(REGEX MATCHALL "\"code\":\"E1001\"" syntax_diagnostics

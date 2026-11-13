@@ -76,6 +76,10 @@ internal sealed record InstallProgress(
     long CompletedBytes,
     long TotalBytes);
 
+internal sealed record ValidatedInstallLocation(
+    string Path,
+    InstallRecord? ExistingRecord);
+
 internal static class PackageInfo
 {
     public const string Product = "Z+";

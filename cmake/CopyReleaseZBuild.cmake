@@ -2,6 +2,8 @@ if(NOT CONFIG STREQUAL "Release")
     return()
 endif()
 
+include("${CMAKE_CURRENT_LIST_DIR}/CopyDirectoryIfDifferent.cmake")
+
 if(NOT DEFINED SOURCE_FILE OR NOT EXISTS "${SOURCE_FILE}")
     message(FATAL_ERROR "Release zbuild executable is missing: ${SOURCE_FILE}")
 endif()
@@ -26,5 +28,5 @@ if(NOT copy_result EQUAL 0)
     message(FATAL_ERROR "Failed to install Release ${executable_name}")
 endif()
 
-file(COPY "${TEMPLATE_SOURCE_DIR}/" DESTINATION "${DESTINATION_DIR}/zbuild-templates")
-file(COPY "${STDLIB_SOURCE_DIR}/" DESTINATION "${DESTINATION_DIR}/stdlib")
+copy_directory_if_different("${TEMPLATE_SOURCE_DIR}" "${DESTINATION_DIR}/zbuild-templates")
+copy_directory_if_different("${STDLIB_SOURCE_DIR}" "${DESTINATION_DIR}/stdlib")

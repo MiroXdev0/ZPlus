@@ -1,3 +1,4 @@
+start {
 pub fn integer(minimum: number, maximum: number): number {
     return __zstdlib_random_integer(minimum, maximum)
 } end fn
@@ -16,3 +17,4 @@ pub fn shuffle(values: number[]): number[] {
 pub fn seed(value: number) {
     __zstdlib_random_seed(value)
 } end fn
+} stop

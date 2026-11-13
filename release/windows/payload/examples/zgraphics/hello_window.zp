@@ -1,6 +1,7 @@
 use zgraphics
 
 start {
+
     let app = zgraphics.createWindow("Hello, Z+", 720, 420)
     zgraphics.background(app, "#18202B")
     zgraphics.text(app, "A real Z+ desktop window", 36, 44, "#FFFFFF", 30)

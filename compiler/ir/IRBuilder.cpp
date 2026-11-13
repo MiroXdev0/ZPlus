@@ -1,6 +1,8 @@
 #include "IR.hpp"
 #include "../NumericLiteral.hpp"
 
+#include <algorithm>
+#include <functional>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -333,6 +335,7 @@ void IRBuilder::buildProgram(
     std::unordered_map<std::string, std::size_t> functionNameCounts;
     std::unordered_map<std::string, std::size_t> variableNameCounts;
     std::unordered_map<std::string, std::size_t> structNameCounts;
+    std::unordered_map<std::string, std::size_t> classNameCounts;
     for (const auto& statement : program.statements) {
         if (const auto* function = statement
                 ? as<zplus::ast::FunctionDeclaration>(statement.get())
@@ -359,6 +362,12 @@ void IRBuilder::buildProgram(
                 : nullptr;
             structure && !structure->moduleName.empty()) {
             ++structNameCounts[structure->name];
+        }
+        if (const auto* klass = statement
+                ? as<zplus::ast::ClassDeclaration>(statement.get())
+                : nullptr;
+            klass && !klass->moduleName.empty()) {
+            ++classNameCounts[klass->name];
         }
     }
     for (const auto& statement : program.statements) {
@@ -394,7 +403,43 @@ void IRBuilder::buildProgram(
                 module.structAliases[structure->name] = canonical;
             }
         }
+        if (const auto* klass = statement
+                ? as<zplus::ast::ClassDeclaration>(statement.get())
+                : nullptr;
+            klass && !klass->moduleName.empty()) {
+            const std::string canonical =
+                klass->moduleName + "::" + klass->name;
+            module.structAliases[klass->moduleName + "." + klass->name] =
+                canonical;
+            if (classNameCounts[klass->name] == 1) {
+                module.structAliases[klass->name] = canonical;
+            }
+        }
     }
+
+    std::function<void(const zplus::ast::Statement&)> prepareNamespaceFunctions;
+    prepareNamespaceFunctions = [&](const zplus::ast::Statement& statement) {
+        const zplus::ast::Statement* declaration = &statement;
+        while (const auto* exported =
+                   declaration
+                       ? as<zplus::ast::ExportDeclaration>(declaration)
+                       : nullptr) {
+            declaration = exported->declaration.get();
+        }
+        if (const auto* function =
+                declaration
+                    ? as<zplus::ast::FunctionDeclaration>(declaration)
+                    : nullptr) {
+            prepareFunction(*function, module);
+        } else if (const auto* namespaceNode =
+                       declaration
+                           ? as<zplus::ast::NamespaceDeclaration>(declaration)
+                           : nullptr) {
+            for (const auto& child : namespaceNode->body) {
+                if (child) prepareNamespaceFunctions(*child);
+            }
+        }
+    };
 
     for (const auto& statement : program.statements) {
         const zplus::ast::Statement* declaration =
@@ -416,6 +461,71 @@ void IRBuilder::buildProgram(
                     ? as<zplus::ast::StructDeclaration>(declaration)
                     : nullptr) {
             buildStruct(*structure, module);
+        }
+        if (const auto* klass =
+                declaration
+                    ? as<zplus::ast::ClassDeclaration>(declaration)
+                    : nullptr) {
+            buildClass(*klass, module);
+        }
+        if (const auto* enumeration =
+                declaration
+                    ? as<zplus::ast::EnumDeclaration>(declaration)
+                    : nullptr) {
+            buildEnum(*enumeration, module);
+        }
+
+        if (const auto* start =
+                declaration
+                    ? as<zplus::ast::StartStatement>(declaration)
+                    : nullptr) {
+            for (const auto& child : start->body) {
+                const zplus::ast::Statement* nested = child.get();
+                while (const auto* exported =
+                           nested
+                               ? as<zplus::ast::ExportDeclaration>(nested)
+                               : nullptr) {
+                    nested = exported->declaration.get();
+                }
+                if (const auto* function =
+                        nested
+                            ? as<zplus::ast::FunctionDeclaration>(nested)
+                            : nullptr) {
+                    prepareFunction(*function, module);
+                } else if (const auto* variable =
+                               nested
+                                   ? as<zplus::ast::VariableDeclaration>(nested)
+                                   : nullptr) {
+                    module.globalVariables.push_back(
+                        variable->bindingName.empty()
+                            ? (variable->internalName.empty()
+                                   ? variable->name
+                                   : variable->internalName)
+                            : variable->bindingName
+                    );
+                } else if (const auto* nestedStruct =
+                               nested
+                                   ? as<zplus::ast::StructDeclaration>(nested)
+                                   : nullptr) {
+                    buildStruct(*nestedStruct, module);
+                } else if (const auto* enumeration =
+                               nested
+                                   ? as<zplus::ast::EnumDeclaration>(nested)
+                                   : nullptr) {
+                    buildEnum(*enumeration, module);
+                } else if (const auto* klass =
+                               nested
+                                   ? as<zplus::ast::ClassDeclaration>(nested)
+                                   : nullptr) {
+                    buildClass(*klass, module);
+                } else if (nested &&
+                           as<zplus::ast::NamespaceDeclaration>(nested)) {
+                    prepareNamespaceFunctions(*nested);
+                }
+            }
+        } else if (declaration &&
+                   as<zplus::ast::NamespaceDeclaration>(declaration)) {
+            prepareNamespaceFunctions(*declaration);
         }
     }
 
@@ -1948,6 +2058,11 @@ void IRBuilder::buildFunction(
         functionPointer = module.findFunction(functionName);
     }
     Function& function = *functionPointer;
+    if (!function.blocks.empty()) {
+        return;
+    }
+
+    const std::size_t receiverOffset = statement.ownerClass.empty() ? 0 : 1;
 
     for (std::size_t i = 0; i < statement.parameters.size(); ++i) {
         const auto& parameter = statement.parameters[i];
@@ -1956,7 +2071,8 @@ void IRBuilder::buildFunction(
         }
 
         Function* helperPointer =
-            module.findFunction(function.parameters[i].defaultFunction);
+            module.findFunction(
+                function.parameters[i + receiverOffset].defaultFunction);
         if (!helperPointer || !helperPointer->blocks.empty()) {
             throw std::runtime_error(
                 "default argument helper was not prepared correctly"
@@ -1985,6 +2101,12 @@ void IRBuilder::buildFunction(
 
     BasicBlock& entry = function.createBlock("entry");
     BasicBlock* currentBlock = &entry;
+
+    if (receiverOffset != 0) {
+        currentBlock->emit(
+            Instruction{"param", {}, {Value{"this"}}}
+        );
+    }
 
     for (const auto& parameter : statement.parameters) {
         if (!parameter) {
@@ -2056,6 +2178,9 @@ void IRBuilder::prepareFunction(
     function.returnType = statement.returnType
         ? irTypeName(statement.returnType.get())
         : "void";
+    if (!statement.ownerClass.empty()) {
+        function.parameters.emplace_back("this", statement.ownerClass);
+    }
     for (const auto& parameter : statement.parameters) {
         if (!parameter) {
             continue;
@@ -2076,11 +2201,15 @@ void IRBuilder::prepareFunction(
 
         const std::string helperName =
             "__zplus_default$" + std::to_string(defaultFunctionCounter_++);
-        function.parameters[i].defaultFunction = helperName;
+        const std::size_t receiverOffset = statement.ownerClass.empty() ? 0 : 1;
+        function.parameters[i + receiverOffset].defaultFunction = helperName;
 
         Function& helper = module.createFunction(helperName);
         helper.location = parameter->location;
         helper.returnType = irTypeName(parameter->type.get());
+        if (!statement.ownerClass.empty()) {
+            helper.parameters.emplace_back("this", statement.ownerClass);
+        }
         for (std::size_t preceding = 0; preceding < i; ++preceding) {
             const auto& previous = statement.parameters[preceding];
             if (!previous) {
@@ -2370,10 +2499,61 @@ void IRBuilder::buildClass(
         );
     }
 
-    module.types.push_back(
-        "class:" +
-        statement.name
-    );
+    const std::string canonicalName = statement.moduleName.empty()
+        ? statement.name
+        : statement.moduleName + "::" + statement.name;
+    const std::string typeName = "class:" + canonicalName;
+    if (std::find(module.types.begin(), module.types.end(), typeName) ==
+        module.types.end()) {
+        module.types.push_back(typeName);
+    }
+
+    if (!module.findStructType(canonicalName)) {
+        StructType type;
+        type.name = canonicalName;
+        for (const auto& field : statement.fields) {
+            if (!field) continue;
+            StructField irField;
+            irField.name = field->name;
+            irField.type = irTypeName(field->type.get());
+            if (field->initializer) {
+                const auto* literal =
+                    as<zplus::ast::Literal>(field->initializer.get());
+                if (!literal) {
+                    throw std::runtime_error(
+                        "class field initializers must be literals");
+                }
+                irField.defaultValue = buildLiteral(*literal);
+                irField.hasDefault = true;
+                if (irField.type == "unknown") {
+                    switch (literal->kind) {
+                        case zplus::ast::Literal::Kind::Number:
+                            irField.type = "number";
+                            break;
+                        case zplus::ast::Literal::Kind::String:
+                            irField.type = "string";
+                            break;
+                        case zplus::ast::Literal::Kind::Character:
+                            irField.type = "char";
+                            break;
+                        case zplus::ast::Literal::Kind::Boolean:
+                            irField.type = "bool";
+                            break;
+                        case zplus::ast::Literal::Kind::Null:
+                            irField.type = "null";
+                            break;
+                    }
+                }
+            }
+            type.fields.push_back(std::move(irField));
+        }
+        module.structTypes.push_back(std::move(type));
+    }
+
+    if (!statement.moduleName.empty()) {
+        module.structAliases[statement.moduleName + "." + statement.name] =
+            canonicalName;
+    }
 
     for (const auto& method :
          statement.methods) {
@@ -2405,10 +2585,51 @@ void IRBuilder::buildEnum(
         );
     }
 
-    module.types.push_back(
-        "enum:" +
-        statement.name
-    );
+    const std::string canonicalName = statement.moduleName.empty()
+        ? statement.name
+        : statement.moduleName + "::" + statement.name;
+    const std::string typeName = "enum:" + canonicalName;
+    if (std::find(module.types.begin(), module.types.end(), typeName) !=
+        module.types.end()) {
+        return;
+    }
+
+    module.types.push_back(typeName);
+    double nextValue = 0.0;
+    for (const auto& member : statement.values) {
+        if (!member) continue;
+
+        double numericValue = nextValue;
+        if (member->value) {
+            const zplus::ast::Literal* literal =
+                as<zplus::ast::Literal>(member->value.get());
+            double sign = 1.0;
+            if (const auto* unary =
+                    as<zplus::ast::UnaryExpression>(member->value.get())) {
+                if (unary->operatorType == zplus::TokenType::Minus) {
+                    sign = -1.0;
+                }
+                literal = as<zplus::ast::Literal>(unary->operand.get());
+            }
+            if (!literal || literal->kind != zplus::ast::Literal::Kind::Number ||
+                !zplus::numeric::parseLiteral(literal->value, numericValue)) {
+                throw std::runtime_error(
+                    "enum values must be numeric literals");
+            }
+            numericValue *= sign;
+        }
+
+        Value value{std::to_string(numericValue), Value::Kind::Number};
+        value.numericValue = numericValue;
+        value.hasNumericValue = true;
+        const std::string memberName = statement.name + "." + member->name;
+        module.enumConstants[memberName] = value;
+        if (!statement.moduleName.empty()) {
+            module.enumConstants[statement.moduleName + "." + memberName] = value;
+            module.enumConstants[canonicalName + "." + member->name] = value;
+        }
+        nextValue = numericValue + 1.0;
+    }
 }
 
 
@@ -2439,6 +2660,25 @@ void IRBuilder::buildNamespace(
 
         if (!child || !currentBlock) {
             continue;
+        }
+
+        const zplus::ast::Statement* declaration = child.get();
+        while (const auto* exported =
+                   declaration
+                       ? as<zplus::ast::ExportDeclaration>(declaration)
+                       : nullptr) {
+            declaration = exported->declaration.get();
+        }
+        if (const auto* functionDeclaration =
+                declaration
+                    ? as<zplus::ast::FunctionDeclaration>(declaration)
+                    : nullptr;
+            functionDeclaration &&
+            !functionDeclaration->namespaceName.empty()) {
+            module.functionAliases[
+                functionDeclaration->namespaceName + "." +
+                functionDeclaration->name
+            ] = functionDeclaration->internalName;
         }
 
         buildStatement(
@@ -3233,13 +3473,13 @@ Value IRBuilder::buildCall(
         );
     }
 
-    Value callee =
-        buildExpression(
-            *expression.callee,
-            module,
-            function,
-            currentBlock
-        );
+    const auto* memberCallee =
+        as<zplus::ast::MemberExpression>(expression.callee.get());
+    const bool instanceMethod =
+        memberCallee && memberCallee->requiresReceiver;
+    Value callee = memberCallee && !memberCallee->resolvedName.empty()
+        ? Value{memberCallee->resolvedName, Value::Kind::Identifier}
+        : buildExpression(*expression.callee, module, function, currentBlock);
 
     if (!currentBlock) {
         throw std::runtime_error(
@@ -3280,12 +3520,21 @@ Value IRBuilder::buildCall(
         "call",
         result
     };
+    instruction.location = expression.location;
 
     instruction.operands.push_back(
         callee
     );
 
     std::vector<Value> arguments;
+    if (instanceMethod) {
+        arguments.push_back(buildExpression(
+            *memberCallee->object, module, function, currentBlock));
+        if (!currentBlock) {
+            throw std::runtime_error(
+                "method receiver lost its basic block");
+        }
+    }
     for (const auto& argument :
          expression.arguments) {
 
@@ -3432,6 +3681,31 @@ Value IRBuilder::buildMember(
         throw std::runtime_error(
             "member expression has an empty member name"
         );
+    }
+
+    if (!expression.resolvedName.empty()) {
+        return Value{expression.resolvedName, Value::Kind::Identifier};
+    }
+
+    if (const auto* enumType =
+            as<zplus::ast::Identifier>(expression.object.get())) {
+        const std::string qualifiedName =
+            enumType->name + "." + expression.member;
+        if (const Value* constant = module.findEnumConstant(qualifiedName)) {
+            return *constant;
+        }
+    } else if (const auto* qualifiedEnum =
+                   as<zplus::ast::MemberExpression>(expression.object.get())) {
+        const auto* moduleName =
+            as<zplus::ast::Identifier>(qualifiedEnum->object.get());
+        if (moduleName) {
+            const std::string qualifiedName =
+                moduleName->name + "." + qualifiedEnum->member + "." +
+                expression.member;
+            if (const Value* constant = module.findEnumConstant(qualifiedName)) {
+                return *constant;
+            }
+        }
     }
 
     if (const auto* qualifier =

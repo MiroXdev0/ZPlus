@@ -1,3 +1,4 @@
+start {
 pub fn createWorld(gravityX: number, gravityY: number): number {
     return __zphysics_createWorld(gravityX, gravityY)
 } end fn
@@ -245,3 +246,4 @@ pub fn queryBodyAt(world: number, index: number): number {
 pub fn setQueryFilter(world: number, category: number, mask: number) {
     __zphysics_setQueryFilter(world, category, mask)
 } end fn
+} stop

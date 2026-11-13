@@ -1,8 +1,8 @@
+start {
 struct Pair {
     first: number
     second: number
 } end struct
 
-start {
     let pair = Pair(1)
 } stop

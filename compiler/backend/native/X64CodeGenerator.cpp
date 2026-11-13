@@ -337,15 +337,35 @@ private:
         }
     }
 
+    bool isEnumTypeName(const std::string& typeName) const {
+        const std::string exact = "enum:" + typeName;
+        if (std::find(module_.types.begin(), module_.types.end(), exact) !=
+            module_.types.end()) {
+            return true;
+        }
+        return std::any_of(
+            module_.types.begin(),
+            module_.types.end(),
+            [&typeName](const std::string& type) {
+                return type.starts_with("enum:") &&
+                    type.size() > typeName.size() &&
+                    type.ends_with("::" + typeName);
+            });
+    }
+
     bool isNumeric(const Value& value) const {
-        return inferredType(value) == "number";
+        const std::string type = inferredType(value);
+        return type == "number" || isEnumTypeName(type);
     }
 
     bool isNumericName(const std::string& value) const {
         const auto local = valueTypes_.find(value);
-        if (local != valueTypes_.end()) return local->second == "number";
+        if (local != valueTypes_.end()) {
+            return local->second == "number" || isEnumTypeName(local->second);
+        }
         const auto global = globalTypes_.find(value);
-        return global != globalTypes_.end() && global->second == "number";
+        return global != globalTypes_.end() &&
+            (global->second == "number" || isEnumTypeName(global->second));
     }
 
     void binary(std::uint8_t opcode, std::uint8_t destination, std::uint8_t source) {
@@ -663,9 +683,12 @@ private:
         if (operation.rfind("file_", 0) == 0) {
             const std::string name = operation.substr(5);
             if (name == "read") return "string";
+            if (name == "readLines") return "string[]";
             if (name == "listDirectory") return "string[]";
             if (name == "size") return "number";
-            if (name == "write" || name == "append") return "void";
+            if (name == "write" || name == "writeLines" || name == "append") {
+                return "void";
+            }
             return "bool";
         }
         if (operation.rfind("crypto_", 0) == 0 ||
@@ -787,11 +810,36 @@ private:
                     emitImportCall("zpg_stringData", "zgraphics_runtime.dll");
                     movReg(argument, RAX);
                 }
+            } else if (inferredType(value) == "bool" ||
+                       inferredType(value) == "boolean") {
+                const std::string falseLabel =
+                    "__write_bool_false_" + std::to_string(uniqueLabel_++);
+                const std::string doneLabel =
+                    "__write_bool_done_" + std::to_string(uniqueLabel_++);
+                loadValue(value, RAX);
+                testRax();
+                emitJump(0x84, falseLabel);
+                leaRip(argument, addString("true"));
+                emitJump(0xFF, doneLabel);
+                localLabels_[falseLabel] = code_.size();
+                leaRip(argument, addString("false"));
+                localLabels_[doneLabel] = code_.size();
             } else {
+                std::string sourceLocation;
+                if (!instruction.location.sourceFile.empty()) {
+                    sourceLocation = " at " + instruction.location.sourceFile;
+                    if (instruction.location.line > 0) {
+                        sourceLocation += ":" + std::to_string(instruction.location.line);
+                        if (instruction.location.column > 0) {
+                            sourceLocation += ":" + std::to_string(instruction.location.column);
+                        }
+                    }
+                }
                 throw std::runtime_error(
-                    "native backend supports string and numeric arguments only for '" + callee +
+                    "native backend supports string, numeric, and boolean arguments only for '" + callee +
                     "'; received '" + value.name + "' with type '" +
-                    inferredType(value) + "' in function '" + functionName + "'");
+                    inferredType(value) + "' in function '" + functionName + "'" +
+                    sourceLocation);
             }
             const bool appendNewline =
                 callee == "say" && index + 1 == instruction.operands.size();
@@ -819,6 +867,25 @@ private:
         const bool audioBuiltin = callee.rfind("__zaudio_", 0) == 0;
         const bool physicsBuiltin = callee.rfind("__zphysics_", 0) == 0;
         const bool stringBuiltin = callee == "__zplus_stringConcat";
+        const bool inputBuiltin =
+            callee == "read" || callee == "read_number" ||
+            callee == "read_integer" || callee == "read_boolean";
+        if (inputBuiltin) {
+            if (instruction.operands.size() != 1) {
+                throw std::runtime_error(
+                    "native backend: " + callee + " expects no arguments");
+            }
+            const std::string symbol =
+                callee == "read" ? "zpi_read" :
+                callee == "read_number" ? "zpi_read_number" :
+                callee == "read_integer" ? "zpi_read_integer" :
+                "zpi_read_boolean";
+            emitImportCall(symbol, windowsAbi_
+                ? "zplus_input_runtime.dll"
+                : "libzplus_input_runtime.so");
+            storeResult(instruction);
+            return;
+        }
         static const std::unordered_map<std::string, std::string> arraySymbols{
             {"push", "zpg_arrayPush"},
             {"pop", "zpg_arrayPop"},
@@ -2171,6 +2238,20 @@ private:
                                 instruction.result, target->returnType);
                         } else if (instruction.operands[0].name == "length") {
                             inferred |= setInferredType(instruction.result, "number");
+                        } else if (instruction.operands[0].name == "read") {
+                            inferred |= setInferredType(instruction.result, "string");
+                        } else if (instruction.operands[0].name == "read_number" ||
+                                   instruction.operands[0].name == "read_integer") {
+                            inferred |= setInferredType(instruction.result, "number");
+                        } else if (instruction.operands[0].name == "read_boolean") {
+                            inferred |= setInferredType(instruction.result, "bool");
+                        } else if ((instruction.operands[0].name == "pop" &&
+                                    instruction.operands.size() == 2) ||
+                                   (instruction.operands[0].name == "remove" &&
+                                    instruction.operands.size() == 3)) {
+                            inferred |= setInferredType(
+                                instruction.result,
+                                arrayElementType(inferredType(instruction.operands[1])));
                         } else if (const std::string type =
                                        standardLibraryReturnType(
                                            instruction.operands[0].name);
@@ -2288,6 +2369,10 @@ private:
                             callee == "__zgraphics_numberText" ||
                             callee == "__zgraphics_eventText") {
                             usesManagedMemory_ = true;
+                        }
+                        if (callee == "read" || callee == "read_number" ||
+                            callee == "read_integer" || callee == "read_boolean") {
+                            usesInputRuntime_ = true;
                         }
                     }
                     if (instruction.opcode.starts_with("cmp_") &&
@@ -2454,6 +2539,10 @@ private:
                 leaRip(RCX, globalOffsets_.at(kPendingExceptionGlobal));
                 emitImportCall("zpg_setExceptionSlot", "zgraphics_runtime.dll");
             }
+            if (usesInputRuntime_) {
+                leaRip(RCX, globalOffsets_.at(kPendingExceptionGlobal));
+                emitImportCall("zpi_set_exception_slot", "zplus_input_runtime.dll");
+            }
             if (usesManagedMemory_ && !globalOffsets_.empty()) {
                 leaRip(RCX, 0);
                 movImm(RDX, globalOffsets_.size());
@@ -2503,6 +2592,11 @@ private:
             functionOffsets_["__zp_write"] = code_.size();
             emitWriteHelperWindows();
         } else {
+            if (usesInputRuntime_) {
+                leaRip(RDI, globalOffsets_.at(kPendingExceptionGlobal));
+                emitImportCall(
+                    "zpi_set_exception_slot", "libzplus_input_runtime.so");
+            }
             if (module_.findFunction(zplus::ir::kModuleInitializerName)) {
                 emitCall(zplus::ir::kModuleInitializerName);
                 loadGlobal(kPendingExceptionGlobal, RAX);
@@ -2682,6 +2776,7 @@ private:
     std::size_t uniqueLabel_ = 0;
     bool usesZGraphicsRuntime_ = false;
     bool usesManagedMemory_ = false;
+    bool usesInputRuntime_ = false;
 };
 
 } // namespace

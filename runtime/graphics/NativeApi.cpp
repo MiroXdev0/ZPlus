@@ -1776,11 +1776,33 @@ ZPLUS_GRAPHICS_API const char* zpg_stdlib_file_read(const char* path) noexcept {
     });
 }
 
+ZPLUS_GRAPHICS_API std::int64_t zpg_stdlib_file_readLines(const char* path) noexcept {
+    return guard<std::int64_t>([&] {
+        return createManagedStringArray(
+            zplus::stdlib::fileReadLines(checkedText(path, "path")));
+    });
+}
+
 ZPLUS_GRAPHICS_API std::int64_t zpg_stdlib_file_write(
     const char* path, const char* contents) noexcept {
     return guardVoid([&] {
         zplus::stdlib::fileWrite(
             checkedText(path, "path"), checkedText(contents, "contents"), false);
+    });
+}
+
+ZPLUS_GRAPHICS_API std::int64_t zpg_stdlib_file_writeLines(
+    const char* path, std::uintptr_t handle) noexcept {
+    return guardVoid([&] {
+        const ManagedNativeArray& lines = checkedArray(handle);
+        std::vector<std::string> contents;
+        contents.reserve(lines.elements.size());
+        for (const std::uintptr_t line : lines.elements) {
+            contents.push_back(checkedText(
+                reinterpret_cast<const char*>(line), "line"));
+        }
+        zplus::stdlib::fileWriteLines(
+            checkedText(path, "path"), contents);
     });
 }
 

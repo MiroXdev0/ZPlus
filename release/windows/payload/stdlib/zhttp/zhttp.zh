@@ -1,3 +1,4 @@
+start {
 pub fn serverCreate(address: string, port: number): number {
     return __zhttp_serverCreate(address, port)
 } end fn
@@ -49,3 +50,4 @@ pub fn requestHeader(requestJson: string, name: string): string {
 pub fn request(method: string, url: string, headersJson: string, body: string, timeoutMilliseconds: number): string {
     return __zhttp_clientRequest(method, url, headersJson, body, timeoutMilliseconds)
 } end fn
+} stop

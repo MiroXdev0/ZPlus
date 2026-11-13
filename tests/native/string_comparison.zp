@@ -1,6 +1,7 @@
 use zjson as json
 
 start {
+
     let method = "POST"
     if method == "POST" {
         printz("string equality passed\n")

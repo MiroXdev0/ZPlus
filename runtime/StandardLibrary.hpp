@@ -41,7 +41,12 @@ std::string pathUnary(const std::string& operation, const std::string& path);
 std::string pathJoin(const std::string& left, const std::string& right);
 
 std::string fileRead(const std::string& path);
+std::vector<std::string> fileReadLines(const std::string& path);
 void fileWrite(const std::string& path, const std::string& contents, bool append);
+void fileWriteLines(
+    const std::string& path,
+    const std::vector<std::string>& lines
+);
 bool fileExists(const std::string& path);
 bool fileDelete(const std::string& path);
 bool fileCreateDirectory(const std::string& path);

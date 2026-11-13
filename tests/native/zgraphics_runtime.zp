@@ -1,6 +1,7 @@
 use zgraphics
 
 start {
+
     let app = zgraphics.createWindow("Z+ native graphics test", 320, 240)
     zgraphics.setTitle(app, "Z+ native graphics test passed")
     zgraphics.setPosition(app, 24, 36)

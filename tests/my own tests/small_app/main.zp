@@ -1,0 +1,17 @@
+use zpath as path
+use zstring as text
+use zenv as env
+
+start{
+    class Data {
+        let name: string = null
+        let email: string = null
+        let age:  = 0
+
+        fn store_data(){
+            
+        }
+    } end class
+
+    
+} stop

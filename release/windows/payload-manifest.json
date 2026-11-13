@@ -23,14 +23,14 @@
     {
       "path": "bin/zbuild-templates/Console/src/commands/greeting.zh",
       "component": "tools",
-      "sha256": "0F7CE61B4CC6052C99307334BB45980F865285C78827766A2BD5CF18C7D23AEB",
-      "length": 82
+      "sha256": "9BAFB07C4C78D8E0B37EAC82DA2A6D6532A722DA65261499461C2ED4D70CFED5",
+      "length": 97
     },
     {
       "path": "bin/zbuild-templates/Console/src/main.zp",
       "component": "tools",
-      "sha256": "F5D7FD198A265C0406AE0013CC095BE13767F4B3226272BFAC1AA331D7B422F6",
-      "length": 342
+      "sha256": "64285C0B29F7F3933988115A353BA044EA7905B98F7A0EADFAD7D8344EB449E8",
+      "length": 343
     },
     {
       "path": "bin/zbuild-templates/Console/template.toml",
@@ -53,20 +53,20 @@
     {
       "path": "bin/zbuild-templates/Desktop/src/main.zp",
       "component": "tools",
-      "sha256": "7648709B61EA80C6607978105F65C5ECF9F7DF45F31A045268652C34432C73C7",
-      "length": 646
+      "sha256": "D738589933951D1422B40B3271BB1722F704C6F9123FB5CB23B51F31E4644402",
+      "length": 647
     },
     {
       "path": "bin/zbuild-templates/Desktop/src/ui/layout.zh",
       "component": "tools",
-      "sha256": "F5395005E1FAFD23F201F9128D49B0632AE3C2851E4608C6FDFCAC6647A183C2",
-      "length": 637
+      "sha256": "B558F14BEE0F790E9622B8ACE2724556AA4563B288B01D7BC98B4BDBF96CAD92",
+      "length": 652
     },
     {
       "path": "bin/zbuild-templates/Desktop/src/window.zh",
       "component": "tools",
-      "sha256": "2B72235B0CA1DB2A7236A86BF2230A6AB4C33BB9286A00EC31B3D1CC81BFA700",
-      "length": 343
+      "sha256": "88D9564E5C73C013396903355836A349721C83E4F9A4DF82AE304E0A02B6BA60",
+      "length": 358
     },
     {
       "path": "bin/zbuild-templates/Desktop/template.toml",
@@ -113,38 +113,38 @@
     {
       "path": "bin/zbuild-templates/Game/src/game/game_state.zh",
       "component": "tools",
-      "sha256": "500869B4B886BF2C00EAF50091204A83B474BAE19513B207A375D38B432C0217",
-      "length": 265
+      "sha256": "F7C605B9FB3F7165C51D559FB397D794224B968719C22ACED1944596D2A8C399",
+      "length": 280
     },
     {
       "path": "bin/zbuild-templates/Game/src/game/player.zh",
       "component": "tools",
-      "sha256": "F3F39A54F7A09B2D5EC81CC0B95A10D65DA4CB7580531D967813ED7B460846F6",
-      "length": 447
+      "sha256": "05118A358F57B4D8801169AAA926CB641B6B00DA5C47B0ABA6B9AADE66307F9A",
+      "length": 462
     },
     {
       "path": "bin/zbuild-templates/Game/src/game/world.zh",
       "component": "tools",
-      "sha256": "FC013FC05343C63F94DC2788F3A1CA9FF09689B1AC25C24E52B809B224F106A1",
-      "length": 414
+      "sha256": "24454CCB6A6B03FAE0E55CB12C12CFB880DD2221D97F1193DEBA47367EDFB533",
+      "length": 429
     },
     {
       "path": "bin/zbuild-templates/Game/src/main.zp",
       "component": "tools",
-      "sha256": "E22C17B2FF82224632BA22A0012C2029C122E4F458DF4C95B05F00FC97FE4F8D",
-      "length": 1448
+      "sha256": "6F954D142BA0E0D23AF30881818E568CE29D367BA55226E6CD35DBFA7546B604",
+      "length": 1449
     },
     {
       "path": "bin/zbuild-templates/Game/src/systems/collision.zh",
       "component": "tools",
-      "sha256": "B2C04E2530C8C5F17E9CF4CF44A48F71734D2373D471EA53B8397C17861AFE03",
-      "length": 814
+      "sha256": "A0D79A8FFD5696FCF2CB111477D402DFA6B511C5C7AA261DFE32B18CFE64195C",
+      "length": 829
     },
     {
       "path": "bin/zbuild-templates/Game/src/systems/input.zh",
       "component": "tools",
-      "sha256": "ACB4FD2101B8C1E3681CA3B37CE080017B43C299BBDE056D71C7F11ACA95FF31",
-      "length": 611
+      "sha256": "6CB3B8069DB986E5A6A8F830523E7197EE9F90E4C4C1DF9BB71550A2219790C5",
+      "length": 626
     },
     {
       "path": "bin/zbuild-templates/Game/template.toml",
@@ -167,14 +167,14 @@
     {
       "path": "bin/zbuild-templates/Library/src/main.zh",
       "component": "tools",
-      "sha256": "8A2A612FC3D6E383F42FDF4034A393D057C90B68BC11746163BC04F28A3DA3B9",
-      "length": 244
+      "sha256": "FC4C502FEADBDA215611D8242C0E365DE5F774DF8204EE317AC99EA9CD82EBC1",
+      "length": 259
     },
     {
       "path": "bin/zbuild-templates/Library/src/utilities.zh",
       "component": "tools",
-      "sha256": "8A604B964D1AC0059237815C91134F32FD089571DB3AD718EB9E0E43FED5C343",
-      "length": 234
+      "sha256": "D97CC69A66E07646D1FAA5C0E5063EE30369CF3EADFF75D4D7C02949F6871A02",
+      "length": 249
     },
     {
       "path": "bin/zbuild-templates/Library/template.toml",
@@ -185,8 +185,8 @@
     {
       "path": "bin/zbuild-templates/Library/tests/main.zp",
       "component": "tools",
-      "sha256": "40A67AE8A4C069B9AA9D86B8DBD89AFEF0BE04E95E35362CC1E2E2C3AE66F135",
-      "length": 440
+      "sha256": "CD272FF56FEB919A76C9ED0CD131FB9C22BE00CBC0BA423356BDBA217648E2B8",
+      "length": 441
     },
     {
       "path": "bin/zbuild-templates/Library/zproject.toml",
@@ -215,8 +215,8 @@
     {
       "path": "bin/zp.exe",
       "component": "core",
-      "sha256": "B28CC2330446D8EEA30ABA3221860E8CADCF2A160A363A453796648A9A01DA3E",
-      "length": 2529792
+      "sha256": "AB6ABFC5C549F37FA322E0834DECECE202AE0479CFF61E5ABCB60AA81C327700",
+      "length": 2588160
     },
     {
       "path": "bin/zphysics_runtime.dll",
@@ -239,8 +239,8 @@
     {
       "path": "docs/INSTALLER.md",
       "component": "documentation",
-      "sha256": "61E515AE3CACA8AF93708C1D5E230279C0CD2F2572735D5C3F7033BC1A885CF1",
-      "length": 3908
+      "sha256": "D4EC7A62AD1390A80370F3D07F074C0C9F46AD5FF417EF1DB2170BA77B78FE25",
+      "length": 4341
     },
     {
       "path": "docs/memory-management.md",
@@ -251,14 +251,14 @@
     {
       "path": "docs/MODULES.md",
       "component": "documentation",
-      "sha256": "50DE37AC01268537357D570B94F7A3DABB7078523C2B3290CB223CFB4AEF4375",
-      "length": 5494
+      "sha256": "6EDADD344CAE1981A6F891D4D4F6BE684CEE79A0C54AB6FA3F8C03B229FBCB92",
+      "length": 5703
     },
     {
       "path": "docs/NATIVE_BACKEND.md",
       "component": "documentation",
-      "sha256": "27C06551D481670F859870C6839F45C3F263C2B47812EBE22ED80279803D4F24",
-      "length": 10098
+      "sha256": "8CC590BCBE312457F6626D4B87050C9D409CEF51E1495BF2B3BC2FC7D145832D",
+      "length": 10563
     },
     {
       "path": "docs/PHYSICS.md",
@@ -269,8 +269,8 @@
     {
       "path": "docs/README.md",
       "component": "documentation",
-      "sha256": "9AAE445D4B4B0E238F5EC960C0F6DCE48C1D8B73BC929F512B7F1A8E4B27ACB2",
-      "length": 3228
+      "sha256": "ACC4B3D4DA50114258FB0253972A4FA8C3A005EC4164EDFD8CD8597C20B5C8AE",
+      "length": 3413
     },
     {
       "path": "docs/roadmap.md",
@@ -281,8 +281,8 @@
     {
       "path": "docs/SYNTAX.md",
       "component": "documentation",
-      "sha256": "99C8D2B6398B156A7BBD590579D6B61145A714710AD40534359A7215B0B802DA",
-      "length": 42261
+      "sha256": "7FA49A6D8BBCA09D5EF6CAD3C157E083697B156156D531CCE98BA2B27035C02C",
+      "length": 43594
     },
     {
       "path": "docs/ZBUILD.md",
@@ -293,7 +293,7 @@
     {
       "path": "examples/functions.zp",
       "component": "examples",
-      "sha256": "E2ABB2F0F408B65C844831EC68AD589F750CB889E1073E2984182B3EC8496AEB",
+      "sha256": "B98A7EC60AE9B237CB6765C977FC3344B645B363B380971444BEEC10B3B83928",
       "length": 121
     },
     {
@@ -311,38 +311,38 @@
     {
       "path": "examples/zgraphics/buttons.zp",
       "component": "examples",
-      "sha256": "A41BD4C557EF2275AB80F728FC72B7F2012130AB5BF2AE601F5BA4A9374BC952",
-      "length": 1278
+      "sha256": "F00294159BEDD51723DD9F9B95DC90F9DBDA7C57972AEF516C611C2A1D11B7EB",
+      "length": 1279
     },
     {
       "path": "examples/zgraphics/calculator.zp",
       "component": "examples",
-      "sha256": "FD152845E038E4B4779F6C9716550C61B97D29FF11F86C4AC9798BBAB9076DED",
-      "length": 5158
+      "sha256": "49311748A5E20CB4C8A98CA3183EDDE2006629FB60C4358C7D2E68FDA7A78940",
+      "length": 5159
     },
     {
       "path": "examples/zgraphics/hello_window.zp",
       "component": "examples",
-      "sha256": "B925CAA4B01D84928AE00C6F80F05723CCED742390E9DFDD279603B94FC6596D",
-      "length": 330
+      "sha256": "31C47EA53997FDD3C547CEA3A38561B328612360039D5F2EDCB9D36F2592CE95",
+      "length": 331
     },
     {
       "path": "examples/zgraphics/multi_window.zp",
       "component": "examples",
-      "sha256": "AC6EBB210B99573FB0D6BF9D4A6AE7E975529F6CF0095EF1368FEA9BE180580C",
-      "length": 704
+      "sha256": "9ED72CECAB08ACF6EB3B2B1F6AEAEB76FDE28F86FA9A762A5E0C297210230C42",
+      "length": 705
     },
     {
       "path": "examples/zgraphics/shapes.zp",
       "component": "examples",
-      "sha256": "4E4FFA28853703B303FB671F0E952E4EB9B3A39DFD32766D9751FA49B2C8FA9D",
-      "length": 840
+      "sha256": "84A2D73C6824EE31FED6C129A0D04E60E61D34EE9C982447C551CE75AC0CE927",
+      "length": 841
     },
     {
       "path": "examples/zgraphics/text_input.zp",
       "component": "examples",
-      "sha256": "F4BBB1B7BEA2AFC05B514ABF5A4CA8F1870508F476BA339AB1209F0B44BE7624",
-      "length": 906
+      "sha256": "0D1D23F3099038792364878B3D8D34317F1D280A0F799B699952F3862DC5409E",
+      "length": 907
     },
     {
       "path": "LICENSE.txt",
@@ -353,8 +353,8 @@
     {
       "path": "stdlib/math/math.zh",
       "component": "core",
-      "sha256": "6889B3F51786FD7998595046880B6487CD04517DA136B0354A44A860CDB9C9D1",
-      "length": 550
+      "sha256": "009553373F5821B39B74AF5E0B8D6F50D9FA5EEDC4CF70DD395EBE32A1A876FD",
+      "length": 565
     },
     {
       "path": "stdlib/README.md",
@@ -365,134 +365,134 @@
     {
       "path": "stdlib/zargs/zargs.zh",
       "component": "core",
-      "sha256": "946EBA2AE9F7E5189E39C343A8F90C5D4536068787BDB820D9C32BC37632E723",
-      "length": 299
+      "sha256": "4061DA333C637C3DC25FDA5F1504221DDA50DC3AD43B6F0841B112207D9CF072",
+      "length": 314
     },
     {
       "path": "stdlib/zaudio/zaudio.zh",
       "component": "core",
-      "sha256": "2CB3B686164DF5AD0389A1679D32071CFC0B3292D236D3D6622CF9E76EEF34C4",
-      "length": 2405
+      "sha256": "F3EBF467FEC02F7A0CD19F8B3C66A49C88D4897FDA7BD2DFBDE681AA50A1A8E8",
+      "length": 2420
     },
     {
       "path": "stdlib/zcollections/zcollections.zh",
       "component": "core",
-      "sha256": "961C719B3AD66A69916D6693BA9926AC282CA9C468A626530389D4F978189AC8",
-      "length": 1220
+      "sha256": "31C158AA7D76FE12553ADEFC938FF83E36AF0591C71E841813A79ECAA4F7363F",
+      "length": 1235
     },
     {
       "path": "stdlib/zcrypto/zcrypto.zh",
       "component": "core",
-      "sha256": "E59EC7FABB30A3595CA4C524E6DB81B4E3D57784DC748C970096995C90215910",
-      "length": 96
+      "sha256": "BD3F12AD9E286697546ADDCF5B6B8E4E4A83E57E2B0833523F7D822AF8F2CDBE",
+      "length": 111
     },
     {
       "path": "stdlib/zenv/zenv.zh",
       "component": "core",
-      "sha256": "F165256BC2B675E70AD9E4FF0715FAE02D02098C5E7E1D779F93433385708E33",
-      "length": 495
+      "sha256": "09ED266125CA39573F20BB0822BE29C874263C9E390F8B90CB0876F826D38DEE",
+      "length": 510
     },
     {
       "path": "stdlib/zfile/zfile.zh",
       "component": "core",
-      "sha256": "5ABAB830FDF6D9A16D3F4DA48B0630DEF14634B08517F8E39634DB36F614CB80",
-      "length": 838
+      "sha256": "B5E5A8E314780B33A343BDA3133DFDEE421E06925D036ACD8463542860EA66C5",
+      "length": 853
     },
     {
       "path": "stdlib/zfilesystem/zfilesystem.zh",
       "component": "core",
-      "sha256": "F86BAE30D159315C5DFCDDB9475F9B64313057C51978C4C5218A37E33360B1C6",
-      "length": 1127
+      "sha256": "1E68C34AD2DAD2869E3543B3D87920ED6BED9E47184EE97FE59D26F2CE03DF02",
+      "length": 1142
     },
     {
       "path": "stdlib/zgraphics/zgraphics.zh",
       "component": "core",
-      "sha256": "C1B9928D7C6B1C8DA115D4AECEAF0292857B791673812C4A87FACF3242046F2A",
-      "length": 5463
+      "sha256": "1674A4DAFE97F62D12D49CC71ECEC77D723C21767F02B99A4F563488A100AC62",
+      "length": 5478
     },
     {
       "path": "stdlib/zhttp/zhttp.zh",
       "component": "core",
-      "sha256": "F635AD873779A8796CB7F164E1C37507A815098CEA410A2A7037ED24E93D5ABB",
-      "length": 1737
+      "sha256": "C95D95A980B203ED58CC7633CA0E261640BDAD37AD352C5D63E759EDC927AD69",
+      "length": 1752
     },
     {
       "path": "stdlib/zjson/zjson.zh",
       "component": "core",
-      "sha256": "78E23E1575079FA91D0F7966433449B15CCC7EBCBBD40629E8BF2B0B3E891232",
-      "length": 1065
+      "sha256": "3E218C2A6A801707E0F16AE411E513A6E0956D81D97CA0B8818CBFDE04637527",
+      "length": 1080
     },
     {
       "path": "stdlib/zlog/zlog.zh",
       "component": "core",
-      "sha256": "03DAA04BC0EDA3719AF4E442DEA21EF19729B6085D0AB7E5A6EEAFEB2977DF99",
-      "length": 450
+      "sha256": "3E680BAAFA84C0AB2CA40A6F1919264C12FEAA892DEAD98A1D499A78B6922CC8",
+      "length": 465
     },
     {
       "path": "stdlib/zmath/zmath.zh",
       "component": "core",
-      "sha256": "367A00122F12A62DE3CEFAD22A96B35A8C9492BD4E91C923297B2BCC1C86F40C",
-      "length": 1605
+      "sha256": "4437E271CB3A06D300CB9E22D3684421DA1D144685D29EF49B5294B23FF44E17",
+      "length": 1620
     },
     {
       "path": "stdlib/zmemory/management.zh",
       "component": "core",
-      "sha256": "16DE6C7AF174C39C5A93F71C0252D3240CA863A3C2B4F4CE9D1A56CB165AB1E6",
-      "length": 363
+      "sha256": "BC0EA11E82F8A2F022CA5280C89A1279262F5BD2A1562B01539E5D9AE93EE5BC",
+      "length": 378
     },
     {
       "path": "stdlib/zpath/zpath.zh",
       "component": "core",
-      "sha256": "FB447DCFD693F1F18E4BBDC75E33950193B78B9C3D6BF32D309E599931C9F6EE",
-      "length": 667
+      "sha256": "B5828D50CFC808E7FAF694DD6696C65043670336D81EC9215D6239257EC897C7",
+      "length": 682
     },
     {
       "path": "stdlib/zphysics/zphysics.zh",
       "component": "core",
-      "sha256": "4BB9D86E73DB4FE10285B77D22CBC2819371F270893D823840C83E39B1F9B1ED",
-      "length": 7226
+      "sha256": "B84F456BE20889EEDA606BA370D194181923A4B8E355F72FCCB2CD2F9C1D57C3",
+      "length": 7241
     },
     {
       "path": "stdlib/zprocess/zprocess.zh",
       "component": "core",
-      "sha256": "8D6DF8BE6D91C593F31524EE5621D01EF0BF4290DF5D98A2AC403FEAE6687F39",
-      "length": 221
+      "sha256": "724556AEB3B5337D54EC1B7A85D6AF2392CBA846D95F25129A9363CD9B2D0796",
+      "length": 236
     },
     {
       "path": "stdlib/zrandom/zrandom.zh",
       "component": "core",
-      "sha256": "6D4F761B27A0F6B7E9A98C0732B902A6654A301C3491088E110D14CDB405E8CB",
-      "length": 580
+      "sha256": "B8A1B44692EF021E1941DAA4F29EA0D59E77625199C46E8DB096F5BEDD09A098",
+      "length": 595
     },
     {
       "path": "stdlib/zregistry/zregistry.zh",
       "component": "core",
-      "sha256": "B1549C2BC25A704DC9FD19B9CF2760389DD5FD967AD2F527586FE6F34E41A2B9",
-      "length": 573
+      "sha256": "AFB7FA828B98CD5D978415C4FA9ED322082705502E54C2A38C12C0C7FAE1C62D",
+      "length": 588
     },
     {
       "path": "stdlib/zsqlite/zsqlite.zh",
       "component": "core",
-      "sha256": "E6E96FED216EB229BB1753711A4CE42FACFF34840B7D0AA0068900AACD83E058",
-      "length": 831
+      "sha256": "5D97FCC9CBB22665999BD2DFF58566370A2614D37399C412F5ADFBFB08BC9A81",
+      "length": 846
     },
     {
       "path": "stdlib/zstring/zstring.zh",
       "component": "core",
-      "sha256": "C8553DA60EAC18B75DE2CC8A5DF809877620FC4F2A9F8FD8602E708B0D758281",
-      "length": 1459
+      "sha256": "BA04FEB4556A18EF51868900C4CF6D0CAE869DC8A618970A1A4A2787B96E76A6",
+      "length": 1474
     },
     {
       "path": "stdlib/zsystem/zsystem.zh",
       "component": "core",
-      "sha256": "E7DF989E858795E686CEF10360A93763D4707F27FEC36C33D37595FE6EAD3B79",
-      "length": 1340
+      "sha256": "0AB198011C855D96111A58055BFE5FC6E7D4139395E91CC3F80D451C84BF443D",
+      "length": 1355
     },
     {
       "path": "stdlib/ztime/ztime.zh",
       "component": "core",
-      "sha256": "48B8F50346B39762C0E4A505E86BE314CE47571EB49B1A7577D17FAA9505E0C8",
-      "length": 943
+      "sha256": "A44A0118BE3D7740A50EB9BBFCFD9B3B9399A86E843634FC0B7D83A7FAC4E588",
+      "length": 958
     },
     {
       "path": "THIRD-PARTY-NOTICES.txt",
@@ -528,26 +528,26 @@
   "components": [
     {
       "name": "Z+ compiler and standard library",
-      "required": true,
       "id": "core",
+      "required": true,
       "description": "Compiler, Windows runtimes, standard modules, and license notices"
     },
     {
       "name": "ZBuild project tool",
-      "required": false,
       "id": "tools",
+      "required": false,
       "description": "ZBuild command-line tool and built-in templates"
     },
     {
       "name": "Documentation",
-      "required": false,
       "id": "documentation",
+      "required": false,
       "description": "Syntax, modules, backend, and tool documentation"
     },
     {
       "name": "Example projects",
-      "required": false,
       "id": "examples",
+      "required": false,
       "description": "Example Z+ programs"
     }
   ]

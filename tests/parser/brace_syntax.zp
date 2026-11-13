@@ -1,3 +1,4 @@
+start {
 fn calculate(a: number, b: number): number {
     return a + b
 } end fn
@@ -14,7 +15,6 @@ fn report(values: number[]) {
     } end for
 } end fn
 
-start {
     announce("Z+")
     let score = calculate(10, 20)
     if score >= 90 {

@@ -1,0 +1,7 @@
+start {
+    enum Status {
+        Ready
+    } end enum
+
+    let current = Status.Unknown
+} stop

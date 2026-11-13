@@ -2,8 +2,8 @@
 
 Z+ is a small compiled language with a lexer, parser, semantic analyzer, shared intermediate representation, interpreter, and an x86-64 native backend.
 
-The current compiler release is **1.1.2 Stable**. On Windows x64, the verified
-per-user installer and release build instructions are documented in
+The current compiler release is **1.1.2 Stable**. The Windows x64 per-user
+installer implementation and release build instructions are documented in
 [docs/INSTALLER.md](./docs/INSTALLER.md).
 
 ## Build
@@ -13,6 +13,9 @@ cmake -S . -B build
 cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```
+
+The CTest suite includes the root `test.zp` feature tour. It runs under the
+interpreter on every host and compares interpreter/native output on Windows x64.
 
 The compiler executable is `build\Release\zp.exe` on Windows Visual Studio builds and `build\zp` on Linux.
 Every successful Release build also synchronizes that executable to `bin\zp.exe` on Windows or `bin/zp` on Linux. Debug builds skip the copy. The synchronization runs after the compiler target succeeds and replaces the destination only with the Release artifact.
@@ -41,7 +44,7 @@ start {
 } stop
 ```
 
-Paths are resolved relative to the file containing each `use`, not the process working directory. Imports can nest and repeated references to the same canonical file load it once. Absolute module paths are denied. Imported `.zh` files contain declarations and cannot contain a `start` block or executable top-level statements. See [MODULES.md](./MODULES.md) for graph behavior, visibility, diagnostics, and limitations.
+Paths are resolved relative to the file containing each `use`, not the process working directory. Imports can nest and repeated references to the same canonical file load it once. Absolute module paths are denied. `.zh` files must have one `start` block containing declarations only; the loader extracts those declarations without executing the block. See [MODULES.md](./MODULES.md) for graph behavior, visibility, diagnostics, and limitations.
 
 ## Standard library
 

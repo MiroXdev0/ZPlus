@@ -1,3 +1,4 @@
+start {
 pub fn copyFile(source: string, destination: string, overwrite: boolean): boolean {
     return __zstdlib_file_copyFile(source, destination, overwrite)
 } end fn
@@ -37,3 +38,4 @@ pub fn scheduleDeleteOnReboot(path: string): boolean {
 pub fn size(path: string): number {
     return __zstdlib_file_size(path)
 } end fn
+} stop

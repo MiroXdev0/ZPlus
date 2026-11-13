@@ -1,0 +1,5 @@
+start {
+    if read_integer() == 1 {
+        say("unexpected integer")
+    } end if
+} stop

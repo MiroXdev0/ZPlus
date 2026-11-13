@@ -2,6 +2,7 @@ use zsqlite as sqlite
 use zjson as json
 
 start {
+
     let database = sqlite.open(":memory:")
     sqlite.execute(database, "CREATE TABLE things (name TEXT, count INTEGER)", "[]")
     sqlite.execute(database, "INSERT INTO things VALUES (?, ?)", "[\"widgets\",3]")

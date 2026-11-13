@@ -57,6 +57,7 @@ function createVscodeMock() {
         constructor(value) { this.value = value; }
     }
     const registrations = { commands: [], providers: [], diagnosticWrites: [] };
+    const configuration = {};
     const event = () => ({ dispose() {} });
     const vscode = {
         Position,
@@ -119,7 +120,10 @@ function createVscodeMock() {
             }
         },
         workspace: {
-            getConfiguration: () => ({ get: (_, fallback) => fallback, update: async () => {} }),
+            getConfiguration: () => ({
+                get: (name, fallback) => Object.hasOwn(configuration, name) ? configuration[name] : fallback,
+                update: async (name, value) => { configuration[name] = value; }
+            }),
             onDidChangeTextDocument: event,
             onDidSaveTextDocument: event,
             onDidCloseTextDocument: event,
@@ -136,7 +140,8 @@ function createVscodeMock() {
             showInformationMessage: async () => {},
             showOpenDialog: async () => undefined
         },
-        registrations
+        registrations,
+        configuration
     };
     return vscode;
 }
@@ -464,6 +469,54 @@ test("real compiler checks and runs source files in paths containing spaces", {
         assert.match(run.stdout, /hello/);
         assert.match(run.stdout, /5/);
     } finally {
+        await fs.promises.rm(directory, { recursive: true, force: true });
+    }
+});
+
+test("live checks analyze unsaved text without creating project snapshots", {
+    skip: !hasCompiler
+}, async () => {
+    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "zplus live check "));
+    const sourcePath = path.join(directory, "main.zp");
+    const document = documentFrom(
+        'use "common.zh"\nstart:\n    say(importedValue)\n    say(missing)\nstop\n',
+        sourcePath
+    );
+    try {
+        await fs.promises.writeFile(sourcePath, "start:\nstop\n");
+        await fs.promises.writeFile(
+            path.join(directory, "common.zh"),
+            "start {\npub let importedValue: number = 1\n} stop\n"
+        );
+        vscodeMock.configuration.compilerPath = compiler;
+        vscodeMock.window.activeTextEditor = { document };
+        extension.activate({ subscriptions: [] });
+
+        const checkCommand = vscodeMock.registrations.commands
+            .filter(item => item.name === "zplus.checkFile")
+            .at(-1);
+        await checkCommand.callback();
+
+        const diagnostics = vscodeMock.registrations.diagnosticWrites
+            .filter(write => write.uri.fsPath === sourcePath)
+            .at(-1).diagnostics;
+        assert.ok(diagnostics.some(item => /missing|undefined/i.test(item.message)));
+
+        const modulePath = path.join(directory, "common.zh");
+        vscodeMock.window.activeTextEditor = {
+            document: documentFrom("start {\n    say(moduleMissing)\n} stop\n", modulePath)
+        };
+        await checkCommand.callback();
+        const moduleDiagnostics = vscodeMock.registrations.diagnosticWrites
+            .filter(write => write.uri.fsPath === modulePath)
+            .at(-1).diagnostics;
+        assert.ok(moduleDiagnostics.some(item => /moduleMissing|undefined/i.test(item.message)));
+
+        assert.deepEqual((await fs.promises.readdir(directory)).sort(), ["common.zh", "main.zp"]);
+    } finally {
+        extension.deactivate();
+        vscodeMock.window.activeTextEditor = undefined;
+        delete vscodeMock.configuration.compilerPath;
         await fs.promises.rm(directory, { recursive: true, force: true });
     }
 });

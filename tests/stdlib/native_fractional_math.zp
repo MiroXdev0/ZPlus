@@ -1,6 +1,7 @@
 use zmath as math
 
 start {
+
     say(math.pi())
     say(math.sqrt(2))
     say(1 / 0)

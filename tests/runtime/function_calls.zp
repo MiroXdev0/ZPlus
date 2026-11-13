@@ -1,3 +1,4 @@
+start {
 let shared: number = 10
 
 fn zero(): number {
@@ -37,7 +38,6 @@ fn fromLocal(value: number): number {
     return local + zero()
 } end fn
 
-start {
     say(zero())
     say(one(4))
     say(many(1, 2, 3, 4, 5, 6, 7, 8, 9))

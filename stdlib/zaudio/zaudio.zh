@@ -1,3 +1,4 @@
+start {
 pub fn initialize() {
     __zaudio_initialize()
 } end fn
@@ -117,3 +118,4 @@ pub fn defaultDevice(): string {
 pub fn selectDevice(name: string) {
     __zaudio_selectDevice(name)
 } end fn
+} stop

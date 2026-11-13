@@ -1,0 +1,5 @@
+use zfile as file
+
+start {
+    file.writeLines("invalid-file-lines.txt", ["one\ntwo"])
+} stop

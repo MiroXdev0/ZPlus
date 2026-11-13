@@ -1,3 +1,4 @@
+start {
 fn divide(): number {
     return 8 / 0
 } end fn
@@ -5,3 +6,4 @@ fn divide(): number {
 fn main() {
     say(divide())
 } end fn
+} stop

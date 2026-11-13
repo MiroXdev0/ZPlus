@@ -1,0 +1,58 @@
+start {
+    fn readFromFunction(): string {
+        return read()
+    } end fn
+
+    let name = readFromFunction()
+    say(name)
+    say(read())
+
+    let emptyLine = read()
+    say(emptyLine == "" ? "empty line passed" : "empty line failed")
+
+    let positive = read_integer()
+    let negative = read_integer()
+    if positive == 42 and negative == -17 {
+        say("integer input passed")
+    } else {
+        say("integer input failed")
+    } end if
+
+    if read_number() == 3.125 {
+        say("decimal input passed")
+    } else {
+        say("decimal input failed")
+    } end if
+
+    if read_number() == 125 {
+        say("exponent input passed")
+    } else {
+        say("exponent input failed")
+    } end if
+
+    if read_boolean() {
+        say("mixed-case true passed")
+    } else {
+        say("mixed-case true failed")
+    } end if
+
+    if not read_boolean() {
+        say("mixed-case false passed")
+    } else {
+        say("mixed-case false failed")
+    } end if
+
+    if read_boolean() {
+        say("conditional input passed")
+    } else {
+        say("conditional input failed")
+    } end if
+
+    let index = 0
+    while index < 2 {
+        say(read())
+        index = index + 1
+    } end while
+
+    say(read())
+} stop

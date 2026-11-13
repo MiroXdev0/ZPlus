@@ -1,3 +1,4 @@
+start {
 pub fn upper(value: string): string {
     return __zstdlib_string_upper(value)
 } end fn
@@ -37,3 +38,4 @@ pub fn reverse(value: string): string {
 pub fn repeat(value: string, repetitions: number): string {
     return __zstdlib_string_repeat(value, repetitions)
 } end fn
+} stop

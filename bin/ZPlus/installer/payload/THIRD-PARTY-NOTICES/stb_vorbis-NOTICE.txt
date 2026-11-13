@@ -1,3 +1,0 @@
-stb_vorbis v1.22 is the public-domain Ogg Vorbis decoder by Sean Barrett.
-The source file bundled in miniaudio's extras directory identifies this work
-as public domain and contains its license notice.

@@ -13,8 +13,7 @@ struct ProcessResult {
 
 ProcessResult runProcess(
     const std::vector<std::string>& arguments,
-    const std::filesystem::path& workingDirectory,
-    const std::filesystem::path& outputFile
+    const std::filesystem::path& workingDirectory
 );
 
 std::filesystem::path findExecutable(const std::string& name);

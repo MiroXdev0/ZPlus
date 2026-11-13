@@ -4,6 +4,7 @@ use zjson as json
 use zpath as path
 use zprocess as process
 use zstring as text
+start {
 
 pub fn verify(installDirectory: string): string {
     let bin = path.join(installDirectory, "bin")
@@ -34,3 +35,4 @@ pub fn verify(installDirectory: string): string {
     } end if
     return ""
 } end fn
+} stop

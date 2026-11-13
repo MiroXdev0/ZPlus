@@ -1,6 +1,7 @@
 use zgraphics
 
 start {
+
     let app = zgraphics.createWindow("Z+ Shapes", 760, 520)
     zgraphics.background(app, "#151923")
     zgraphics.text(app, "Drawing with ZGraphics", 28, 24, "#FFFFFF", 28)

@@ -1,0 +1,7 @@
+start {
+    if true {
+        fn nested() {
+            say("not allowed")
+        } end fn
+    } end if
+} stop

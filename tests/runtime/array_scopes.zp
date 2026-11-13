@@ -1,6 +1,6 @@
+start {
 let values: number[] = [1, 2]
 
-start {
     if true {
         let values: number[] = [3]
         values[0] = 4

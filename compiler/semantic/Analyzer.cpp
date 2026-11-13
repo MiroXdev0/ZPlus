@@ -1,5 +1,6 @@
 #include "Analyzer.hpp"
 
+#include <algorithm>
 #include <sstream>
 #include <utility>
 
@@ -468,6 +469,9 @@ bool Analyzer::analyze(
     nextBindingId_ = 0;
 
     userTypes_.clear();
+    structDeclarations_.clear();
+    classDeclarations_.clear();
+    enumDeclarations_.clear();
     moduleNamesByFile_.clear();
     privateTypeOwners_.clear();
     ambiguousPublicTypeNames_.clear();
@@ -546,6 +550,10 @@ bool Analyzer::analyze(
     const Type string = Type::string();
     const Type boolean = Type::boolean();
     const Type voidType = Type::voidType();
+    declareBuiltin("read", {}, string);
+    declareBuiltin("read_number", {}, number);
+    declareBuiltin("read_integer", {}, number);
+    declareBuiltin("read_boolean", {}, boolean);
     declareBuiltin("__zgraphics_createWindow", {string, number, number}, number);
     declareBuiltin("length", {Type::unknown()}, number);
     declareBuiltin("push", {Type::unknown(), Type::unknown()}, voidType);
@@ -608,7 +616,9 @@ bool Analyzer::analyze(
     }
     declareBuiltin("__zstdlib_path_join", {string, string}, string);
     declareBuiltin("__zstdlib_file_read", {string}, string);
+    declareBuiltin("__zstdlib_file_readLines", {string}, Type::array(string));
     declareBuiltin("__zstdlib_file_write", {string, string}, voidType);
+    declareBuiltin("__zstdlib_file_writeLines", {string, Type::array(string)}, voidType);
     declareBuiltin("__zstdlib_file_append", {string, string}, voidType);
     for (const char* operation : {"exists", "delete", "createDirectory", "isDirectory"}) {
         declareBuiltin(std::string("__zstdlib_file_") + operation, {string}, boolean);
@@ -874,18 +884,25 @@ void Analyzer::predeclareTypes(
     std::unordered_map<std::string, std::size_t> publicTypeCounts;
     for (const auto& statement : statements) {
         if (!statement) continue;
+        const zplus::ast::Statement* declaration = statement.get();
+        while (const auto* exported =
+                   declaration
+                       ? as<zplus::ast::ExportDeclaration>(declaration)
+                       : nullptr) {
+            declaration = exported->declaration.get();
+        }
         if (const auto* structure =
-                as<zplus::ast::StructDeclaration>(statement.get());
+                as<zplus::ast::StructDeclaration>(declaration);
             structure && !structure->moduleName.empty() && structure->isPublic) {
             ++publicTypeCounts[structure->name];
         }
         if (const auto* klass =
-                as<zplus::ast::ClassDeclaration>(statement.get());
+                as<zplus::ast::ClassDeclaration>(declaration);
             klass && !klass->moduleName.empty() && klass->isPublic) {
             ++publicTypeCounts[klass->name];
         }
         if (const auto* enumeration =
-                as<zplus::ast::EnumDeclaration>(statement.get());
+                as<zplus::ast::EnumDeclaration>(declaration);
             enumeration && !enumeration->moduleName.empty() && enumeration->isPublic) {
             ++publicTypeCounts[enumeration->name];
         }
@@ -898,10 +915,18 @@ void Analyzer::predeclareTypes(
             continue;
         }
 
+        const zplus::ast::Statement* declaration = statement.get();
+        while (const auto* exported =
+                   declaration
+                       ? as<zplus::ast::ExportDeclaration>(declaration)
+                       : nullptr) {
+            declaration = exported->declaration.get();
+        }
+
         if (const auto* node =
                 as<
                     zplus::ast::StructDeclaration
-                >(statement.get())) {
+                >(declaration)) {
 
             const std::string key = node->moduleName.empty()
                 ? node->name
@@ -930,17 +955,19 @@ void Analyzer::predeclareTypes(
         if (const auto* node =
                 as<
                     zplus::ast::ClassDeclaration
-                >(statement.get())) {
+                >(declaration)) {
 
             const std::string key = node->moduleName.empty()
                 ? node->name
                 : node->moduleName + "::" + node->name;
+            classDeclarations_[key] = node;
             if (!userTypes_.emplace(key, Type::custom(key)).second) {
                 error(*node, "duplicate type declaration '" + node->name + "'");
             }
             if (!node->moduleName.empty()) {
                 moduleNamesByFile_[node->location.sourceFile] = node->moduleName;
                 if (node->isPublic && publicTypeCounts[node->name] == 1) {
+                    classDeclarations_[node->name] = node;
                     if (!userTypes_.emplace(node->name, Type::custom(key)).second) {
                         error(*node, "duplicate type declaration '" + node->name + "'");
                     }
@@ -957,17 +984,19 @@ void Analyzer::predeclareTypes(
         if (const auto* node =
                 as<
                     zplus::ast::EnumDeclaration
-                >(statement.get())) {
+                >(declaration)) {
 
             const std::string key = node->moduleName.empty()
                 ? node->name
                 : node->moduleName + "::" + node->name;
+            enumDeclarations_[key] = node;
             if (!userTypes_.emplace(key, Type::custom(key)).second) {
                 error(*node, "duplicate type declaration '" + node->name + "'");
             }
             if (!node->moduleName.empty()) {
                 moduleNamesByFile_[node->location.sourceFile] = node->moduleName;
                 if (node->isPublic && publicTypeCounts[node->name] == 1) {
+                    enumDeclarations_[node->name] = node;
                     if (!userTypes_.emplace(node->name, Type::custom(key)).second) {
                         error(*node, "duplicate type declaration '" + node->name + "'");
                     }
@@ -997,12 +1026,24 @@ void Analyzer::predeclareFunctions(
             continue;
         }
 
+        const zplus::ast::Statement* declaration = statement.get();
+        while (const auto* exported =
+                   declaration
+                       ? as<zplus::ast::ExportDeclaration>(declaration)
+                       : nullptr) {
+            declaration = exported->declaration.get();
+        }
+
         const auto* function =
             as<
                 zplus::ast::FunctionDeclaration
-            >(statement.get());
+            >(declaration);
 
         if (!function) {
+            if (const auto* namespaceNode =
+                    as<zplus::ast::NamespaceDeclaration>(declaration)) {
+                predeclareFunctions(namespaceNode->body);
+            }
             continue;
         }
 
@@ -1425,6 +1466,8 @@ void Analyzer::analyzeStart(
 ) {
 
     enterScope();
+    predeclareTypes(statement.body);
+    predeclareFunctions(statement.body);
 
     analyzeBlock(
         statement.body
@@ -1977,9 +2020,10 @@ void Analyzer::analyzeFunction(
     const zplus::ast::FunctionDeclaration& statement
 ) {
 
-    const Symbol* existing = statement.moduleName.empty()
-        ? findSymbol(statement.name)
-        : findModuleSymbol(statement.moduleName, statement.name);
+    const std::string symbolName = statement.internalName.empty()
+        ? statement.name
+        : statement.internalName;
+    const Symbol* existing = findSymbol(symbolName);
 
     if (
         !existing
@@ -2046,6 +2090,16 @@ void Analyzer::analyzeFunction(
     ++functionDepth_;
 
     enterScope();
+
+    if (!statement.ownerClass.empty()) {
+        Symbol receiver;
+        receiver.name = "this";
+        receiver.bindingName = "this";
+        receiver.sourceFile = statement.location.sourceFile;
+        receiver.type = Type::custom(statement.ownerClass);
+        receiver.initialized = true;
+        declareSymbol(receiver);
+    }
 
     // --------------------------------------------------------
     // Parameters
@@ -2282,6 +2336,7 @@ void Analyzer::analyzeClass(
     const zplus::ast::ClassDeclaration& statement
 ) {
 
+    std::unordered_set<std::string> memberNames;
     for (const auto& field :
          statement.fields) {
 
@@ -2289,18 +2344,35 @@ void Analyzer::analyzeClass(
             continue;
         }
 
+        if (!memberNames.insert(field->name).second) {
+            error(*field, "duplicate class member '" + field->name + "'");
+        }
+
         if (field->type) {
 
-            (void)resolveType(
+            const Type fieldType = resolveType(
                 *field->type
             );
+            if (field->initializer) {
+                const Type initializerType = expressionType(*field->initializer);
+                if (!isAssignable(fieldType, initializerType)) {
+                    error(*field, "initializer for class field '" + field->name +
+                                      "' has type '" + typeName(initializerType) +
+                                      "', expected '" + typeName(fieldType) + "'");
+                }
+            }
         }
 
         if (field->initializer) {
 
-            expressionType(
-                *field->initializer
-            );
+            const auto* literal =
+                as<zplus::ast::Literal>(field->initializer.get());
+            if (!literal) {
+                error(*field, "class field initializers must be literals");
+            }
+        } else if (!field->type) {
+            error(*field, "class field '" + field->name +
+                              "' requires a type or initializer");
         }
     }
 
@@ -2308,6 +2380,9 @@ void Analyzer::analyzeClass(
          statement.methods) {
 
         if (method) {
+            if (!memberNames.insert(method->name).second) {
+                error(*method, "duplicate class member '" + method->name + "'");
+            }
             analyzeFunction(
                 *method
             );
@@ -2324,13 +2399,17 @@ void Analyzer::analyzeEnum(
     const zplus::ast::EnumDeclaration& statement
 ) {
 
+    std::unordered_set<std::string> memberNames;
     for (const auto& value :
          statement.values) {
 
-        if (
-            value &&
-            value->value
-        ) {
+        if (!value) continue;
+
+        if (!memberNames.insert(value->name).second) {
+            error(*value, "duplicate enum member '" + value->name + "'");
+        }
+
+        if (value->value) {
 
             Type valueType =
                 expressionType(
@@ -2347,6 +2426,20 @@ void Analyzer::analyzeEnum(
                     "enum value must be numeric"
                 );
             }
+
+            const auto* literal = as<zplus::ast::Literal>(value->value.get());
+            const auto* signedLiteral =
+                as<zplus::ast::UnaryExpression>(value->value.get());
+            const auto* signedNumber = signedLiteral &&
+                    (signedLiteral->operatorType == zplus::TokenType::Minus ||
+                     signedLiteral->operatorType == zplus::TokenType::Plus)
+                ? as<zplus::ast::Literal>(signedLiteral->operand.get())
+                : nullptr;
+            if ((!literal || literal->kind != zplus::ast::Literal::Kind::Number) &&
+                (!signedNumber ||
+                 signedNumber->kind != zplus::ast::Literal::Kind::Number)) {
+                error(*value, "enum values must be numeric literals");
+            }
         }
     }
 }
@@ -2361,6 +2454,30 @@ void Analyzer::analyzeNamespace(
 ) {
 
     enterScope();
+    predeclareTypes(statement.body);
+    predeclareFunctions(statement.body);
+    for (const auto& child : statement.body) {
+        const zplus::ast::Statement* declaration = child.get();
+        while (const auto* exported =
+                   declaration
+                       ? as<zplus::ast::ExportDeclaration>(declaration)
+                       : nullptr) {
+            declaration = exported->declaration.get();
+        }
+        const auto* function =
+            declaration
+                ? as<zplus::ast::FunctionDeclaration>(declaration)
+                : nullptr;
+        if (!function || function->namespaceName.empty()) continue;
+        const Symbol* existing = findSymbol(function->internalName);
+        if (!existing) continue;
+        Symbol alias = *existing;
+        alias.name = function->name;
+        if (!declareSymbol(alias)) {
+            error(*function, "duplicate declaration '" + function->name +
+                                 "' in namespace '" + statement.name + "'");
+        }
+    }
 
     analyzeBlock(
         statement.body
@@ -3267,7 +3384,10 @@ Type Analyzer::typeOfCall(
         if (!sourceModule.empty()) {
             const std::string localKey =
                 sourceModule + "::" + calleeIdentifier->name;
-            if (structDeclarations_.contains(localKey)) structKey = localKey;
+            if (structDeclarations_.contains(localKey) ||
+                classDeclarations_.contains(localKey)) {
+                structKey = localKey;
+            }
         }
         const auto structure = structDeclarations_.find(structKey);
         if (structure != structDeclarations_.end()) {
@@ -3305,6 +3425,47 @@ Type Analyzer::typeOfCall(
                 }
             }
             return Type::custom(structKey);
+        }
+
+        const auto klass = classDeclarations_.find(structKey);
+        if (klass != classDeclarations_.end()) {
+            std::vector<Type> argumentTypes;
+            argumentTypes.reserve(expression.arguments.size());
+            for (const auto& argument : expression.arguments) {
+                if (argument) argumentTypes.push_back(expressionType(*argument));
+            }
+
+            const auto& fields = klass->second->fields;
+            std::size_t requiredCount = fields.size();
+            while (requiredCount > 0 && fields[requiredCount - 1] &&
+                   fields[requiredCount - 1]->initializer) {
+                --requiredCount;
+            }
+            if (argumentTypes.size() < requiredCount ||
+                argumentTypes.size() > fields.size()) {
+                error(expression, "constructor for class '" + klass->second->name +
+                                      "' expects " +
+                                      (requiredCount == fields.size()
+                                           ? std::to_string(fields.size())
+                                           : std::to_string(requiredCount) + " to " +
+                                                 std::to_string(fields.size())) +
+                                      " arguments");
+                return Type::unknown();
+            }
+            for (std::size_t i = 0; i < argumentTypes.size(); ++i) {
+                if (!fields[i] || !fields[i]->type) continue;
+                const Type expected = resolveType(*fields[i]->type);
+                if (!isAssignable(expected, argumentTypes[i])) {
+                    error(*expression.arguments[i],
+                          "constructor argument for class field '" + fields[i]->name +
+                              "' has type '" + typeName(argumentTypes[i]) +
+                              "', expected '" + typeName(expected) + "'");
+                }
+            }
+            const std::string className = klass->second->moduleName.empty()
+                ? klass->second->name
+                : klass->second->moduleName + "::" + klass->second->name;
+            return Type::custom(className);
         }
     }
 
@@ -3518,6 +3679,65 @@ Type Analyzer::typeOfMember(
 
     const auto* moduleIdentifier =
         as<zplus::ast::Identifier>(expression.object.get());
+
+    if (moduleIdentifier) {
+        const std::string namespaceFunctionName =
+            moduleIdentifier->name + "::" + expression.member;
+        if (const Symbol* namespaceFunction =
+                findSymbol(namespaceFunctionName);
+            namespaceFunction && namespaceFunction->isFunction) {
+            const std::string sourceModule =
+                moduleNameForFile(expression.location.sourceFile);
+            if (!namespaceFunction->isPublic &&
+                namespaceFunction->moduleName != sourceModule) {
+                error(expression, "declaration '" + expression.member +
+                                      "' is private to module '" +
+                                      namespaceFunction->moduleName + "'");
+                return Type::unknown();
+            }
+            expression.resolvedName = namespaceFunctionName;
+            return namespaceFunction->type;
+        }
+
+        const std::string sourceModule =
+            moduleNameForFile(expression.location.sourceFile);
+        std::string enumKey = moduleIdentifier->name;
+        if (!sourceModule.empty()) {
+            const std::string localKey =
+                sourceModule + "::" + moduleIdentifier->name;
+            if (enumDeclarations_.contains(localKey)) enumKey = localKey;
+        }
+
+        const auto enumeration = enumDeclarations_.find(enumKey);
+        if (enumeration != enumDeclarations_.end()) {
+            const auto member = std::find_if(
+                enumeration->second->values.begin(),
+                enumeration->second->values.end(),
+                [&expression](const auto& value) {
+                    return value && value->name == expression.member;
+                });
+            if (member == enumeration->second->values.end()) {
+                error(expression, "enum '" + enumeration->second->name +
+                                      "' has no member '" + expression.member + "'");
+                return Type::unknown();
+            }
+            return Type::custom(
+                enumeration->second->moduleName.empty()
+                    ? enumeration->second->name
+                    : enumeration->second->moduleName + "::" +
+                          enumeration->second->name
+            );
+        }
+
+        for (const auto& [key, candidate] : enumDeclarations_) {
+            (void)key;
+            if (candidate && candidate->moduleName == moduleIdentifier->name &&
+                candidate->name == expression.member) {
+                return Type::custom(candidate->moduleName + "::" + candidate->name);
+            }
+        }
+    }
+
     if (moduleIdentifier) {
         const Symbol* symbol =
             findModuleSymbol(moduleIdentifier->name, expression.member);
@@ -3552,6 +3772,66 @@ Type Analyzer::typeOfMember(
     }
 
     if (objectType.kind == TypeKind::Custom) {
+        const auto enumeration = enumDeclarations_.find(objectType.name);
+        if (enumeration != enumDeclarations_.end()) {
+            const auto member = std::find_if(
+                enumeration->second->values.begin(),
+                enumeration->second->values.end(),
+                [&expression](const auto& value) {
+                    return value && value->name == expression.member;
+                });
+            if (member == enumeration->second->values.end()) {
+                error(expression, "enum '" + enumeration->second->name +
+                                      "' has no member '" + expression.member + "'");
+                return Type::unknown();
+            }
+            return Type::custom(objectType.name);
+        }
+        const auto klass = classDeclarations_.find(objectType.name);
+        if (klass != classDeclarations_.end()) {
+            for (const auto& field : klass->second->fields) {
+                if (field && field->name == expression.member) {
+                    return field->type
+                        ? resolveType(*field->type)
+                        : (field->initializer
+                               ? expressionType(*field->initializer)
+                               : Type::unknown());
+                }
+            }
+            for (const auto& method : klass->second->methods) {
+                if (!method || method->name != expression.member) continue;
+                std::vector<Type> parameterTypes;
+                parameterTypes.reserve(method->parameters.size());
+                std::size_t requiredParameterCount = 0;
+                for (const auto& parameter : method->parameters) {
+                    if (!parameter) continue;
+                    parameterTypes.push_back(
+                        parameter->type
+                            ? resolveType(*parameter->type)
+                            : Type::unknown()
+                    );
+                    if (!parameter->defaultValue) {
+                        ++requiredParameterCount;
+                    }
+                }
+                Type methodType = Type::function(
+                    std::move(parameterTypes),
+                    method->returnType
+                        ? resolveType(*method->returnType)
+                        : Type::voidType()
+                );
+                methodType.requiredParameterCount = requiredParameterCount;
+                expression.resolvedName = method->internalName.empty()
+                    ? klass->second->name + "::" + method->name
+                    : method->internalName;
+                expression.requiresReceiver = true;
+                return methodType;
+            }
+            error(expression, "class '" + klass->second->name +
+                                  "' has no field or method '" +
+                                  expression.member + "'");
+            return Type::unknown();
+        }
         const auto structure = structDeclarations_.find(objectType.name);
         if (structure != structDeclarations_.end()) {
             for (const auto& field : structure->second->fields) {

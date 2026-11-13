@@ -1,6 +1,7 @@
 use zgraphics
 
 start {
+
     let app = zgraphics.createWindow("Z+ Button Demo", 520, 300)
     let clicks = 0
     zgraphics.background(app, "#18202B")

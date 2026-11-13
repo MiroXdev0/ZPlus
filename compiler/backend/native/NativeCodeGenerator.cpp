@@ -99,6 +99,9 @@ void NativeCodeGenerator::writeExecutable(
     const bool needsPhysicsRuntime = std::any_of(
         image.importFixups.begin(), image.importFixups.end(),
         [](const auto& fixup) { return fixup.library == "zphysics_runtime.dll"; });
+    const bool needsInputRuntime = std::any_of(
+        image.importFixups.begin(), image.importFixups.end(),
+        [](const auto& fixup) { return fixup.library == "zplus_input_runtime.dll"; });
     const auto bytes = writePE(image, windowsGui);
 #elif defined(__linux__)
     if (windowsGui) {
@@ -111,6 +114,9 @@ void NativeCodeGenerator::writeExecutable(
     const bool needsPhysicsRuntime = std::any_of(
         image.importFixups.begin(), image.importFixups.end(),
         [](const auto& fixup) { return fixup.library == "libzphysics_runtime.so"; });
+    const bool needsInputRuntime = std::any_of(
+        image.importFixups.begin(), image.importFixups.end(),
+        [](const auto& fixup) { return fixup.library == "libzplus_input_runtime.so"; });
     const auto bytes = writeELF(image);
 #else
     if (windowsGui) {
@@ -245,6 +251,39 @@ void NativeCodeGenerator::writeExecutable(
                 std::filesystem::copy_options::overwrite_existing, copyError);
             if (copyError) {
                 throw std::runtime_error("cannot package physics runtime beside output: " +
+                    copyError.message());
+            }
+        }
+    }
+    if (needsInputRuntime) {
+#if defined(_WIN32)
+        const char* runtimeName = "zplus_input_runtime.dll";
+#else
+        const char* runtimeName = "libzplus_input_runtime.so";
+#endif
+        const auto runtime = compilerDirectory() / runtimeName;
+        if (!std::filesystem::is_regular_file(runtime)) {
+            throw std::runtime_error(
+                "terminal input was used but the required runtime '" +
+                runtime.string() + "' was not found beside the Z+ compiler");
+        }
+        std::error_code directoryError;
+        const auto outputDirectory = output.has_parent_path()
+            ? output.parent_path()
+            : std::filesystem::current_path();
+        std::filesystem::create_directories(outputDirectory, directoryError);
+        if (directoryError) {
+            throw std::runtime_error("cannot create native output directory '" +
+                outputDirectory.string() + "': " + directoryError.message());
+        }
+        const auto deployedRuntime = outputDirectory / runtime.filename();
+        std::error_code copyError;
+        if (std::filesystem::weakly_canonical(runtime) !=
+            std::filesystem::weakly_canonical(deployedRuntime)) {
+            std::filesystem::copy_file(runtime, deployedRuntime,
+                std::filesystem::copy_options::overwrite_existing, copyError);
+            if (copyError) {
+                throw std::runtime_error("cannot package terminal input runtime beside output: " +
                     copyError.message());
             }
         }

@@ -2,7 +2,6 @@
 
 const vscode = require("vscode");
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
 const { executeCompiler, resolveCompilerPath } = require("./lib/compiler");
 const { parseDiagnostics } = require("./lib/diagnostics");
@@ -141,22 +140,6 @@ function scheduleCheck(document, overrideDelay) {
     }, delay));
 }
 
-async function withTemporarySource(document, callback) {
-    const sourcePath = document.uri.fsPath;
-    const directory = sourcePath ? path.dirname(sourcePath) : os.tmpdir();
-    const basename = path.basename(sourcePath || "untitled.zp");
-    const file = path.join(
-        directory,
-        `.${basename}.${process.pid}.${require("node:crypto").randomUUID()}.zp`
-    );
-    try {
-        await fs.promises.writeFile(file, document.getText(), { encoding: "utf8", flag: "wx" });
-        return await callback(file);
-    } finally {
-        await fs.promises.rm(file, { force: true });
-    }
-}
-
 function toVscodeDiagnostics(output, document) {
     return parseDiagnostics(output)
         .filter(item => item.line > 0 && item.column > 0 && document.lineCount > 0)
@@ -240,16 +223,18 @@ async function checkFile(document) {
     runningChecks.set(key, version);
 
     try {
-        const { result, compiledSourcePath } = await withTemporarySource(document, async file => ({
-            result: await executeCompiler(getCompilerPath(), ["check", file, "--diagnostics=json"], {
-                cwd: path.dirname(document.uri.fsPath)
-            }),
-            compiledSourcePath: file
-        }));
+        const result = await executeCompiler(
+            getCompilerPath(),
+            ["check", document.uri.fsPath, "--source-stdin", "--diagnostics=json"],
+            {
+                cwd: path.dirname(document.uri.fsPath),
+                input: document.getText()
+            }
+        );
         if (runningChecks.get(key) !== version || document.version !== version) return;
 
         const output = `${result.stderr}\n${result.stdout}`;
-        publishDiagnostics(result.stderr, document, compiledSourcePath);
+        publishDiagnostics(result.stderr, document);
         if (result.code !== 0 || output.trim()) {
             outputChannel.appendLine(`---- Z+ Check (${document.uri.fsPath}) ----`);
             outputChannel.appendLine(output.trim() || `Compiler exited with code ${result.code}.`);

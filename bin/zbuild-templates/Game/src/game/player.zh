@@ -1,5 +1,6 @@
 use zgraphics
 use "../systems/collision.zh" as collision
+start {
 
 pub fn moveX(window: number, x: number, direction: number): number {
     return collision.clampX(x + direction * 5, 720)
@@ -12,3 +13,4 @@ pub fn moveY(window: number, y: number, direction: number): number {
 pub fn draw(window: number, x: number, y: number) {
     zgraphics.rectangle(window, x, y, 28, 28, "#F87171", true, 1)
 } end fn
+} stop

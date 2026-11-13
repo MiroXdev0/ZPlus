@@ -1,3 +1,5 @@
+start {
 while false {
     say("body")
 }
+} stop

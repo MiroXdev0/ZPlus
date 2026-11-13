@@ -412,6 +412,24 @@ std::filesystem::path physicsRuntime(const std::filesystem::path& compiler) {
 #endif
 }
 
+std::filesystem::path terminalInputRuntime(const std::filesystem::path& compiler) {
+#if defined(_WIN32)
+    const std::string name = "zplus_input_runtime.dll";
+#elif defined(__linux__)
+    const std::string name = "libzplus_input_runtime.so";
+#else
+    (void)compiler;
+    return {};
+#endif
+#if defined(_WIN32) || defined(__linux__)
+    auto runtime = compiler.parent_path() / name;
+    if (std::filesystem::is_regular_file(runtime)) return runtime;
+    runtime = compiler.parent_path().parent_path() / "Release" / name;
+    if (std::filesystem::is_regular_file(runtime)) return runtime;
+    return {};
+#endif
+}
+
 bool needsAudioRuntime(
     const std::set<std::filesystem::path>& sourceFiles
 ) {
@@ -424,6 +442,17 @@ bool needsAudioRuntime(
 bool needsPhysicsRuntime(const std::set<std::filesystem::path>& sourceFiles) {
     for (const auto& source : sourceFiles) {
         if (readText(source).find("__zphysics_") != std::string::npos) return true;
+    }
+    return false;
+}
+
+bool needsTerminalInputRuntime(
+    const std::set<std::filesystem::path>& sourceFiles
+) {
+    static const std::regex inputCall(
+        R"(\b(read|read_number|read_integer|read_boolean)\s*\()");
+    for (const auto& source : sourceFiles) {
+        if (std::regex_search(readText(source), inputCall)) return true;
     }
     return false;
 }
@@ -580,9 +609,8 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
         : project_.jobs != 0 ? project_.jobs
         : std::max(1u, std::thread::hardware_concurrency());
     std::unordered_map<std::string, std::string> compilerVersion;
-    const auto versionOutput = outputRoot / "cache" / "compiler-version.txt";
     const ProcessResult version = runProcess(
-        {compiler_.string(), "version"}, project_.root, versionOutput);
+        {compiler_.string(), "version"}, project_.root);
     if (version.exitCode != 0) {
         throw std::runtime_error("cannot query compiler version:\n" + version.output);
     }
@@ -667,6 +695,9 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                         targetBackend == "native" && needsAudioRuntime(tracked);
                     const bool usesPhysics =
                         targetBackend == "native" && needsPhysicsRuntime(tracked);
+                    const bool usesTerminalInput =
+                        targetBackend == "native" &&
+                        needsTerminalInputRuntime(tracked);
                     if (usesAudio) {
                         const auto runtime = audioRuntime(compiler_);
                         signatureData << "audio-runtime:";
@@ -676,6 +707,12 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                     if (usesPhysics) {
                         const auto runtime = physicsRuntime(compiler_);
                         signatureData << "physics-runtime:";
+                        if (runtime.empty()) signatureData << "missing\n";
+                        else signatureData << sha256File(runtime) << '\n';
+                    }
+                    if (usesTerminalInput) {
+                        const auto runtime = terminalInputRuntime(compiler_);
+                        signatureData << "terminal-input-runtime:";
                         if (runtime.empty()) signatureData << "missing\n";
                         else signatureData << sha256File(runtime) << '\n';
                     }
@@ -716,6 +753,18 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                     const auto output = targetDirectory / (targetComponent(target->name) +
                         (targetBackend == "interpreter" ? ".checked" : extension));
                     const auto temporaryOutput = output.string() + ".zbuild-tmp";
+                    struct TemporaryFileCleanup {
+                        std::filesystem::path path;
+                        ~TemporaryFileCleanup() {
+                            if (!path.empty()) {
+                                std::error_code ignored;
+                                std::filesystem::remove(path, ignored);
+                            }
+                        }
+                        void release() { path.clear(); }
+                    };
+                    TemporaryFileCleanup temporaryOutputCleanup{
+                        std::filesystem::path(temporaryOutput)};
                     bool cacheHit = false;
                     bool runtimeMatches = true;
 #ifdef _WIN32
@@ -767,6 +816,24 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                                 sha256File(runtime) == sha256File(stagedRuntime)
                             : !std::filesystem::exists(stagedRuntime));
                     }
+                    if (targetBackend == "native") {
+                        std::lock_guard runtimeLock(graphicsRuntimeStagingMutex);
+                        const auto runtime = usesTerminalInput
+                            ? terminalInputRuntime(compiler_)
+                            : std::filesystem::path{};
+#ifdef _WIN32
+                        const auto stagedRuntime =
+                            targetDirectory / "zplus_input_runtime.dll";
+#else
+                        const auto stagedRuntime =
+                            targetDirectory / "libzplus_input_runtime.so";
+#endif
+                        runtimeMatches = runtimeMatches && (usesTerminalInput
+                            ? !runtime.empty() &&
+                                std::filesystem::is_regular_file(stagedRuntime) &&
+                                sha256File(runtime) == sha256File(stagedRuntime)
+                            : !std::filesystem::exists(stagedRuntime));
+                    }
                     if (!options.force && std::filesystem::is_regular_file(output) &&
                         std::filesystem::is_regular_file(cacheRecord) && runtimeMatches) {
                         std::istringstream record(readText(cacheRecord));
@@ -803,8 +870,7 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                             command.push_back(temporaryOutput);
                             if (project_.windowsGui) command.push_back("--windows-gui");
                         }
-                        const auto logFile = cacheDirectory / (targetComponent(target->name) + ".log");
-                        const ProcessResult built = runProcess(command, project_.root, logFile);
+                        const ProcessResult built = runProcess(command, project_.root);
                         if (options.verbose || built.exitCode != 0) {
                             std::lock_guard lock(consoleMutex);
                             std::cout << built.output;
@@ -902,6 +968,35 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                                     std::filesystem::remove(stagedPhysicsRuntime);
                                 }
                             }
+                            {
+                                std::lock_guard runtimeLock(graphicsRuntimeStagingMutex);
+                                const auto inputRuntimeFile = usesTerminalInput
+                                    ? terminalInputRuntime(compiler_)
+                                    : std::filesystem::path{};
+#ifdef _WIN32
+                                const auto stagedInputRuntime =
+                                    targetDirectory / "zplus_input_runtime.dll";
+#else
+                                const auto stagedInputRuntime =
+                                    targetDirectory / "libzplus_input_runtime.so";
+#endif
+                                if (usesTerminalInput && inputRuntimeFile.empty()) {
+                                    throw std::runtime_error(
+                                        "terminal input runtime was not found beside compiler '" +
+                                        compiler_.string() + "'");
+                                }
+                                if (usesTerminalInput &&
+                                    (!std::filesystem::is_regular_file(stagedInputRuntime) ||
+                                     sha256File(inputRuntimeFile) !=
+                                        sha256File(stagedInputRuntime))) {
+                                    std::filesystem::copy_file(
+                                        inputRuntimeFile, stagedInputRuntime,
+                                        std::filesystem::copy_options::overwrite_existing);
+                                } else if (!usesTerminalInput &&
+                                    std::filesystem::exists(stagedInputRuntime)) {
+                                    std::filesystem::remove(stagedInputRuntime);
+                                }
+                            }
                             std::error_code error;
                             std::filesystem::rename(temporaryOutput, output, error);
                             if (error) {
@@ -911,6 +1006,7 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                             }
                             if (error) throw std::runtime_error(
                                 "cannot publish target output '" + output.string() + "': " + error.message());
+                            temporaryOutputCleanup.release();
                         } else {
                             std::ofstream marker(output, std::ios::binary | std::ios::trunc);
                             if (!marker) throw std::runtime_error(
@@ -918,6 +1014,8 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                             marker << signature << '\n';
                         }
                         const auto temporaryRecord = cacheRecord.string() + ".tmp";
+                        TemporaryFileCleanup temporaryRecordCleanup{
+                            std::filesystem::path(temporaryRecord)};
                         {
                             std::ofstream record(temporaryRecord, std::ios::trunc);
                             if (!record) throw std::runtime_error("cannot write build cache");
@@ -931,6 +1029,7 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                         std::filesystem::rename(temporaryRecord, cacheRecord, recordError);
                         if (recordError) throw std::runtime_error(
                             "cannot publish build cache record: " + recordError.message());
+                        temporaryRecordCleanup.release();
                         std::lock_guard lock(resultMutex);
                         result.built.push_back(target->name);
                     }
@@ -997,10 +1096,7 @@ int BuildEngine::run(
     }
     const std::string mode = effectiveMode(project_, options);
     const auto workDirectory = project_.root;
-    const auto outputFile = checkedRelativePath(
-        project_, (std::filesystem::path(project_.outputDirectory) / mode / "run.log")
-            .generic_string(), "run output");
-    const ProcessResult process = runProcess(command, workDirectory, outputFile);
+    const ProcessResult process = runProcess(command, workDirectory);
     std::cout << process.output;
     return process.exitCode;
 }
@@ -1033,11 +1129,6 @@ int BuildEngine::test(const BuildOptions& options) {
         const std::string backend = target->backend.empty()
             ? effectiveBackend(project_, options)
             : target->backend;
-        const auto log = checkedRelativePath(
-            project_, (std::filesystem::path(project_.outputDirectory) /
-                effectiveMode(project_, options) /
-                "cache" / (targetComponent(name) + ".test.log")).generic_string(),
-            "test log");
         std::vector<std::string> command;
         if (backend == "interpreter") {
             command = {compiler_.string(), "run", (project_.root / target->entry).string()};
@@ -1050,7 +1141,7 @@ int BuildEngine::test(const BuildOptions& options) {
             command.push_back(outputIt->second.string());
         }
         command.insert(command.end(), project_.testArguments.begin(), project_.testArguments.end());
-        const ProcessResult result = runProcess(command, project_.root, log);
+        const ProcessResult result = runProcess(command, project_.root);
         if (options.verbose || result.exitCode != 0) std::cout << result.output;
         if (result.exitCode != 0) {
             std::cerr << "[test] " << name << " failed (" << result.exitCode << ")\n";
@@ -1168,22 +1259,35 @@ void BuildEngine::package(const BuildOptions& options) {
             .generic_string(), "package directory");
     std::filesystem::create_directories(packageRoot);
     const auto executableDestination = packageRoot / result.selectedOutput.filename();
-    std::filesystem::copy_file(
-        result.selectedOutput, executableDestination,
-        std::filesystem::copy_options::overwrite_existing);
+    const auto copyIfDifferent = [](const std::filesystem::path& source,
+                                    const std::filesystem::path& destination) {
+        if (!std::filesystem::is_regular_file(source)) {
+            throw std::runtime_error(
+                "package source file is missing: " + source.string());
+        }
+        if (std::filesystem::is_regular_file(destination) &&
+            sha256File(source) == sha256File(destination)) {
+            return;
+        }
+        std::filesystem::copy_file(
+            source, destination,
+            std::filesystem::copy_options::overwrite_existing);
+    };
+    const auto syncOptionalFile = [&](const std::filesystem::path& source,
+                                      const std::string& destinationName) {
+        const auto destination = packageRoot / destinationName;
+        if (!source.empty() && std::filesystem::is_regular_file(source)) {
+            copyIfDifferent(source, destination);
+        } else if (std::filesystem::exists(destination)) {
+            std::filesystem::remove(destination);
+        }
+    };
+    copyIfDifferent(result.selectedOutput, executableDestination);
 #ifdef _WIN32
     const auto runtime = result.selectedOutput.parent_path() / "zgraphics_runtime.dll";
-    if (std::filesystem::exists(runtime)) {
-        std::filesystem::copy_file(
-            runtime, packageRoot / runtime.filename(),
-            std::filesystem::copy_options::overwrite_existing);
-    }
+    syncOptionalFile(runtime, runtime.filename().string());
     const auto sqlite = result.selectedOutput.parent_path() / "sqlite3.dll";
-    if (std::filesystem::exists(sqlite)) {
-        std::filesystem::copy_file(
-            sqlite, packageRoot / sqlite.filename(),
-            std::filesystem::copy_options::overwrite_existing);
-    }
+    syncOptionalFile(sqlite, sqlite.filename().string());
 #endif
     const auto audioRuntimeFile =
 #ifdef _WIN32
@@ -1193,10 +1297,8 @@ void BuildEngine::package(const BuildOptions& options) {
 #else
         std::filesystem::path{};
 #endif
-    if (!audioRuntimeFile.empty() && std::filesystem::exists(audioRuntimeFile)) {
-        std::filesystem::copy_file(
-            audioRuntimeFile, packageRoot / audioRuntimeFile.filename(),
-            std::filesystem::copy_options::overwrite_existing);
+    if (!audioRuntimeFile.empty()) {
+        syncOptionalFile(audioRuntimeFile, audioRuntimeFile.filename().string());
     }
     const auto physicsRuntimeFile =
 #ifdef _WIN32
@@ -1206,20 +1308,72 @@ void BuildEngine::package(const BuildOptions& options) {
 #else
         std::filesystem::path{};
 #endif
-    if (!physicsRuntimeFile.empty() && std::filesystem::exists(physicsRuntimeFile)) {
-        std::filesystem::copy_file(
-            physicsRuntimeFile, packageRoot / physicsRuntimeFile.filename(),
-            std::filesystem::copy_options::overwrite_existing);
+    if (!physicsRuntimeFile.empty()) {
+        syncOptionalFile(physicsRuntimeFile, physicsRuntimeFile.filename().string());
+    }
+    const auto inputRuntimeFile =
+#ifdef _WIN32
+        result.selectedOutput.parent_path() / "zplus_input_runtime.dll";
+#elif defined(__linux__)
+        result.selectedOutput.parent_path() / "libzplus_input_runtime.so";
+#else
+        std::filesystem::path{};
+#endif
+    if (!inputRuntimeFile.empty()) {
+        syncOptionalFile(inputRuntimeFile, inputRuntimeFile.filename().string());
     }
     const auto stagedAssets = checkedRelativePath(
         project_, (std::filesystem::path(project_.outputDirectory) /
             mode / "assets").generic_string(), "staged asset directory");
     if (!project_.assetDirectories.empty()) {
         const auto destinationRoot = packageRoot / "assets";
-        std::filesystem::copy(
-            stagedAssets, destinationRoot,
-            std::filesystem::copy_options::recursive |
-                std::filesystem::copy_options::overwrite_existing);
+        if (!std::filesystem::is_directory(stagedAssets)) {
+            throw std::runtime_error(
+                "staged asset directory is missing: " + stagedAssets.string());
+        }
+        std::filesystem::create_directories(destinationRoot);
+        std::unordered_set<std::string> expectedFiles;
+        std::unordered_set<std::string> expectedDirectories;
+        for (const auto& entry :
+             std::filesystem::recursive_directory_iterator(stagedAssets)) {
+            const auto relative = entry.path().lexically_relative(stagedAssets);
+            const std::string key = relative.generic_string();
+            const auto destination = destinationRoot / relative;
+            if (entry.is_directory()) {
+                expectedDirectories.insert(key);
+                std::filesystem::create_directories(destination);
+            } else if (entry.is_regular_file()) {
+                expectedFiles.insert(key);
+                copyIfDifferent(entry.path(), destination);
+            }
+        }
+
+        std::vector<std::filesystem::path> staleDirectories;
+        for (const auto& entry :
+             std::filesystem::recursive_directory_iterator(destinationRoot)) {
+            const auto relative = entry.path().lexically_relative(destinationRoot);
+            const std::string key = relative.generic_string();
+            if (entry.is_directory()) {
+                if (!expectedDirectories.contains(key)) {
+                    staleDirectories.push_back(entry.path());
+                }
+            } else if (entry.is_regular_file() &&
+                       !expectedFiles.contains(key)) {
+                std::filesystem::remove(entry.path());
+            }
+        }
+        std::sort(staleDirectories.begin(), staleDirectories.end(),
+                  [](const auto& left, const auto& right) {
+                      return left.native().size() > right.native().size();
+                  });
+        for (const auto& directory : staleDirectories) {
+            std::filesystem::remove(directory);
+        }
+    } else {
+        const auto destinationRoot = packageRoot / "assets";
+        if (std::filesystem::exists(destinationRoot)) {
+            std::filesystem::remove_all(destinationRoot);
+        }
     }
     std::cout << "[package] " << packageRoot.string() << '\n';
 }

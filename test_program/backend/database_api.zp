@@ -2,6 +2,7 @@ use zsqlite as sqlite
 use zjson as json
 
 start {
+
     let database = sqlite.open("backend_api.sqlite")
     sqlite.execute(database, "CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY, title TEXT NOT NULL)", "[]")
     sqlite.begin(database)

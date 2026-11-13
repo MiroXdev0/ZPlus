@@ -1,6 +1,8 @@
 #include "Parser.hpp"
 
+#include <functional>
 #include <initializer_list>
+#include <unordered_map>
 #include <utility>
 
 namespace zplus::parser {
@@ -317,6 +319,223 @@ Parser::parseProgram() {
         }
 
         skipNewlines();
+    }
+
+    std::size_t startCount = 0;
+    std::function<void(const std::vector<zplus::ast::Stmt>&, bool, const std::string&)>
+        validateScope;
+    std::function<void(const zplus::ast::Statement&, bool, const std::string&)>
+        validateStatement;
+
+    std::function<std::pair<std::string, std::string>(
+        const zplus::ast::Statement&)> declarationName;
+    declarationName = [&](const zplus::ast::Statement& statement)
+        -> std::pair<std::string, std::string> {
+        if (const auto* node = dynamic_cast<const zplus::ast::FunctionDeclaration*>(&statement)) {
+            return {"fn", node->name};
+        }
+        if (const auto* node = dynamic_cast<const zplus::ast::NamespaceDeclaration*>(&statement)) {
+            return {"namespace", node->name};
+        }
+        if (const auto* node = dynamic_cast<const zplus::ast::ClassDeclaration*>(&statement)) {
+            return {"class", node->name};
+        }
+        if (const auto* node = dynamic_cast<const zplus::ast::EnumDeclaration*>(&statement)) {
+            return {"enum", node->name};
+        }
+        if (const auto* node = dynamic_cast<const zplus::ast::StructDeclaration*>(&statement)) {
+            return {"struct", node->name};
+        }
+        if (const auto* node = dynamic_cast<const zplus::ast::VariableDeclaration*>(&statement)) {
+            return {"variable", node->name};
+        }
+        if (const auto* node = dynamic_cast<const zplus::ast::ExportDeclaration*>(&statement)) {
+            return node->declaration ? declarationName(*node->declaration)
+                                     : std::pair<std::string, std::string>{};
+        }
+        return {};
+    };
+
+    const auto isConstrainedDeclaration = [](const zplus::ast::Statement& statement) {
+        if (const auto* node = dynamic_cast<const zplus::ast::ExportDeclaration*>(&statement)) {
+            return node->declaration &&
+                (dynamic_cast<const zplus::ast::FunctionDeclaration*>(node->declaration.get()) ||
+                 dynamic_cast<const zplus::ast::NamespaceDeclaration*>(node->declaration.get()) ||
+                 dynamic_cast<const zplus::ast::ClassDeclaration*>(node->declaration.get()) ||
+                 dynamic_cast<const zplus::ast::EnumDeclaration*>(node->declaration.get()) ||
+                 dynamic_cast<const zplus::ast::StructDeclaration*>(node->declaration.get()));
+        }
+        return dynamic_cast<const zplus::ast::FunctionDeclaration*>(&statement) ||
+            dynamic_cast<const zplus::ast::NamespaceDeclaration*>(&statement) ||
+            dynamic_cast<const zplus::ast::ClassDeclaration*>(&statement) ||
+            dynamic_cast<const zplus::ast::EnumDeclaration*>(&statement) ||
+            dynamic_cast<const zplus::ast::StructDeclaration*>(&statement);
+    };
+
+    validateScope = [&](const std::vector<zplus::ast::Stmt>& statements,
+                        bool declarationsAllowed,
+                        const std::string& scopeName) {
+        std::unordered_map<std::string, zplus::ast::Location> names;
+        for (const auto& statement : statements) {
+            if (!statement) continue;
+
+            if (isConstrainedDeclaration(*statement)) {
+                if (!declarationsAllowed) {
+                    const auto [kind, name] = declarationName(*statement);
+                    (void)name;
+                    errorAt(Token{TokenType::Unknown, {}, statement->location.line,
+                                  statement->location.column, statement->location.sourceFile},
+                            "'" + kind + "' declarations may only appear directly inside "
+                            "the program's start block or a namespace");
+                    continue;
+                }
+
+                const auto [kind, name] = declarationName(*statement);
+                if (!name.empty() && names.contains(name)) {
+                    errorAt(Token{TokenType::Unknown, {}, statement->location.line,
+                                  statement->location.column, statement->location.sourceFile},
+                            "duplicate declaration '" + name + "' in " + scopeName);
+                } else if (!name.empty()) {
+                    names.emplace(name, statement->location);
+                }
+                validateStatement(*statement, true, scopeName);
+                continue;
+            }
+
+            if (const auto* variable =
+                    dynamic_cast<const zplus::ast::VariableDeclaration*>(statement.get())) {
+                if (!variable->name.empty() && names.contains(variable->name)) {
+                    errorAt(Token{TokenType::Unknown, {}, variable->location.line,
+                                  variable->location.column, variable->location.sourceFile},
+                            "duplicate declaration '" + variable->name + "' in " + scopeName);
+                } else if (!variable->name.empty()) {
+                    names.emplace(variable->name, variable->location);
+                }
+            }
+
+            validateStatement(*statement, false, scopeName);
+        }
+    };
+
+    validateStatement = [&](const zplus::ast::Statement& statement,
+                            bool declarationAllowed,
+                            const std::string& scopeName) {
+        if (const auto* start =
+                dynamic_cast<const zplus::ast::StartStatement*>(&statement)) {
+            if (!declarationAllowed) {
+                errorAt(Token{TokenType::Unknown, {}, start->location.line,
+                              start->location.column, start->location.sourceFile},
+                        "a program may contain only one top-level start block");
+            } else {
+                validateScope(start->body, true, "start block");
+            }
+            return;
+        }
+
+        if (const auto* node =
+                dynamic_cast<const zplus::ast::FunctionDeclaration*>(&statement)) {
+            validateScope(node->body, false, "function body");
+            return;
+        }
+        if (const auto* node =
+                dynamic_cast<const zplus::ast::NamespaceDeclaration*>(&statement)) {
+            validateScope(node->body, true, "namespace '" + node->name + "'");
+            return;
+        }
+        if (const auto* node =
+                dynamic_cast<const zplus::ast::ClassDeclaration*>(&statement)) {
+            for (const auto& method : node->methods) {
+                if (method) validateScope(method->body, false, "method body");
+            }
+            return;
+        }
+        if (const auto* node =
+                dynamic_cast<const zplus::ast::ExportDeclaration*>(&statement)) {
+            if (node->declaration) {
+                validateStatement(*node->declaration, declarationAllowed, scopeName);
+            }
+            return;
+        }
+
+        const auto inspectBody = [&](const std::vector<zplus::ast::Stmt>& body) {
+            validateScope(body, false, scopeName);
+        };
+        if (const auto* blockNode =
+                dynamic_cast<const zplus::ast::BlockStatement*>(&statement)) {
+            inspectBody(blockNode->statements);
+        } else if (const auto* ifNode =
+                       dynamic_cast<const zplus::ast::IfStatement*>(&statement)) {
+            inspectBody(ifNode->thenBody);
+            inspectBody(ifNode->elseBody);
+        } else if (const auto* whileNode =
+                       dynamic_cast<const zplus::ast::WhileStatement*>(&statement)) {
+            inspectBody(whileNode->body);
+        } else if (const auto* forNode =
+                       dynamic_cast<const zplus::ast::ForStatement*>(&statement)) {
+            if (forNode->initializer) {
+                validateStatement(*forNode->initializer, false, scopeName);
+            }
+            inspectBody(forNode->body);
+        } else if (const auto* repeatNode =
+                       dynamic_cast<const zplus::ast::RepeatStatement*>(&statement)) {
+            inspectBody(repeatNode->body);
+        } else if (const auto* switchNode =
+                       dynamic_cast<const zplus::ast::SwitchStatement*>(&statement)) {
+            for (const auto& branch : switchNode->cases) {
+                if (branch) inspectBody(branch->body);
+            }
+            inspectBody(switchNode->defaultBody);
+        } else if (const auto* caseNode =
+                       dynamic_cast<const zplus::ast::CaseStatement*>(&statement)) {
+            inspectBody(caseNode->body);
+        } else if (const auto* tryNode =
+                       dynamic_cast<const zplus::ast::TryStatement*>(&statement)) {
+            inspectBody(tryNode->tryBody);
+            inspectBody(tryNode->catchBody);
+        } else if (const auto* deferNode =
+                       dynamic_cast<const zplus::ast::DeferStatement*>(&statement)) {
+            inspectBody(deferNode->body);
+        } else if (dynamic_cast<const zplus::ast::UseDeclaration*>(&statement) ||
+                   dynamic_cast<const zplus::ast::ImportDeclaration*>(&statement)) {
+            if (scopeName != "module scope") {
+                errorAt(Token{TokenType::Unknown, {}, statement.location.line,
+                              statement.location.column, statement.location.sourceFile},
+                        "module directives must remain outside the program's start block");
+            }
+        } else if (dynamic_cast<const zplus::ast::StartStatement*>(&statement)) {
+            errorAt(Token{TokenType::Unknown, {}, statement.location.line,
+                          statement.location.column, statement.location.sourceFile},
+                    "a nested start block is not allowed");
+        }
+    };
+
+    for (const auto& statement : program->statements) {
+        if (!statement) continue;
+        if (const auto* start =
+                dynamic_cast<const zplus::ast::StartStatement*>(statement.get())) {
+            ++startCount;
+            if (startCount > 1) {
+                errorAt(Token{TokenType::Unknown, {}, start->location.line,
+                              start->location.column, start->location.sourceFile},
+                        "a source file must contain exactly one top-level start block");
+            }
+            validateScope(start->body, true, "start block");
+        } else if (!dynamic_cast<const zplus::ast::UseDeclaration*>(statement.get()) &&
+                   !dynamic_cast<const zplus::ast::ImportDeclaration*>(statement.get())) {
+            const auto [kind, name] = declarationName(*statement);
+            const std::string message = isConstrainedDeclaration(*statement)
+                ? "'" + kind + "' declarations must be inside the program's start block"
+                : "top-level statements must be inside the program's start block";
+            errorAt(Token{TokenType::Unknown, {}, statement->location.line,
+                          statement->location.column, statement->location.sourceFile},
+                    message);
+            (void)name;
+        }
+    }
+
+    if (startCount == 0) {
+        errorAt(tokens_.empty() ? Token{} : tokens_.front(),
+                "a source file must contain one top-level start block");
     }
 
     return program;
@@ -3057,6 +3276,14 @@ Parser::parsePrimary() {
     // Identifier
     // --------------------------------------------------------
 
+    if (match(TokenType::This)) {
+        auto identifier =
+            std::make_unique<zplus::ast::Identifier>();
+        setLocation(*identifier, token);
+        identifier->name = "this";
+        return identifier;
+    }
+
     if (match(TokenType::Identifier)) {
 
         auto identifier =
@@ -3852,6 +4079,9 @@ Parser::parseClass() {
                     );
 
                 if (function) {
+                    function->ownerClass = declaration->name;
+                    function->internalName =
+                        declaration->name + "::" + function->name;
 
                     declaration->methods.emplace_back(
                         function
@@ -4127,6 +4357,33 @@ Parser::parseNamespace() {
         declaration->body = parseUntil(TokenType::End);
         consume(TokenType::End, "expected 'end' after namespace");
     }
+
+    std::function<void(std::vector<zplus::ast::Stmt>&, const std::string&)>
+        assignNamespaceNames;
+    assignNamespaceNames = [&](std::vector<zplus::ast::Stmt>& statements,
+                               const std::string& namespaceName) {
+        for (auto& child : statements) {
+            if (!child) continue;
+            zplus::ast::Statement* nested = child.get();
+            if (auto* exported =
+                    dynamic_cast<zplus::ast::ExportDeclaration*>(nested)) {
+                nested = exported->declaration.get();
+            }
+            if (auto* function =
+                    dynamic_cast<zplus::ast::FunctionDeclaration*>(nested)) {
+                function->namespaceName = namespaceName;
+                function->internalName =
+                    namespaceName + "::" + function->name;
+            } else if (auto* nestedNamespace =
+                           dynamic_cast<zplus::ast::NamespaceDeclaration*>(nested)) {
+                assignNamespaceNames(
+                    nestedNamespace->body,
+                    namespaceName + "::" + nestedNamespace->name
+                );
+            }
+        }
+    };
+    assignNamespaceNames(declaration->body, declaration->name);
 
     return declaration;
 }

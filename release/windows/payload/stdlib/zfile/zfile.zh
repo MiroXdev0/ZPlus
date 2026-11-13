@@ -1,3 +1,4 @@
+start {
 pub fn read(path: string): string {
     return __zstdlib_file_read(path)
 } end fn
@@ -25,3 +26,4 @@ pub fn size(path: string): number {
 pub fn isDirectory(path: string): boolean {
     return __zstdlib_file_isDirectory(path)
 } end fn
+} stop

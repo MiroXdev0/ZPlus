@@ -1,5 +1,7 @@
 use zmemory.management
 
+start {
+
 let shared: string = "global" + " string"
 
 fn decorate(value: string): string {
@@ -23,7 +25,6 @@ fn exerciseActiveRoot(value: string): string {
     return result
 } end fn
 
-start {
     let transient: string = makeTransient("managed")
     if zmemory.heapObjects() > 0 {
         say("native managed string allocated")

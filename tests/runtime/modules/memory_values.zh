@@ -1,1 +1,3 @@
+start {
 pub let importedValues: number[] = [40, 2]
+} stop

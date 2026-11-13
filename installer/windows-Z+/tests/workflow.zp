@@ -9,6 +9,7 @@ use "../src/components/integration.zh" as integration
 use "../src/components/install-directory.zh" as location
 
 start {
+
     let root = env.currentDirectory()
     let payload = path.join(root, "payload")
     let destination = path.join(root, "installed")

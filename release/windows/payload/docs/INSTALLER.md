@@ -23,6 +23,13 @@ Notepad (with a separate "Run with Z+" context-menu action), and creates Start
 Menu shortcuts. A desktop shortcut is optional. Existing unrelated PATH
 entries and environment variables are preserved.
 
+The destination page remembers a selected directory when navigating backward
+and forward. Browse uses the current destination's parent as its starting
+folder; canceling the folder dialog leaves the destination unchanged.
+Destination, existing-installation, and write-access checks run away from the
+UI thread. Setup diagnostics, including folder-dialog open/close events, are
+written to `%LOCALAPPDATA%\ZPlusInstaller\Logs`.
+
 The installed `ZPlusUninstall.exe` removes only unchanged files recorded as
 installed, the installer-created PATH entry and associations, and shortcuts
 that still point to this installation. Modified or untracked files are kept.

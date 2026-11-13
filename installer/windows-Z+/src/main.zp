@@ -7,6 +7,7 @@ use "components/deployment.zh" as deployment
 use "components/integration.zh" as integration
 
 start {
+
     if system.platform() != "Windows" or system.architecture() != "x64" {
         system.messageBox("Z+ Setup", "This release supports Windows x64 only.", "ok", "error")
     } else {

@@ -26,14 +26,18 @@ struct LoadedProgram {
 
 class ModuleLoader {
 public:
-    LoadedProgram load(const std::filesystem::path& entryPath);
+    LoadedProgram load(
+        const std::filesystem::path& entryPath,
+        const std::string* entrySource = nullptr
+    );
 
 private:
     bool loadModule(
         const std::filesystem::path& path,
         bool entryModule,
         std::vector<std::string>& activePaths,
-        const std::string& requestedName = {}
+        const std::string& requestedName = {},
+        const std::string* sourceOverride = nullptr
     );
 
     void addDiagnostic(

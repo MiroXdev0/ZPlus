@@ -8,6 +8,7 @@ use zstring as text
 use zargs as args
 
 start {
+
     let outputDir: string = args.get(0)
     let userName: string = args.get(1)
     let displayName: string = text.upper(userName)

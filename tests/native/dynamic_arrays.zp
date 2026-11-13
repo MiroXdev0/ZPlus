@@ -1,5 +1,7 @@
 use zmemory.management
 
+start {
+
 let globalValues: number[] = [1]
 
 fn appendAndReturn(values: number[], value: number): number[] {
@@ -19,7 +21,6 @@ fn allocateTransient() {
     push(discarded, [4])
 } end fn
 
-start {
     zmemory.setThreshold(1024)
     let values: number[] = []
     push(values, 10)

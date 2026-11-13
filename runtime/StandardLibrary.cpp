@@ -563,6 +563,25 @@ std::string fileRead(const std::string& value) {
     return contents.str();
 }
 
+std::vector<std::string> fileReadLines(const std::string& value) {
+    const std::string contents = fileRead(value);
+    std::vector<std::string> lines;
+    std::size_t begin = 0;
+    while (begin < contents.size()) {
+        const std::size_t end = contents.find('\n', begin);
+        std::size_t length = end == std::string::npos
+            ? contents.size() - begin
+            : end - begin;
+        if (length > 0 && contents[begin + length - 1] == '\r') {
+            --length;
+        }
+        lines.emplace_back(contents.substr(begin, length));
+        if (end == std::string::npos) break;
+        begin = end + 1;
+    }
+    return lines;
+}
+
 void fileWrite(const std::string& value, const std::string& contents, bool append) {
     const auto path = checkedPath(value, append ? "append" : "write");
     std::ofstream output(path, std::ios::binary |
@@ -571,6 +590,21 @@ void fileWrite(const std::string& value, const std::string& contents, bool appen
     output.write(contents.data(), static_cast<std::streamsize>(contents.size()));
     output.flush();
     if (!output) throw std::runtime_error("failed while writing file: " + pathString(path));
+}
+
+void fileWriteLines(
+    const std::string& path,
+    const std::vector<std::string>& lines
+) {
+    std::string contents;
+    for (const std::string& line : lines) {
+        if (line.find_first_of("\r\n") != std::string::npos) {
+            throw std::invalid_argument("writeLines entries must not contain line breaks");
+        }
+        contents.append(line);
+        contents.push_back('\n');
+    }
+    fileWrite(path, contents, false);
 }
 
 bool fileExists(const std::string& value) {

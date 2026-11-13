@@ -305,6 +305,7 @@ struct Module {
 
     std::vector<std::string> types;
     std::vector<StructType> structTypes;
+    std::unordered_map<std::string, Value> enumConstants;
 
     const StructType* findStructType(const std::string& typeName) const noexcept {
         const auto alias = structAliases.find(typeName);
@@ -330,6 +331,11 @@ struct Module {
         return id != 0 && id <= structTypes.size()
             ? &structTypes[id - 1]
             : nullptr;
+    }
+
+    const Value* findEnumConstant(const std::string& constantName) const noexcept {
+        const auto found = enumConstants.find(constantName);
+        return found == enumConstants.end() ? nullptr : &found->second;
     }
 
 

@@ -1,6 +1,7 @@
 use "../src/main.zh" as library
 
 start {
+
     if library.greeting("Z+") == "Hello, Z+!" {
         printz("Library greeting test passed\n")
     } else {

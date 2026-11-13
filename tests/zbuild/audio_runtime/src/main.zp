@@ -1,5 +1,7 @@
 use zaudio
 
+start {
+
 if zaudio.deviceCount() > 0 {
     zaudio.initialize()
     let music = zaudio.loadMusic("assets/tone.ogg")
@@ -11,3 +13,4 @@ if zaudio.deviceCount() > 0 {
 } else {
     say("ZBuild audio integration skipped: no playback device")
 } end if
+} stop

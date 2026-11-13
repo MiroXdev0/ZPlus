@@ -1,5 +1,8 @@
 use "bad_module.zh" as bad
 
+start {
+
 fn main() {
     say(bad.readPastEnd())
 } end fn
+} stop

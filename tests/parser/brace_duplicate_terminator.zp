@@ -1,3 +1,5 @@
+start {
 if true {
     say("once")
 } end if end if
+} stop

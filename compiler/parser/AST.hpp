@@ -703,6 +703,10 @@ struct MemberExpression final : Expression {
     std::string member;
 
     bool pointerAccess = false;
+
+    mutable std::string resolvedName;
+
+    mutable bool requiresReceiver = false;
 };
 
 
@@ -1148,6 +1152,10 @@ struct FunctionDeclaration final : Statement {
     std::string moduleName;
 
     std::string internalName;
+
+    std::string ownerClass;
+
+    std::string namespaceName;
 
     bool hasReturnType() const {
         return returnType != nullptr;

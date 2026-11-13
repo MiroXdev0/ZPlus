@@ -28,7 +28,7 @@
 
 namespace zplus {
 
-constexpr const char* VERSION = "1.1.2";
+constexpr const char* VERSION = "1.1.4";
 constexpr const char* COMPILER_NAME = "Z+ Compiler";
 constexpr const char* EXECUTABLE_NAME = "zp";
 
@@ -108,6 +108,79 @@ bool readSourceLine(
     return true;
 }
 
+std::string diagnosticCategory(
+    const std::string& code,
+    const std::string& message
+) {
+    if (code == "E1000") return "Lexical error";
+    if (code == "E1001") return "Syntax error";
+    if (code == "E3001") return "Module/import error";
+    if (code != "E2001") return "Compiler error";
+
+    if (message.find("undefined function") != std::string::npos) {
+        return "Undefined function";
+    }
+    if (message.find("undefined variable") != std::string::npos ||
+        message.find("undefined identifier") != std::string::npos) {
+        return "Undefined name";
+    }
+    if (message.find("__zstdlib_") != std::string::npos ||
+        message.find("standard-library") != std::string::npos ||
+        message.find("builtin") != std::string::npos) {
+        return "Standard-library call error";
+    }
+    if (message.find("member") != std::string::npos ||
+        message.find("field") != std::string::npos ||
+        message.find("class") != std::string::npos ||
+        message.find("method") != std::string::npos) {
+        return "Member access error";
+    }
+    if (message.find("argument") != std::string::npos ||
+        message.find("expects") != std::string::npos ||
+        message.find("too many") != std::string::npos ||
+        message.find("not enough") != std::string::npos) {
+        return "Function argument error";
+    }
+    if (message.find("type") != std::string::npos ||
+        message.find("returns") != std::string::npos ||
+        message.find("assign") != std::string::npos ||
+        message.find("must be a number") != std::string::npos ||
+        message.find("expects an array") != std::string::npos) {
+        return "Type error";
+    }
+    return "Semantic error";
+}
+
+std::string diagnosticSuggestion(
+    const std::string& code,
+    const std::string& message
+) {
+    if (code != "E1001") return {};
+    if (message.find("expected ':'") != std::string::npos) {
+        return "Add ':' at the indicated location.";
+    }
+    if (message.find("expected ')'") != std::string::npos) {
+        if (message.find("RightBracket") != std::string::npos ||
+            message.find("found ']'") != std::string::npos) {
+            return "Replace ']' with ')'.";
+        }
+        return "Add ')' to close the expression.";
+    }
+    if (message.find("expected ']'") != std::string::npos) {
+        return "Add ']' to close the index or array.";
+    }
+    if (message.find("expected '}'") != std::string::npos) {
+        return "Add '}' to close the block.";
+    }
+    if (message.find("expected 'end'") != std::string::npos) {
+        return "Add 'end' to close the block.";
+    }
+    if (message.find("expected 'stop'") != std::string::npos) {
+        return "Add 'stop' to close the start block.";
+    }
+    return {};
+}
+
 // ============================================================
 // Console
 // ============================================================
@@ -144,6 +217,7 @@ void usage() {
         << "Options:\n"
         << "  -o <file>    Set native executable output path (build only)\n"
         << "  --windows-gui  Use the Windows GUI subsystem (Windows builds only)\n"
+        << "  --source-stdin  Read check source from standard input\n"
         << "  -h, --help   Show this help message\n\n"
 
         << "Examples:\n"
@@ -166,16 +240,27 @@ void printError(
     const std::string& code = "E0001"
 ) {
 
+    const std::string category = diagnosticCategory(code, message);
+    const std::string suggestion = diagnosticSuggestion(code, message);
+    std::string sourceLine;
+    if (!sourceFile.empty() && line > 0) {
+        readSourceLine(sourceFile, line, sourceLine);
+    }
+
     if (diagnosticsJson) {
         std::cerr << "{\"severity\":\"error\",\"code\":\""
                   << jsonEscape(code) << "\",\"message\":\""
-                  << jsonEscape(message) << "\",\"file\":\""
+                  << jsonEscape(message) << "\",\"category\":\""
+                  << jsonEscape(category) << "\",\"file\":\""
                   << jsonEscape(sourceFile) << "\",\"line\":" << line
-                  << ",\"column\":" << column << "}\n";
+                  << ",\"column\":" << column << ",\"sourceLine\":\""
+                  << jsonEscape(sourceLine) << "\",\"suggestion\":\""
+                  << jsonEscape(suggestion) << "\"}\n";
         return;
     }
 
-    std::cerr << "error[" << code << "]: " << message << '\n';
+    std::cerr << "error[" << code << "] (" << category << "): "
+              << message << '\n';
 
     if (!sourceFile.empty()) {
         std::cerr << "  --> " << sourceFile;
@@ -187,12 +272,7 @@ void printError(
         }
         std::cerr << '\n';
 
-        if (line <= 0) {
-            return;
-        }
-
-        std::string sourceLine;
-        if (readSourceLine(sourceFile, line, sourceLine)) {
+        if (line > 0 && !sourceLine.empty()) {
             const std::string expandedLine = expandTabs(sourceLine);
             std::size_t caretColumn = 0;
             std::size_t prefixLength = column > 1
@@ -213,6 +293,9 @@ void printError(
                       << std::string(lineWidth + 1, ' ') << "| "
                       << std::string(caretColumn, ' ') << "^\n";
         }
+    }
+    if (!suggestion.empty()) {
+        std::cerr << "  help: " << suggestion << '\n';
     }
 }
 
@@ -451,17 +534,8 @@ int main(
     std::filesystem::path outputPath;
     bool outputPathSet = false;
     bool windowsGui = false;
+    bool sourceFromStdin = false;
     std::vector<std::string> programArguments;
-
-
-    // ========================================================
-    // Validate input
-    // ========================================================
-
-    if (!validateInputFile(filename)) {
-        return 1;
-    }
-
 
     // ========================================================
     // Options
@@ -507,6 +581,15 @@ int main(
             continue;
         }
 
+        if (argument == "--source-stdin") {
+            if (command != "check") {
+                printError("option '--source-stdin' is valid only with the check command");
+                return 1;
+            }
+            sourceFromStdin = true;
+            continue;
+        }
+
         if (argument.starts_with("--diagnostics=")) {
             const std::string format = argument.substr(std::string("--diagnostics=").size());
             if (format != "json") {
@@ -524,13 +607,26 @@ int main(
         return 1;
     }
 
+    std::string sourceText;
+    if (sourceFromStdin) {
+        std::ostringstream input;
+        input << std::cin.rdbuf();
+        if (std::cin.bad()) {
+            printError("failed to read source from standard input");
+            return 1;
+        }
+        sourceText = input.str();
+    } else if (!validateInputFile(filename)) {
+        return 1;
+    }
+
 
     // ========================================================
     // Load module graph
     // ========================================================
 
     zplus::ModuleLoader moduleLoader;
-    auto loaded = moduleLoader.load(filename);
+    auto loaded = moduleLoader.load(filename, sourceFromStdin ? &sourceText : nullptr);
     for (const auto& diagnostic : loaded.diagnostics) {
         printError(
             diagnostic.message,

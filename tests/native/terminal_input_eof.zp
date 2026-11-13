@@ -1,0 +1,4 @@
+start {
+    let value = read()
+    say(value == "" ? "string EOF is empty" : "unexpected input")
+} stop

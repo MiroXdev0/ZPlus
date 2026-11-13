@@ -1,4 +1,5 @@
 use zgraphics
+start {
 
 pub fn startX(): number {
     return 80
@@ -11,3 +12,4 @@ pub fn startY(): number {
 pub fn drawHud(window: number, score: number) {
     zgraphics.text(window, "Score: " + zgraphics.numberText(score), 24, 386, "#F8FAFC", 16)
 } end fn
+} stop

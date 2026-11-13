@@ -23,10 +23,15 @@ internal sealed class InstallerForm : Form
     private readonly Button cancelButton;
     private readonly string logoPath;
     private readonly string licensePath;
+    private readonly System.Windows.Forms.Timer diskSpaceTimer = new() { Interval = 300 };
     private int page;
+    private int diskSpaceRequest;
     private bool installing;
+    private bool folderPickerOpen;
     private bool licenseAccepted;
+    private string selectedInstallPath = "";
     private TextBox? installPathBox;
+    private Button? browseInstallPathButton;
     private CheckBox? toolsBox;
     private CheckBox? docsBox;
     private CheckBox? examplesBox;
@@ -51,6 +56,8 @@ internal sealed class InstallerForm : Form
     {
         this.package = package;
         this.logger = logger;
+        selectedInstallPath =
+            WindowsIntegration.ExistingInstallPath() ?? WindowsIntegration.DefaultInstallPath;
         logoPath = Path.Combine(AppContext.BaseDirectory, "ZPlusLogo.png");
         licensePath = Path.Combine(AppContext.BaseDirectory, "LICENSE.txt");
         Text = "Z+ Setup";
@@ -72,7 +79,17 @@ internal sealed class InstallerForm : Form
             if (Opacity >= 1) fadeTimer.Stop();
         };
         Shown += (_, _) => fadeTimer.Start();
-        FormClosed += (_, _) => fadeTimer.Dispose();
+        diskSpaceTimer.Tick += async (_, _) =>
+        {
+            diskSpaceTimer.Stop();
+            await RefreshDiskSpaceAsync(diskSpaceRequest);
+        };
+        FormClosed += (_, args) =>
+        {
+            logger.Info($"Setup window closed: {args.CloseReason}.");
+            fadeTimer.Dispose();
+            diskSpaceTimer.Dispose();
+        };
 
         var shell = new TableLayoutPanel
         {
@@ -118,9 +135,10 @@ internal sealed class InstallerForm : Form
         backButton.Anchor = AnchorStyles.Right | AnchorStyles.Top;
         nextButton.Anchor = AnchorStyles.Right | AnchorStyles.Top;
         cancelButton.Anchor = AnchorStyles.Left | AnchorStyles.Top;
-        cancelButton.Click += (_, _) => CancelCurrentOperation();
-        backButton.Click += (_, _) => Navigate(-1);
-        nextButton.Click += async (_, _) => await NavigateNextAsync();
+        cancelButton.Click += (_, _) => DispatchToUi(CancelCurrentOperation);
+        backButton.Click += (_, _) => DispatchToUi(() => Navigate(-1));
+        nextButton.Click += (_, _) =>
+            DispatchToUi(() => _ = RunUiTaskAsync("Navigation", NavigateNextAsync));
         footer.Controls.Add(cancelButton);
         footer.Controls.Add(backButton);
         footer.Controls.Add(nextButton);
@@ -212,6 +230,7 @@ internal sealed class InstallerForm : Form
 
     private void RenderPage()
     {
+        logger.Info($"Rendering setup page {page}.");
         content.SuspendLayout();
         content.Controls.Clear();
         switch (page)
@@ -244,6 +263,7 @@ internal sealed class InstallerForm : Form
         };
         nextButton.Enabled = page != 0 || licenseAccepted;
         UpdateStepRail();
+        logger.Info($"Rendered setup page {page}.");
     }
 
     private void RenderWelcome()
@@ -291,16 +311,17 @@ internal sealed class InstallerForm : Form
             FlatStyle = FlatStyle.Flat,
             Checked = licenseAccepted
         };
-        licenseBox.CheckedChanged += (_, _) =>
+        licenseBox.CheckedChanged += (_, _) => DispatchToUi(() =>
         {
             licenseAccepted = licenseBox.Checked;
             nextButton.Enabled = licenseAccepted;
-        };
+        });
         content.Controls.Add(licenseBox);
     }
 
     private void RenderLocation()
     {
+        logger.Info("Location page: adding directory controls.");
         content.Controls.Add(Heading("Choose where Z+ will live", 20F));
         content.Controls.Add(Body(
             "Z+ installs for this Windows user. No administrator access is required.",
@@ -315,35 +336,32 @@ internal sealed class InstallerForm : Form
             ForeColor = TextPrimary,
             BorderStyle = BorderStyle.FixedSingle,
             Font = new Font(Font.FontFamily, 10.5F),
-            Text = WindowsIntegration.ExistingInstallPath() ?? WindowsIntegration.DefaultInstallPath
+            Text = selectedInstallPath
         };
-        installPathBox.TextChanged += (_, _) => UpdateDiskSpace();
+        installPathBox.TextChanged += (_, _) =>
+        {
+            selectedInstallPath = installPathBox.Text;
+            ScheduleDiskSpaceUpdate();
+        };
         content.Controls.Add(installPathBox);
         var browse = MakeButton("Browse…", primary: false);
+        browseInstallPathButton = browse;
         browse.Location = new Point(500, 140);
         browse.Size = new Size(108, 36);
         browse.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         browse.Click += (_, _) =>
-        {
-            using var dialog = new FolderBrowserDialog
-            {
-                Description = "Select the Z+ installation directory",
-                UseDescriptionForTitle = true,
-                ShowNewFolderButton = true,
-                InitialDirectory = Directory.Exists(installPathBox.Text)
-                    ? installPathBox.Text
-                    : Path.GetDirectoryName(installPathBox.Text) ?? ""
-            };
-            if (dialog.ShowDialog(this) == DialogResult.OK)
-                installPathBox.Text = dialog.SelectedPath;
-        };
+            DispatchToUi(() => _ = RunUiTaskAsync(
+                "Folder picker", BrowseForInstallDirectoryAsync));
         content.Controls.Add(browse);
+        logger.Info("Location page: directory controls added.");
         diskSpaceLabel = Body("", new Point(0, 188), new Size(600, 28), TextSecondary);
         content.Controls.Add(diskSpaceLabel);
         existingInstallLabel = Body("", new Point(0, 230), new Size(600, 56), Accent);
         content.Controls.Add(existingInstallLabel);
-        UpdateDiskSpace();
+        ScheduleDiskSpaceUpdate();
+        logger.Info("Location page: reading existing installation registration.");
         string? existing = WindowsIntegration.ExistingInstallPath();
+        logger.Info("Location page: existing installation registration read.");
         if (!string.IsNullOrWhiteSpace(existing))
         {
             existingInstallLabel.Text =
@@ -352,6 +370,7 @@ internal sealed class InstallerForm : Form
         content.Controls.Add(Body(
             "A non-empty directory that is not already owned by Z+ will not be overwritten.",
             new Point(0, 310), new Size(590, 50), TextSecondary));
+        logger.Info("Location page: controls complete.");
     }
 
     private void RenderComponents()
@@ -511,16 +530,8 @@ internal sealed class InstallerForm : Form
         }
         else if (page == 1)
         {
-            try
-            {
-                _ = Path.GetFullPath(installPathBox?.Text ?? "");
-                page = 2;
-            }
-            catch (Exception error) when (error is ArgumentException or NotSupportedException)
-            {
-                ShowError(error.Message);
-                return;
-            }
+            await ValidateLocationAndContinueAsync();
+            return;
         }
         else if (page == 2)
         {
@@ -532,6 +543,209 @@ internal sealed class InstallerForm : Form
             return;
         }
         RenderPage();
+    }
+
+    private async Task BrowseForInstallDirectoryAsync()
+    {
+        if (installPathBox is null || folderPickerOpen) return;
+
+        string initialDirectory = GetBrowseInitialDirectory(installPathBox.Text);
+        folderPickerOpen = true;
+        installPathBox.Enabled = false;
+        if (browseInstallPathButton is not null)
+            browseInstallPathButton.Enabled = false;
+        backButton.Enabled = false;
+        nextButton.Enabled = false;
+        var timer = Stopwatch.StartNew();
+        try
+        {
+            logger.Info($"Opening folder picker with initial directory '{initialDirectory}'.");
+            (DialogResult result, string selectedPath) =
+                await ShowFolderBrowserAsync(initialDirectory);
+            logger.Info($"Folder picker returned '{result}' after {timer.ElapsedMilliseconds} ms.");
+            if (result == DialogResult.OK)
+            {
+                selectedInstallPath = selectedPath;
+                logger.Info($"Selected installation directory '{selectedInstallPath}'.");
+                if (!IsDisposed && installPathBox is not null)
+                    installPathBox.Text = selectedInstallPath;
+            }
+        }
+        catch (Exception error)
+        {
+            logger.Error($"The installation folder picker failed: {error}");
+            if (!IsDisposed)
+                ShowError($"Could not open the folder-selection dialog: {error.Message}");
+        }
+        finally
+        {
+            folderPickerOpen = false;
+            if (!IsDisposed && page == 1)
+            {
+                if (installPathBox is not null) installPathBox.Enabled = true;
+                if (browseInstallPathButton is not null)
+                    browseInstallPathButton.Enabled = true;
+                backButton.Enabled = true;
+                nextButton.Enabled = true;
+            }
+        }
+    }
+
+    private static Task<(DialogResult Result, string SelectedPath)> ShowFolderBrowserAsync(
+        string initialDirectory)
+    {
+        var completion = new TaskCompletionSource<(DialogResult, string)>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var pickerThread = new Thread(() =>
+        {
+            try
+            {
+                using var dialog = new FolderBrowserDialog
+                {
+                    Description = "Select the Z+ installation directory",
+                    UseDescriptionForTitle = true,
+                    ShowNewFolderButton = true,
+                    InitialDirectory = initialDirectory
+                };
+                DialogResult result = dialog.ShowDialog();
+                completion.TrySetResult((result, dialog.SelectedPath));
+            }
+            catch (Exception error)
+            {
+                completion.TrySetException(error);
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "Z+ folder picker"
+        };
+        pickerThread.SetApartmentState(ApartmentState.STA);
+        pickerThread.Start();
+        return completion.Task;
+    }
+
+    private static string GetBrowseInitialDirectory(string path)
+    {
+        try
+        {
+            string fullPath = Path.GetFullPath(path.Trim());
+            return Path.GetDirectoryName(fullPath)
+                ?? Path.GetPathRoot(fullPath)
+                ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        }
+        catch (Exception error) when (error is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        }
+    }
+
+    private void DispatchToUi(Action action)
+    {
+        if (IsDisposed || !IsHandleCreated) return;
+        if (!InvokeRequired)
+        {
+            action();
+            return;
+        }
+
+        try
+        {
+            BeginInvoke(action);
+        }
+        catch (InvalidOperationException error)
+        {
+            logger.Error($"Could not dispatch an installer action to the UI thread: {error}");
+        }
+    }
+
+    private async Task RunUiTaskAsync(string operation, Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (Exception error)
+        {
+            logger.Error($"{operation} failed: {error}");
+            if (!IsDisposed) ShowError(error.Message);
+        }
+    }
+
+    private async Task ValidateLocationAndContinueAsync()
+    {
+        string path = installPathBox?.Text ?? "";
+        nextButton.Enabled = false;
+        backButton.Enabled = false;
+        if (browseInstallPathButton is not null) browseInstallPathButton.Enabled = false;
+        try
+        {
+            ValidatedInstallLocation location =
+                await Task.Run(() => InstallEngine.ValidateLocation(path));
+            selectedInstallPath = location.Path;
+            if (installPathBox is not null) installPathBox.Text = location.Path;
+            logger.Info($"Installation location validated: '{location.Path}'.");
+            page = 2;
+            RenderPage();
+        }
+        catch (Exception error)
+        {
+            logger.Error($"Installation location validation failed for '{path}': {error}");
+            ShowError(error.Message);
+        }
+        finally
+        {
+            if (page == 1)
+            {
+                nextButton.Enabled = true;
+                backButton.Enabled = true;
+                if (browseInstallPathButton is not null)
+                    browseInstallPathButton.Enabled = true;
+            }
+        }
+    }
+
+    private void ScheduleDiskSpaceUpdate()
+    {
+        if (diskSpaceLabel is null || installPathBox is null) return;
+        diskSpaceRequest++;
+        diskSpaceLabel.Text = "Checking available disk space…";
+        diskSpaceTimer.Stop();
+        diskSpaceTimer.Start();
+    }
+
+    private async Task RefreshDiskSpaceAsync(int request)
+    {
+        if (diskSpaceLabel is null || installPathBox is null) return;
+        string path = installPathBox.Text;
+        string message;
+        try
+        {
+            message = await Task.Run(() => GetDiskSpaceMessage(path));
+        }
+        catch (Exception error)
+        {
+            logger.Error($"Could not read disk space for '{path}': {error}");
+            message = $"Available disk space could not be determined: {error.Message}";
+        }
+
+        if (IsDisposed || request != diskSpaceRequest || diskSpaceLabel is null) return;
+        diskSpaceLabel.Text = message;
+    }
+
+    private static string GetDiskSpaceMessage(string path)
+    {
+        string fullPath = Path.GetFullPath(path.Trim());
+        string root = Path.GetPathRoot(fullPath)
+            ?? throw new IOException("Cannot determine the installation drive.");
+        if (root.StartsWith(@"\\", StringComparison.Ordinal))
+            return "Network paths are not supported as installation locations.";
+
+        var drive = new DriveInfo(root);
+        if (drive.DriveType == DriveType.Network)
+            return "Network paths are not supported as installation locations.";
+        return drive.IsReady
+            ? $"Available disk space: {drive.AvailableFreeSpace / (1024d * 1024d):N0} MiB on {root}"
+            : "Available disk space cannot be determined until the destination drive is ready.";
     }
 
     private void Navigate(int delta)
@@ -560,8 +774,9 @@ internal sealed class InstallerForm : Form
             ReplaceModifiedFiles: replaceModified);
         try
         {
-            completedRecord = await new InstallEngine(package, logger).InstallAsync(
-                options, progress, cancellation.Token);
+            completedRecord = await Task.Run(() =>
+                new InstallEngine(package, logger).InstallAsync(
+                    options, progress, cancellation.Token));
             page = 5;
             RenderPage();
         }
@@ -649,26 +864,6 @@ internal sealed class InstallerForm : Form
         progressBar.Value = (int)Math.Min(100, bounded * 100 / progress.TotalBytes);
     }
 
-    private void UpdateDiskSpace()
-    {
-        if (diskSpaceLabel is null || installPathBox is null) return;
-        try
-        {
-            string full = Path.GetFullPath(installPathBox.Text.Trim());
-            string root = Path.GetPathRoot(full)
-                ?? throw new IOException("Cannot determine the installation drive.");
-            var drive = new DriveInfo(root);
-            diskSpaceLabel.Text = drive.IsReady
-                ? $"Available disk space: {drive.AvailableFreeSpace / (1024d * 1024d):N0} MiB on {root}"
-                : "Available disk space cannot be determined until the destination drive is ready.";
-        }
-        catch (Exception error) when (error is ArgumentException or IOException or
-                                       UnauthorizedAccessException or NotSupportedException)
-        {
-            diskSpaceLabel.Text = $"Available disk space: unavailable ({error.Message})";
-        }
-    }
-
     private void CancelCurrentOperation()
     {
         if (installing)
@@ -710,7 +905,9 @@ internal sealed class InstallerForm : Form
     private void ShowError(string message)
     {
         logger.Error(message);
-        MessageBox.Show(message, "Z+ Setup", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        MessageBox.Show(
+            $"{message}\n\nDetails were written to:\n{logger.Path}",
+            "Z+ Setup", MessageBoxButtons.OK, MessageBoxIcon.Warning);
     }
 
     private void LayoutFooterButtons()

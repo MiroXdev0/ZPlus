@@ -1,0 +1,8 @@
+start {
+    class Counter {
+        value: number = 0
+    } end class
+
+    let counter = Counter()
+    say(counter.missing)
+} stop

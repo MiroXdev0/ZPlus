@@ -10,6 +10,7 @@ use "../components/integration.zh" as integration
 use "../components/verification.zh" as verification
 use "layout.zh" as layout
 use "../window.zh" as windowFactory
+start {
 
 fn isEmpty(value: string): boolean {
     return text.length(value) == 0
@@ -243,3 +244,4 @@ pub fn run(payloadDirectory: string, payloadManifest: string) {
     } end while
     graphics.close(app)
 } end fn
+} stop
