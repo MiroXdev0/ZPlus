@@ -6,7 +6,7 @@ do not manually free these values.
 ```zp
 use zmemory.management
 
-start:
+start {
     let name = "Z+" + " language"
     let numbers: number[] = [10, 20, 30]
 
@@ -17,7 +17,7 @@ start:
 
     zmemory.collect()
     say(zmemory.collectionCount())
-stop
+} stop
 ```
 
 `use zmemory.management` resolves the standard module without a source-file

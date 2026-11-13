@@ -1,0 +1,39 @@
+pub fn copyFile(source: string, destination: string, overwrite: boolean): boolean {
+    return __zstdlib_file_copyFile(source, destination, overwrite)
+} end fn
+
+pub fn moveFile(source: string, destination: string, overwrite: boolean): boolean {
+    return __zstdlib_file_moveFile(source, destination, overwrite)
+} end fn
+
+pub fn removeEmptyDirectory(path: string): boolean {
+    return __zstdlib_file_removeEmptyDirectory(path)
+} end fn
+
+pub fn exists(path: string): boolean {
+    return __zstdlib_file_exists(path)
+} end fn
+
+pub fn isDirectory(path: string): boolean {
+    return __zstdlib_file_isDirectory(path)
+} end fn
+
+pub fn createDirectory(path: string): boolean {
+    return __zstdlib_file_createDirectory(path)
+} end fn
+
+pub fn listDirectory(path: string): string[] {
+    return __zstdlib_file_listDirectory(path)
+} end fn
+
+pub fn deleteFile(path: string): boolean {
+    return __zstdlib_file_delete(path)
+} end fn
+
+pub fn scheduleDeleteOnReboot(path: string): boolean {
+    return __zstdlib_file_scheduleDeleteOnReboot(path)
+} end fn
+
+pub fn size(path: string): number {
+    return __zstdlib_file_size(path)
+} end fn

@@ -1,27 +1,27 @@
-pub fn read(path: string) -> string:
+pub fn read(path: string): string {
     return __zstdlib_file_read(path)
-end
-pub fn write(path: string, contents: string):
+} end fn
+pub fn write(path: string, contents: string) {
     __zstdlib_file_write(path, contents)
-end
-pub fn append(path: string, contents: string):
+} end fn
+pub fn append(path: string, contents: string) {
     __zstdlib_file_append(path, contents)
-end
-pub fn exists(path: string) -> boolean:
+} end fn
+pub fn exists(path: string): boolean {
     return __zstdlib_file_exists(path)
-end
-pub fn delete(path: string) -> boolean:
+} end fn
+pub fn delete(path: string): boolean {
     return __zstdlib_file_delete(path)
-end
-pub fn createDirectory(path: string) -> boolean:
+} end fn
+pub fn createDirectory(path: string): boolean {
     return __zstdlib_file_createDirectory(path)
-end
-pub fn listDirectory(path: string) -> string[]:
+} end fn
+pub fn listDirectory(path: string): string[] {
     return __zstdlib_file_listDirectory(path)
-end
-pub fn size(path: string) -> number:
+} end fn
+pub fn size(path: string): number {
     return __zstdlib_file_size(path)
-end
-pub fn isDirectory(path: string) -> boolean:
+} end fn
+pub fn isDirectory(path: string): boolean {
     return __zstdlib_file_isDirectory(path)
-end
+} end fn

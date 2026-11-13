@@ -301,6 +301,7 @@ if(HOST_WINDOWS)
     set(missing_runtime_dir "${WORK_DIR}/missing-runtime")
     file(MAKE_DIRECTORY "${missing_runtime_dir}")
     file(COPY_FILE "${ZP}" "${missing_runtime_dir}/zp.exe")
+    file(COPY "${SOURCE_DIR}/stdlib" DESTINATION "${missing_runtime_dir}")
     execute_process(
         COMMAND "${missing_runtime_dir}/zp.exe" build
                 "${SOURCE_DIR}/tests/native/zgraphics_runtime.zp"

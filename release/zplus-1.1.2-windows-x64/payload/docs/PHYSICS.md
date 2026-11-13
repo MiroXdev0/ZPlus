@@ -6,20 +6,20 @@ ZGraphics and can run in interpreter or native programs.
 ```zp
 use zphysics
 
-start:
+start {
     let world = zphysics.createWorld(0, 980)
     let floor = zphysics.createBody(world, "static", 320, 420)
     zphysics.createBox(world, floor, 600, 20)
     let ball = zphysics.createBody(world, "dynamic", 320, 80)
     zphysics.createCircle(world, ball, 18)
 
-    for (let frame: number = 0; frame < 180; frame++):
+    for (let frame: number = 0; frame < 180; frame++) {
         zphysics.update(world, 1 / 60)
-    end
+    } end for
 
     say(zphysics.getPositionY(ball))
     zphysics.destroyWorld(world)
-stop
+} stop
 ```
 
 ## World lifecycle and stepping
@@ -117,9 +117,9 @@ world releases all of its dependent resources. A shape may be unloaded while
 the world is idle; Box2D invalidates its contacts before returning. Do not retain
 handles after destruction.
 
-Interpreter errors are reported as runtime errors. Native runtime errors are
-reported to standard error and terminate the application with a failure status.
-No Z+ code runs in Box2D worker or callback threads.
+Interpreter errors are reported as runtime errors. Native physics runtime errors
+are reported to standard error and terminate the application with a failure
+status. No Z+ code runs in Box2D worker or callback threads.
 
 ## Backends and limitations
 

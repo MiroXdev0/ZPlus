@@ -1,25 +1,25 @@
 use zgraphics
 
-pub fn horizontal(window: number) -> number:
-    if zgraphics.keyDown(window, 65) or zgraphics.keyDown(window, 97):
+pub fn horizontal(window: number): number {
+    if zgraphics.keyDown(window, 65) or zgraphics.keyDown(window, 97) {
         return -1
-    else:
-    end
-    if zgraphics.keyDown(window, 68) or zgraphics.keyDown(window, 100):
+    } else {
+    } end if
+    if zgraphics.keyDown(window, 68) or zgraphics.keyDown(window, 100) {
         return 1
-    else:
-    end
+    } else {
+    } end if
     return 0
-end
+} end fn
 
-pub fn vertical(window: number) -> number:
-    if zgraphics.keyDown(window, 87) or zgraphics.keyDown(window, 119):
+pub fn vertical(window: number): number {
+    if zgraphics.keyDown(window, 87) or zgraphics.keyDown(window, 119) {
         return -1
-    else:
-    end
-    if zgraphics.keyDown(window, 83) or zgraphics.keyDown(window, 115):
+    } else {
+    } end if
+    if zgraphics.keyDown(window, 83) or zgraphics.keyDown(window, 115) {
         return 1
-    else:
-    end
+    } else {
+    } end if
     return 0
-end
+} end fn

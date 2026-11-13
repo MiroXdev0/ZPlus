@@ -25,11 +25,18 @@ Native programs that use runtime APIs may require the applicable runtime DLLs
 to remain beside the generated executable; ZBuild stages required runtimes
 for supported project targets.
 
+Windows installer bundles
+-------------------------
+installer\ZPlus-1.1.2-Setup.exe is the .NET GUI setup package. The
+installer\zplus-native\setup.exe bundle is the Z+-based GUI installer. Each
+installer directory includes its own payload and required dependencies.
+
 Documentation is in SYNTAX.md, MODULES.md, NATIVE_BACKEND.md, docs\, and
 stdlib\README.md. Starter projects are in zbuild-templates\. The examples\
 directory contains sample Z+ programs.
 
-The native compiler target is Windows x64. Some language APIs and features
+The portable compiler target is Windows x64. Some language APIs and features
 are interpreter-only or platform-specific; see NATIVE_BACKEND.md and
-docs\BACKEND.md for current limits. Native try/catch/throw/defer are not
-supported and are rejected during native compilation.
+docs\BACKEND.md for current limits. Native try/catch/throw/defer are supported
+for Z+ function calls and scoped cleanup. Native runtime APIs are platform
+specific; consult NATIVE_BACKEND.md for the current subset.

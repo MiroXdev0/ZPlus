@@ -7,10 +7,10 @@ independent of the current working directory. Import with an alias:
 use zmath as math
 use zstring as text
 
-start:
+start {
     let total: number = math.sqrt(144) + math.pow(2, 3)
     say(text.upper("ready"))
-stop
+} stop
 ```
 
 `use zmath` resolves to `stdlib/zmath/zmath.zh`. Dotted paths such as
@@ -154,18 +154,39 @@ threshold are filtered. Output includes a local-time timestamp and severity.
 An empty output path selects standard output; a non-empty path opens an
 append-mode file. File and console write failures are errors.
 
-## Unsupported modules
+## Additional modules
 
-There are no `zjson`, `zhttp`, `zregex`, `zencoding`, `zcompression`, or
-`zsystem` modules yet. Z+ does not currently have a dynamic object/map value
-model for JSON objects or HTTP response records; publishing string-only
-placeholders would misrepresent support. HTTP and JSON are therefore not
-implemented in either backend.
+The standard-library tree also contains source modules for `zjson`, `zhttp`,
+`zsqlite`, `zcrypto`, `zfilesystem`, `zprocess`, `zregistry`, and `zsystem`.
+These provide string-based JSON helpers, HTTP client/server calls, SQLite
+operations, SHA-256 file hashing, filesystem operations, process execution,
+Windows registry integration, and platform/system helpers. Their wrappers
+are real APIs, not placeholder modules; individual runtime operations may
+still be platform-specific or unsupported by a given backend. For JSON,
+objects are exchanged as JSON strings rather than a dynamic object value.
+Modules such as `zregex`, `zcompression`, `zencoding`, `zoption`, and
+`zresult` are not currently provided; there are no empty stubs for them.
 
-The existing `stdlib/math/math.zh` remains a small source module with `abs`,
-`min`, `max`, and `clamp`. `zgraphics` and `zmemory.management` are documented
-in [ZGraphics](../ZGraphics/README.md) and
-[managed memory](../docs/memory-management.md).
+`zaudio` and `zphysics` provide the APIs documented in
+[AUDIO.md](../docs/AUDIO.md) and [PHYSICS.md](../docs/PHYSICS.md).
+`zgraphics` is documented in [ZGraphics](../ZGraphics/README.md), and
+`zmemory.management` in [managed memory](../docs/memory-management.md).
+`stdlib/math/math.zh` retains the source-level `abs`, `min`, `max`, and
+`clamp` helpers.
+
+## Compatibility and backend support
+
+The `collections`, `graphics`, `io`, `math`, and `memory` directories are
+legacy compatibility locations, not additional complete modules. Import the
+documented `z...` module names for supported APIs.
+
+The interpreter and Windows x64 native runtime are the primary tested
+execution targets. Runtime coverage is module-specific: CTest includes
+interpreter/native integration for core modules and platform APIs, and
+Windows-only tests exercise installer integrations. Merely importing a
+module validates its source and name resolution; it does not prove every API
+call is supported. Linux native availability varies by runtime and is not
+certified by the Windows test suite.
 
 ## Backend support summary
 
@@ -176,7 +197,8 @@ in [ZGraphics](../ZGraphics/README.md) and
 | `zrandom` | Yes | Integer/bool/array APIs; `number` errors | Unsupported |
 | `zcollections` | Yes | Numeric arrays; integer numbers | Unsupported |
 | `zfile`, `zpath`, `zenv`, `ztime`, `zargs`, `zlog` | Yes | Yes, with integer-only native numbers | Unsupported |
-| `zjson`, `zhttp` and advanced modules | Unsupported | Unsupported | Unsupported |
+| `zaudio`, `zgraphics`, `zphysics` | Yes | Windows x64 runtime integrations; see the linked module documentation | Platform-specific |
+| `zjson`, `zhttp`, `zsqlite`, installer/system modules | Runtime bindings exist; see module API and tests | Runtime and platform coverage is per operation | Platform-specific |
 
 Native standard-library calls use the packaged `zgraphics_runtime.dll`; keep
 it beside the generated executable. The API wrappers do not add a C++ source

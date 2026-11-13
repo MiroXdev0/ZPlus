@@ -31,7 +31,17 @@ Every local and IR temporary currently receives a stack slot; this is a simple r
 
 The backend rejects unsupported IR explicitly. In particular, class instances/method calls, pointers/references, arbitrary external functions, and floating-point output through the Linux syscall-only runtime are not implemented. Struct construction and member access execute in the interpreter and Windows x64 native backend; Linux native struct operations are rejected rather than falling back to interpretation. Windows native arrays and structs use the packaged runtime's non-moving tracing heap. Tagged handles remain stable; generated functions register active local slots, and the entry registers module globals. The collector traces nested array, struct, and managed-string references; numeric array elements remain untagged double payloads. Array/struct creation and array capacity growth temporarily root input values. Bounds failures and invalid array operations terminate with a descriptive native runtime error. Linux native array and managed-memory operations are rejected explicitly. Module variables/constants have one 64-bit native storage slot each; initialization runs through a generated module-initializer function before the entry function.
 
-On Windows x64, the complete `zgraphics` module is callable from native Z+ programs. Native builds import the real ZGraphics C++ implementation through a small C ABI adapter; the interpreter remains unchanged. Each output directory receives `zgraphics_runtime.dll` beside the generated `.exe`. Keep the two files together when running or distributing the application. The DLL statically links the MSVC C++ runtime and uses only Windows system libraries (Kernel32, User32, and GDI32). The executable is a native PE console-subsystem program that opens actual desktop windows; it does not interpret source at runtime. Runtime API errors are written to standard error and terminate the application with a nonzero exit code. The backend does not silently fall back to `zp run`.
+Native `try`, `catch`, `throw`, and `defer` are supported for direct Z+ function
+calls, including nested handlers, caller-side propagation, rethrowing, early
+returns, and LIFO cleanup on normal and exceptional exits. Native runtime API
+failures from the Windows graphics/standard-library runtime enter the same
+exception path. The shared regression fixture
+`tests/runtime/error_handling.zp` is executed by both interpreter and Windows
+native backends and checks matching output. Uncaught native exceptions are
+reported and exit with status 1. Linux exception/defer execution has not been
+validated on a Linux host.
+
+On Windows x64, the complete `zgraphics` module is callable from native Z+ programs. Native builds import the real ZGraphics C++ implementation through a small C ABI adapter; the interpreter remains unchanged. Each output directory receives `zgraphics_runtime.dll` beside the generated `.exe`. Keep the two files together when running or distributing the application. The DLL statically links the MSVC C++ runtime and uses only Windows system libraries (Kernel32, User32, and GDI32). The executable is a native PE console-subsystem program that opens actual desktop windows; it does not interpret source at runtime. Errors from this runtime are converted to native Z+ exceptions when a generated exception slot is available; otherwise the runtime reports them and exits. Uncaught Z+ exceptions are reported by the generated executable and exit with status 1. Audio and physics runtime errors still use their runtime-specific failure reporting. The backend does not silently fall back to `zp run`.
 
 The Windows x64 runtime also implements the standard-library calls documented
 in [stdlib/README.md](./stdlib/README.md), including numeric math, random
@@ -47,7 +57,9 @@ and in native numeric slots. Native `say`, `printz`, and `printm` format numeric
 arguments on Windows. NaN comparisons follow IEEE-754 unordered-comparison
 rules, including `NaN != NaN`. Native runtime imports, managed arrays, and
 numeric output are not yet available on Linux; Linux platform parity has not
-been verified.
+been verified. Linux native ELF generation and dynamic runtime linking exist,
+but actual Linux execution has not been verified in this Windows environment.
+Structural ELF checks alone are not runtime validation.
 
 Native ZGraphics is Windows x64 only. Linux `zp build` continues to reject ZGraphics and native string concatenation with an explicit diagnostic. The graphics module itself still has the same limited controls, event loop, and drawing features on both interpreter and native paths.
 
@@ -61,10 +73,18 @@ The backend writes a PE32+ console executable with `.text` and writable `.data` 
 
 ### Linux x86-64
 
-The backend writes a static ELF64 `ET_EXEC` image with separate read-only header/data mappings and an executable code mapping. It has no dynamic loader or libc dependency. Output and process termination use Linux `write` and `exit` syscalls. User calls follow the System V AMD64 convention, with integer/pointer and SSE argument registers allocated independently. Linux native execution is not validated on this host.
+The backend writes an ELF64 `ET_EXEC` image with separate read-only header/data
+mappings and an executable code mapping. Programs without runtime imports use
+Linux `write` and `exit` syscalls and need no dynamic loader or libc. Audio and
+physics imports use the host's supported x86-64 dynamic loader and the
+`libzaudio_runtime.so` / `libzphysics_runtime.so` shared libraries, copied
+beside the executable and resolved through `$ORIGIN`. User calls follow the
+System V AMD64 convention, with integer/pointer and SSE argument registers
+allocated independently. Linux native execution is not validated on this host.
 
 ## Validation status
 
-The CTest suite builds and executes Windows PE fixtures for floating-point arithmetic, formatting, comparisons, special values, function arguments/returns, arrays and collections, standard-library runtime bindings, physics/audio, branching and loops, and module initialization. It also checks runtime error reporting, unsupported IR, runtime packaging, and PE/ELF structure. Linux ELF execution must be tested separately.
+The CTest suite builds and executes Windows PE fixtures for floating-point arithmetic, formatting, comparisons, special values, function arguments/returns, arrays and collections, standard-library runtime bindings, physics/audio, branching and loops, module initialization, and interpreter/native exception-defer parity. It also checks runtime error reporting, unsupported IR, runtime packaging, and PE/ELF structure. Linux ELF execution must be tested separately.
 
-Linux ELF execution must be tested on a Linux host. Structural ELF checks alone do not claim that Linux runtime execution has been validated.
+Linux ELF execution must be tested on a Linux host. Structural ELF checks alone
+do not claim that Linux runtime execution has been validated.

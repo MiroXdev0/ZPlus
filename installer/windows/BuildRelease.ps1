@@ -19,6 +19,22 @@ function Invoke-Checked {
     }
 }
 
+function Copy-NonemptyTree {
+    param([string]$SourceDirectory, [string]$DestinationDirectory)
+
+    $sourceRoot = (Resolve-Path -LiteralPath $SourceDirectory).Path
+    New-Item -ItemType Directory -Path $DestinationDirectory -Force | Out-Null
+    foreach ($file in Get-ChildItem -LiteralPath $sourceRoot -File -Recurse -Force) {
+        if ($file.Length -eq 0) {
+            continue
+        }
+        $relative = [IO.Path]::GetRelativePath($sourceRoot, $file.FullName)
+        $destination = Join-Path $DestinationDirectory $relative
+        New-Item -ItemType Directory -Path (Split-Path $destination -Parent) -Force | Out-Null
+        Copy-Item -LiteralPath $file.FullName -Destination $destination
+    }
+}
+
 if (-not $SkipCompilerBuild) {
     Invoke-Checked 'cmake' @('--build', $buildDir, '--config', 'Release', '--target', 'zp', 'zbuild', '--', '/m')
 }
@@ -88,21 +104,15 @@ if (-not (Test-Path $templates -PathType Container)) {
 Copy-Item -LiteralPath $templates -Destination $binPayload -Recurse
 
 $stdlibDestination = Join-Path $payloadDir 'stdlib'
-New-Item -ItemType Directory -Path $stdlibDestination -Force | Out-Null
-foreach ($file in Get-ChildItem (Join-Path $root 'stdlib') -Recurse -File) {
-    $relative = [IO.Path]::GetRelativePath((Join-Path $root 'stdlib'), $file.FullName)
-    $destination = Join-Path $stdlibDestination $relative
-    New-Item -ItemType Directory -Path (Split-Path $destination -Parent) -Force | Out-Null
-    Copy-Item -LiteralPath $file.FullName -Destination $destination
-}
+Copy-NonemptyTree -SourceDirectory (Join-Path $root 'stdlib') -DestinationDirectory $stdlibDestination
 
 $docsDestination = Join-Path $payloadDir 'docs'
 New-Item -ItemType Directory -Path $docsDestination -Force | Out-Null
 foreach ($name in @('README.md', 'SYNTAX.md', 'MODULES.md', 'NATIVE_BACKEND.md')) {
     Copy-Item -LiteralPath (Join-Path $root $name) -Destination $docsDestination
 }
-Copy-Item -Path (Join-Path $root 'docs\*') -Destination $docsDestination -Recurse
-Copy-Item -LiteralPath (Join-Path $root 'examples') -Destination $payloadDir -Recurse
+Copy-NonemptyTree -SourceDirectory (Join-Path $root 'docs') -DestinationDirectory $docsDestination
+Copy-NonemptyTree -SourceDirectory (Join-Path $root 'examples') -DestinationDirectory (Join-Path $payloadDir 'examples')
 Copy-Item -LiteralPath (Join-Path $root 'LICENSE.txt') -Destination $payloadDir
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'THIRD-PARTY-NOTICES.txt') -Destination $payloadDir
 

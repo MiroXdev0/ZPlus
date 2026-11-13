@@ -81,6 +81,8 @@ std::size_t managedBytes = 0;
 std::size_t collectionCount = 0;
 std::size_t minimumCollectionThreshold = 64 * 1024;
 std::size_t nextCollectionThreshold = 64 * 1024;
+std::uintptr_t* nativeExceptionSlot = nullptr;
+std::string nativeExceptionMessage;
 constexpr std::uintptr_t managedStringTag = 1;
 constexpr std::uintptr_t managedArrayTag = 2;
 constexpr std::uintptr_t managedStructTag = 3;
@@ -505,7 +507,20 @@ Application& graphics() {
     return *application;
 }
 
-[[noreturn]] void fail(const char* message) noexcept {
+void fail(const char* message) noexcept {
+    if (nativeExceptionSlot) {
+        try {
+            nativeExceptionMessage = message ? message : "unknown failure";
+            *nativeExceptionSlot = reinterpret_cast<std::uintptr_t>(
+                nativeExceptionMessage.c_str());
+            return;
+        } catch (...) {
+            *nativeExceptionSlot = reinterpret_cast<std::uintptr_t>(
+                "native runtime error");
+            return;
+        }
+    }
+
     const HANDLE error = GetStdHandle(STD_ERROR_HANDLE);
     if (error && error != INVALID_HANDLE_VALUE) {
         DWORD written = 0;
@@ -525,8 +540,10 @@ Result guard(Function&& function) noexcept {
         return std::forward<Function>(function)();
     } catch (const std::exception& error) {
         fail(error.what());
+        return Result{};
     } catch (...) {
         fail("unknown failure");
+        return Result{};
     }
 }
 
@@ -574,6 +591,10 @@ const char* keepString(T&& value) {
 }
 
 } // namespace
+
+ZPLUS_GRAPHICS_API void zpg_setExceptionSlot(std::uintptr_t* slot) noexcept {
+    nativeExceptionSlot = slot;
+}
 
 ZPLUS_GRAPHICS_API std::int64_t zpg_createWindow(
     const char* title, std::int64_t width, std::int64_t height

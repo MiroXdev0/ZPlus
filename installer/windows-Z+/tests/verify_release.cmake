@@ -21,6 +21,18 @@ endif()
 if(NOT IS_DIRECTORY "${zbuild_directory}/zbuild-templates")
     message(FATAL_ERROR "The ZBuild template collection is missing")
 endif()
+foreach(runtime IN ITEMS
+        zgraphics_runtime.dll zaudio_runtime.dll zphysics_runtime.dll sqlite3.dll)
+    if(NOT EXISTS "${PAYLOAD_DIRECTORY}/bin/${runtime}")
+        message(FATAL_ERROR "The installer payload is missing ${runtime}")
+    endif()
+endforeach()
+foreach(notice IN ITEMS Box2D-LICENSE.txt miniaudio-LICENSE.txt SQLite-LICENSE.txt
+                        stb_vorbis-NOTICE.txt)
+    if(NOT EXISTS "${PAYLOAD_DIRECTORY}/THIRD-PARTY-NOTICES/${notice}")
+        message(FATAL_ERROR "The installer payload is missing third-party notice ${notice}")
+    endif()
+endforeach()
 
 execute_process(
     COMMAND "${ZP}" version

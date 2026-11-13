@@ -19,7 +19,7 @@ void require(bool condition, const char* message) {
 
 } // namespace
 
-int main() {
+int main(int, char** argv) {
     try {
         require(
             zbuild::sha256("") ==
@@ -41,7 +41,7 @@ int main() {
             setenv("ZBUILD_TEMPLATES_DIR",
                 (temporary / "custom-templates").string().c_str(), 1);
 #endif
-            zbuild::TemplateRegistry templates;
+            zbuild::TemplateRegistry templates(std::filesystem::absolute(argv[0]));
             const auto available = templates.list();
             require(available.size() == 6, "six built-in templates should be discoverable");
             const auto& game = templates.find("gAmE");

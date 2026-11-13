@@ -26,26 +26,26 @@ http.configureCors(server, "*", "GET, POST, OPTIONS", "Content-Type")
 http.serverStart(server)
 
 let serving = true
-while serving:
+while serving {
     let request = http.serverNext(server, 250)
-    if request != "":
+    if request != "" {
         let method = json.getString(request, "/method")
         let path = json.getString(request, "/path")
         let id = json.getNumber(request, "/id")
-        if method == "GET" and path == "/health":
+        if method == "GET" and path == "/health" {
             http.serverRespond(server, id, 200, "{\"content-type\":\"application/json\"}", "{\"status\":\"ok\"}")
-        else:
-            if method == "POST" and path == "/__stop":
+        } else {
+            if method == "POST" and path == "/__stop" {
                 http.serverRespond(server, id, 200, "{}", "stopping")
                 serving = false
-            else:
+            } else {
                 http.serverRespond(server, id, 404, "{}", "not found")
-            end
-        end
-    else:
+            } end if
+        } end if
+    } else {
         printz("")
-    end
-end
+    } end if
+} end while
 
 http.serverStop(server)
 ```

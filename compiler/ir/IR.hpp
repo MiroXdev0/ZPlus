@@ -72,6 +72,10 @@ struct Instruction {
     zplus::ast::Location location;
     std::size_t resultSlot = kInvalidRuntimeSlot;
     std::size_t calleeFunctionIndex = kInvalidFunctionIndex;
+    std::string scopeId;
+    std::string siteId;
+    std::size_t scopeDepth = 0;
+    std::size_t handlerScopeDepth = 0;
 
     Instruction() = default;
 
@@ -730,6 +734,7 @@ private:
     mutable std::vector<std::size_t> loopScopeDepths_;
 
     mutable std::size_t deferScopeDepth_ = 0;
+    mutable std::vector<std::string> deferScopeIds_;
 
     mutable zplus::ast::Location currentLocation_;
 };

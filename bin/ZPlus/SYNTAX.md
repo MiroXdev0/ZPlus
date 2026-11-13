@@ -11,7 +11,7 @@ The status labels used below mean:
 - **Parsed only:** syntax is recognized, but it does not pass the complete compiler pipeline.
 
 `zp check` runs lexing, parsing, semantic analysis, and IR generation. It does **not** execute the program. `zp run` performs those same steps and then runs the interpreter.
-`zp build (file) -o (file name)` builds the file in to a .exe 
+`zp build (file) -o (file name)` builds the file into a `.exe`.
 
 ## Diagnostics
 
@@ -329,9 +329,11 @@ The loop forms, `if`/`else if`/`else`, and switch dispatch are lowered through t
 
 ### Error handling and cleanup
 
-`throw expression` raises an error. The interpreter converts the value to its
-string representation and stores it in an `Error` value with a `message`
-field. A `try` requires one `catch` clause:
+`throw expression` raises an error. The interpreter converts ordinary values
+to their string representation and stores the result in an `Error` value with
+a `message` field. Throwing a caught `Error` value again preserves its
+`message`. A `try` requires one `catch` clause; the binding may be written with
+or without parentheses:
 
 ```zp
 fn divide(a: number, b: number): number {
@@ -345,7 +347,7 @@ start {
     try {
         let result = divide(10, 0)
         say(result)
-    } catch (error) {
+    } catch error {
         say(error.message)
     } end try
 } stop
@@ -370,11 +372,11 @@ scope are attempted; if one or more fail, the first cleanup failure is
 propagated after the remaining calls have run and may replace the error that
 started unwinding.
 
-The interpreter implements these behaviors. The Windows x64 native backend
-does not yet implement `try`, `catch`, `throw`, or `defer` and reports them as
-unsupported; ordinary programs without these constructs remain supported.
-Native `scope_push`/`scope_pop` markers are ignored only when the module has no
-deferred calls.
+The interpreter implements these behaviors. The Windows x64 and Linux native
+backends do not yet implement `try`, `catch`, `throw`, or `defer` and report
+them as unsupported with the source location when available; ordinary programs
+without these constructs remain supported. Native `scope_push`/`scope_pop`
+markers are ignored only when the module has no deferred calls.
 
 ## 8. Data Structures
 
@@ -454,7 +456,7 @@ start {
 
 Fields without defaults are required constructor arguments. Constructor arguments fill fields in declaration order, so required fields must precede defaulted fields. Current field defaults must be literals. Assignment, array insertion, and function argument/return passing preserve object identity; mutating an alias changes the same instance. Interpreter structs are traced by the interpreter's managed heap. Windows native structs are tagged managed references in the existing native tracing heap; collection traces references in arrays and struct fields. Fields are public; per-field visibility is not implemented.
 
-Windows x64 native programs support struct allocation, fields, identity, `is` checks, arrays and function argument/return references. Native struct execution and tracing under allocation pressure are covered by regression tests. Linux native struct operations remain explicitly unsupported, and native `.zh` struct imports have not yet been validated. Classes/methods, enums, and function values have no general runtime model. Structured error handling and `defer` execute in the interpreter but are not implemented by the Windows x64 native backend. **Structs: interpreter and Windows x64 implemented; Linux and native module-import parity incomplete. Classes/enums: partial declarations only.**
+Windows x64 native programs support struct allocation, fields, identity, `is` checks, arrays and function argument/return references. Native struct execution and tracing under allocation pressure are covered by regression tests. Native `try`, `catch`, `throw`, and `defer` support nested handlers, function-call propagation, rethrowing, early returns, and scoped LIFO cleanup; the interpreter/native regression fixture checks output parity. Linux native struct operations remain explicitly unsupported, and native `.zh` struct imports have not yet been validated. Classes/methods, enums, and function values have no general runtime model. **Structs: interpreter and Windows x64 implemented; Linux and native module-import parity incomplete. Classes/enums: partial declarations only.**
 
 ### Pointers and references
 

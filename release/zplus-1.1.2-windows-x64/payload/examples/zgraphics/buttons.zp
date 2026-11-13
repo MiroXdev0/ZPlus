@@ -1,6 +1,6 @@
 use zgraphics
 
-start:
+start {
     let app = zgraphics.createWindow("Z+ Button Demo", 520, 300)
     let clicks = 0
     zgraphics.background(app, "#18202B")
@@ -10,27 +10,27 @@ start:
     zgraphics.text(app, "Click the blue button to update this message.", 40, 210, "#A7F3D0", 18)
     zgraphics.show(app)
 
-    while true:
+    while true {
         let event = zgraphics.waitEvent(app)
-        if event == 1:
+        if event == 1 {
             break
-        else:
-        end
-        if event == 2:
+        } else {
+        } end if
+        if event == 2 {
             let x = zgraphics.eventX(app)
             let y = zgraphics.eventY(app)
-            if x >= 40 and x <= 250 and y >= 100 and y <= 162:
+            if x >= 40 and x <= 250 and y >= 100 and y <= 162 {
                 clicks += 1
                 say("button clicked")
                 zgraphics.rectangle(app, 30, 190, 450, 55, "#18202B", true, 1)
-                if clicks == 1:
+                if clicks == 1 {
                     zgraphics.text(app, "Button clicked!", 40, 210, "#A7F3D0", 22)
-                else:
+                } else {
                     zgraphics.text(app, "Button clicked again!", 40, 210, "#A7F3D0", 22)
-                end
-            else:
-            end
-        else:
-        end
-    end
-stop
+                } end if
+            } else {
+            } end if
+        } else {
+        } end if
+    } end while
+} stop

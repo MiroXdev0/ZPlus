@@ -1,0 +1,152 @@
+use zgraphics
+
+fn calculate(left: number, right: number, operation: number): number {
+    if operation == 1 {
+        return left + right
+    } else {
+    } end if
+    if operation == 2 {
+        return left - right
+    } else {
+    } end if
+    if operation == 3 {
+        return left * right
+    } else {
+    } end if
+    if operation == 4 and right != 0 {
+        return left / right
+    } else {
+    } end if
+    return right
+} end fn
+
+fn drawKey(app: number, x: number, y: number, label: string) {
+    zgraphics.rectangle(app, x, y, 62, 42, "#334155", true, 1)
+    zgraphics.text(app, label, x + 20, y + 9, "#FFFFFF", 18)
+} end fn
+
+start {
+    let app = zgraphics.createWindow("Z+ Pocket Calculator", 300, 400)
+    let current = 0
+    let total = 0
+    let operation = 0
+    zgraphics.background(app, "#111827")
+    zgraphics.rectangle(app, 20, 28, 250, 54, "#1F2937", true, 1)
+    zgraphics.text(app, "0", 32, 40, "#A7F3D0", 24)
+    drawKey(app, 20, 105, "7")
+    drawKey(app, 95, 105, "8")
+    drawKey(app, 170, 105, "9")
+    drawKey(app, 20, 155, "4")
+    drawKey(app, 95, 155, "5")
+    drawKey(app, 170, 155, "6")
+    drawKey(app, 20, 205, "1")
+    drawKey(app, 95, 205, "2")
+    drawKey(app, 170, 205, "3")
+    drawKey(app, 20, 255, "0")
+    drawKey(app, 95, 255, "C")
+    drawKey(app, 170, 255, "+")
+    drawKey(app, 20, 305, "-")
+    drawKey(app, 95, 305, "x")
+    drawKey(app, 170, 305, "=")
+    zgraphics.show(app)
+
+    while true {
+        let event = zgraphics.waitEvent(app)
+        if event == 1 {
+            break
+        } else {
+        } end if
+        if event == 2 {
+            let x = zgraphics.eventX(app)
+            let y = zgraphics.eventY(app)
+            let digit = -1
+            let selectedOperation = 0
+            if y >= 105 and y < 147 {
+                if x < 82 {
+                    digit = 7
+                } else {
+                    if x < 157 {
+                        digit = 8
+                    } else {
+                        digit = 9
+                    } end if
+                } end if
+            } else {
+                if y >= 155 and y < 197 {
+                    if x < 82 {
+                        digit = 4
+                    } else {
+                        if x < 157 {
+                            digit = 5
+                        } else {
+                            digit = 6
+                        } end if
+                    } end if
+                } else {
+                    if y >= 205 and y < 247 {
+                        if x < 82 {
+                            digit = 1
+                        } else {
+                            if x < 157 {
+                                digit = 2
+                            } else {
+                                digit = 3
+                            } end if
+                        } end if
+                    } else {
+                        if y >= 255 and y < 297 {
+                            if x < 82 {
+                                digit = 0
+                            } else {
+                                if x < 157 {
+                                    current = 0
+                                    total = 0
+                                    operation = 0
+                                } else {
+                                    selectedOperation = 1
+                                } end if
+                            } end if
+                        } else {
+                            if y >= 305 and y < 347 {
+                                if x < 82 {
+                                    selectedOperation = 2
+                                } else {
+                                    if x < 157 {
+                                        selectedOperation = 3
+                                    } else {
+                                        if operation != 0 {
+                                            total = calculate(total, current, operation)
+                                            current = total
+                                            operation = 0
+                                        } else {
+                                        } end if
+                                        say(zgraphics.numberText(current))
+                                    } end if
+                                } end if
+                            } else {
+                            } end if
+                        } end if
+                    } end if
+                } end if
+            } end if
+
+            if digit >= 0 {
+                current = current * 10 + digit
+            } else {
+            } end if
+            if selectedOperation != 0 {
+                if operation == 0 {
+                    total = current
+                } else {
+                    total = calculate(total, current, operation)
+                } end if
+                current = 0
+                operation = selectedOperation
+            } else {
+            } end if
+            zgraphics.rectangle(app, 20, 28, 250, 54, "#1F2937", true, 1)
+            zgraphics.text(app, zgraphics.numberText(current), 32, 40, "#A7F3D0", 24)
+        } else {
+        } end if
+    } end while
+} stop

@@ -13,11 +13,11 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ZPlus-1.1.2-Setup")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e18777a047237aa6c125efbd67de6113b4dfdf49")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6d6f52170e00ebdfc0525ef3ec10951d220aa0f1")]
 [assembly: System.Reflection.AssemblyProductAttribute("ZPlus-1.1.2-Setup")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ZPlus-1.1.2-Setup")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyMetadata("ZPlusPackageManifestSha256", "DEE2ED7C5461D86F04E85DD91205A5D54B62AF01B1D89363DC492EEFE5919AE3")]
+[assembly: System.Reflection.AssemblyMetadata("ZPlusPackageManifestSha256", "0769A7D9C35A2638C779E6EC71D4A24A580A103D47F2E646859501CEDD6654B1")]
 [assembly: System.Runtime.Versioning.TargetPlatformAttribute("Windows7.0")]
 [assembly: System.Runtime.Versioning.SupportedOSPlatformAttribute("Windows7.0")]
 

@@ -11,7 +11,7 @@ The status labels used below mean:
 - **Parsed only:** syntax is recognized, but it does not pass the complete compiler pipeline.
 
 `zp check` runs lexing, parsing, semantic analysis, and IR generation. It does **not** execute the program. `zp run` performs those same steps and then runs the interpreter.
-`zp build (file) -o (file name)` builds the file in to a .exe 
+`zp build (file) -o (file name)` builds the file into a `.exe`.
 
 ## Diagnostics
 
@@ -456,7 +456,7 @@ start {
 
 Fields without defaults are required constructor arguments. Constructor arguments fill fields in declaration order, so required fields must precede defaulted fields. Current field defaults must be literals. Assignment, array insertion, and function argument/return passing preserve object identity; mutating an alias changes the same instance. Interpreter structs are traced by the interpreter's managed heap. Windows native structs are tagged managed references in the existing native tracing heap; collection traces references in arrays and struct fields. Fields are public; per-field visibility is not implemented.
 
-Windows x64 native programs support struct allocation, fields, identity, `is` checks, arrays and function argument/return references. Native struct execution and tracing under allocation pressure are covered by regression tests. Linux native struct operations remain explicitly unsupported, and native `.zh` struct imports have not yet been validated. Classes/methods, enums, and function values have no general runtime model. Structured error handling and `defer` execute in the interpreter but are not implemented by the Windows x64 native backend. **Structs: interpreter and Windows x64 implemented; Linux and native module-import parity incomplete. Classes/enums: partial declarations only.**
+Windows x64 native programs support struct allocation, fields, identity, `is` checks, arrays and function argument/return references. Native struct execution and tracing under allocation pressure are covered by regression tests. Native `try`, `catch`, `throw`, and `defer` support nested handlers, function-call propagation, rethrowing, early returns, and scoped LIFO cleanup; the interpreter/native regression fixture checks output parity. Linux native struct operations remain explicitly unsupported, and native `.zh` struct imports have not yet been validated. Classes/methods, enums, and function values have no general runtime model. **Structs: interpreter and Windows x64 implemented; Linux and native module-import parity incomplete. Classes/enums: partial declarations only.**
 
 ### Pointers and references
 

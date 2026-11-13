@@ -8,9 +8,9 @@
 use zaudio
 
 zaudio.initialize()
-if zaudio.initialized():
+if zaudio.initialized() {
     say("Audio is ready")
-end
+} end if
 zaudio.shutdown()
 ```
 

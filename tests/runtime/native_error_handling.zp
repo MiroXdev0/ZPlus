@@ -1,0 +1,73 @@
+fn fail() {
+    throw "boom"
+} end fn
+
+fn failCleanup() {
+    throw "cleanup failure"
+} end fn
+
+fn rethrow(error: Error) {
+    throw error
+} end fn
+
+fn returnWithCleanup(): number {
+    defer {
+        say("return cleanup")
+    } end defer
+    defer {
+        say("last")
+    } end defer
+    return 7
+} end fn
+
+start {
+    defer {
+        say("outer")
+    } end defer
+
+    try {
+        try {
+            defer {
+                say("try cleanup")
+            } end defer
+            fail()
+        } catch inner {
+            say("inner: " + inner.message)
+            throw "raised again"
+        } end try
+    } catch outer {
+        say(outer.message)
+    } end try
+
+    if true {
+        defer {
+            say("nested")
+        } end defer
+    } end if
+
+    let value = returnWithCleanup()
+    say(value)
+
+    try {
+        try {
+            defer {
+                failCleanup()
+            } end defer
+            throw "original failure"
+        } catch inner {
+            say("inner handler should be bypassed")
+        } end try
+    } catch cleanup {
+        say(cleanup.message)
+    } end try
+
+    try {
+        try {
+            fail()
+        } catch first {
+            rethrow(first)
+        } end try
+    } catch second {
+        say("rethrow: " + second.message)
+    } end try
+} stop

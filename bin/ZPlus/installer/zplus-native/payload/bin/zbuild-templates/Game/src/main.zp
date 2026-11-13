@@ -1,0 +1,48 @@
+use zgraphics
+use "game/player.zh" as player
+use "game/world.zh" as world
+use "game/game_state.zh" as game_state
+use "systems/input.zh" as input
+use "systems/collision.zh" as collision
+
+start {
+    let app = zgraphics.createWindow("{{PROJECT_NAME}}", 720, 420)
+    zgraphics.background(app, "#18202B")
+    zgraphics.setTargetFPS(app, 60)
+    zgraphics.show(app)
+
+    let playerX = game_state.startX()
+    let playerY = game_state.startY()
+    let coinX = 560
+    let coinY = 220
+    let score = 0
+    let collected = false
+
+    while zgraphics.isOpen(app) {
+        zgraphics.update(app)
+        if zgraphics.keyPressed(app, 27) {
+            zgraphics.close(app)
+        } else {
+        } end if
+
+        if zgraphics.isOpen(app) {
+            playerX = player.moveX(app, playerX, input.horizontal(app))
+            playerY = player.moveY(app, playerY, input.vertical(app))
+            if not collected and collision.overlaps(playerX, playerY, 28, 28, coinX, coinY, 20, 20) {
+                collected = true
+                score += 1
+            } else {
+            } end if
+
+            zgraphics.clear(app)
+            world.draw(app)
+            if not collected {
+                zgraphics.circle(app, coinX + 10, coinY + 10, 10, "#FACC15", true, 1)
+            } else {
+            } end if
+            player.draw(app, playerX, playerY)
+            game_state.drawHud(app, score)
+        } else {
+        } end if
+    } end while
+} stop

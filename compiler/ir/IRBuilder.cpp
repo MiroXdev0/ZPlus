@@ -297,6 +297,10 @@ Module IRBuilder::build(
 
     breakTargets_.clear();
     continueTargets_.clear();
+    breakScopeDepths_.clear();
+    loopScopeDepths_.clear();
+    deferScopeDepth_ = 0;
+    deferScopeIds_.clear();
 
     Module module;
     module.name = "main";
@@ -424,7 +428,12 @@ void IRBuilder::buildProgram(
 
     BasicBlock* currentBlock =
         &entry;
-    currentBlock->emit(Instruction{"scope_push"});
+    const std::string topLevelScope = nextLabel("scope");
+    Instruction topLevelScopePush{"scope_push"};
+    topLevelScopePush.scopeId = topLevelScope;
+    topLevelScopePush.scopeDepth = deferScopeIds_.size();
+    currentBlock->emit(std::move(topLevelScopePush));
+    deferScopeIds_.push_back(topLevelScope);
     ++deferScopeDepth_;
 
     for (const auto& statement :
@@ -488,11 +497,14 @@ void IRBuilder::buildProgram(
         !blockTerminated(currentBlock)
     ) {
 
-        currentBlock->emit(Instruction{"scope_pop"});
+        Instruction topLevelScopePop{"scope_pop"};
+        topLevelScopePop.scopeId = topLevelScope;
+        currentBlock->emit(std::move(topLevelScopePop));
         currentBlock->emit(
             Instruction{"ret"}
         );
     }
+    deferScopeIds_.pop_back();
     --deferScopeDepth_;
 
     if (!moduleVariables.empty()) {
@@ -989,8 +1001,11 @@ void IRBuilder::buildReturn(
         }
     }
 
-    for (std::size_t i = 0; i < deferScopeDepth_; ++i) {
-        currentBlock->emit(Instruction{"scope_pop"});
+    for (auto scope = deferScopeIds_.rbegin();
+         scope != deferScopeIds_.rend(); ++scope) {
+        Instruction scopePop{"scope_pop"};
+        scopePop.scopeId = *scope;
+        currentBlock->emit(std::move(scopePop));
     }
 
     if (statement.hasValue && statement.value) {
@@ -1055,10 +1070,12 @@ void IRBuilder::buildTry(
         Value{catchName, Value::Kind::Identifier}
     }};
     begin.location = statement.location;
+    begin.handlerScopeDepth = deferScopeIds_.size();
     currentBlock->emit(std::move(begin));
     buildScopedStatements(statement.tryBody, module, function, currentBlock);
     if (currentBlock && !blockTerminated(currentBlock)) {
-        currentBlock->emit(Instruction{"try_pop"});
+        currentBlock->emit(Instruction{
+            "try_pop", {}, {Value{catchBlock.label, Value::Kind::Identifier}}});
         branchTo(*currentBlock, mergeBlock.label);
     }
 
@@ -1107,6 +1124,11 @@ void IRBuilder::buildDefer(
     }
     Instruction instruction{"defer_push", {}, std::move(operands)};
     instruction.location = statement.location;
+    if (deferScopeIds_.empty()) {
+        throw std::runtime_error("defer has no enclosing scope");
+    }
+    instruction.scopeId = deferScopeIds_.back();
+    instruction.siteId = nextLabel("defer");
     currentBlock->emit(std::move(instruction));
 }
 
@@ -1117,7 +1139,12 @@ void IRBuilder::buildScopedStatements(
     BasicBlock*& currentBlock
 ) const {
     if (!currentBlock) return;
-    currentBlock->emit(Instruction{"scope_push"});
+    const std::string scopeId = nextLabel("scope");
+    Instruction scopePush{"scope_push"};
+    scopePush.scopeId = scopeId;
+    scopePush.scopeDepth = deferScopeIds_.size();
+    currentBlock->emit(std::move(scopePush));
+    deferScopeIds_.push_back(scopeId);
     ++deferScopeDepth_;
     for (const auto& child : statements) {
         if (!child || !currentBlock) continue;
@@ -1125,8 +1152,11 @@ void IRBuilder::buildScopedStatements(
         if (!currentBlock || blockTerminated(currentBlock)) break;
     }
     if (currentBlock && !blockTerminated(currentBlock)) {
-        currentBlock->emit(Instruction{"scope_pop"});
+        Instruction scopePop{"scope_pop"};
+        scopePop.scopeId = scopeId;
+        currentBlock->emit(std::move(scopePop));
     }
+    deferScopeIds_.pop_back();
     --deferScopeDepth_;
 }
 
@@ -1829,8 +1859,10 @@ void IRBuilder::buildBreak(
     const std::size_t scopeDepth = breakScopeDepths_.empty()
         ? 0
         : breakScopeDepths_.back();
-    for (std::size_t i = scopeDepth; i < deferScopeDepth_; ++i) {
-        currentBlock->emit(Instruction{"scope_pop"});
+    for (std::size_t i = deferScopeIds_.size(); i > scopeDepth; --i) {
+        Instruction scopePop{"scope_pop"};
+        scopePop.scopeId = deferScopeIds_[i - 1];
+        currentBlock->emit(std::move(scopePop));
     }
 
     currentBlock->emit(
@@ -1872,8 +1904,10 @@ void IRBuilder::buildContinue(
     const std::size_t scopeDepth = loopScopeDepths_.empty()
         ? 0
         : loopScopeDepths_.back();
-    for (std::size_t i = scopeDepth; i < deferScopeDepth_; ++i) {
-        currentBlock->emit(Instruction{"scope_pop"});
+    for (std::size_t i = deferScopeIds_.size(); i > scopeDepth; --i) {
+        Instruction scopePop{"scope_pop"};
+        scopePop.scopeId = deferScopeIds_[i - 1];
+        currentBlock->emit(std::move(scopePop));
     }
 
     currentBlock->emit(
@@ -1976,9 +2010,13 @@ void IRBuilder::buildFunction(
     // --------------------------------------------------------
 
     const std::size_t savedDeferDepth = deferScopeDepth_;
+    std::vector<std::string> savedDeferScopeIds =
+        std::move(deferScopeIds_);
     deferScopeDepth_ = 0;
+    deferScopeIds_.clear();
     buildScopedStatements(statement.body, module, function, currentBlock);
     deferScopeDepth_ = savedDeferDepth;
+    deferScopeIds_ = std::move(savedDeferScopeIds);
 
 
     // --------------------------------------------------------

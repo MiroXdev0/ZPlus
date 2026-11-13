@@ -26,6 +26,11 @@ using zplus::ir::Parameter;
 using zplus::ir::Value;
 using mpp::native::MachineCode;
 
+constexpr char kPendingExceptionGlobal[] = "__zplus_native_pending_exception";
+constexpr char kActiveHandlerSlot[] = "__zp_active_exception_handler";
+constexpr char kCleanupOriginalSlot[] = "__zp_cleanup_original_exception";
+constexpr char kCleanupFirstSlot[] = "__zp_cleanup_first_exception";
+
 enum Reg : std::uint8_t {
     RAX = 0, RCX = 1, RDX = 2, RBX = 3,
     RSP = 4, RBP = 5, RSI = 6, RDI = 7,
@@ -66,6 +71,12 @@ public:
             globalOffsets_.emplace(name, data_.size());
             data_.emit64(0);
         }
+        if (globalOffsets_.contains(kPendingExceptionGlobal)) {
+            throw std::runtime_error(
+                "native backend: module variable uses a reserved exception name");
+        }
+        globalOffsets_.emplace(kPendingExceptionGlobal, data_.size());
+        data_.emit64(0);
 
         identifyManagedMemoryUse();
 
@@ -90,6 +101,25 @@ public:
     }
 
 private:
+    struct DeferredSite {
+        std::string id;
+        std::string scopeId;
+        std::string callee;
+        std::string flagSlot;
+        std::vector<std::string> argumentSlots;
+        std::vector<Value> arguments;
+        std::size_t scopeDepth = 0;
+        std::size_t sequence = 0;
+    };
+
+    struct HandlerSite {
+        std::string label;
+        std::string binding;
+        std::string previousHandlerSlot;
+        std::string caughtExceptionSlot;
+        std::size_t scopeDepth = 0;
+    };
+
     void emit8(std::uint8_t value) { code_.emit8(value); }
     void emit32(std::int32_t value) { code_.emitS32(value); }
     void emit64(std::uint64_t value) { code_.emit64(value); }
@@ -341,6 +371,27 @@ private:
         emit8(0x48);
         emit8(0x85);
         emit8(0xC0);
+    }
+
+    void testRegister(std::uint8_t reg) {
+        rex(true, reg, reg);
+        emit8(0x85);
+        modrm(3, reg, reg);
+    }
+
+    void jumpRegister(std::uint8_t reg) {
+        rex(true, 4, reg);
+        emit8(0xFF);
+        modrm(3, 4, reg);
+    }
+
+    void leaCodeLabel(std::uint8_t destination, const std::string& target) {
+        rex(true, destination, 5);
+        emit8(0x8D);
+        modrm(0, destination, 5);
+        const std::size_t offset = code_.size();
+        emit32(0);
+        branchFixups_.push_back({offset, target});
     }
 
     void setCondition(std::uint8_t condition) {
@@ -858,6 +909,7 @@ private:
             usesManagedMemory_ = true;
             usesZGraphicsRuntime_ = true;
             storeResult(instruction);
+            emitExceptionDispatch(functionName);
             return;
         }
         if (callee.rfind("__zjson_", 0) == 0) {
@@ -873,6 +925,7 @@ private:
             usesManagedMemory_ = true;
             usesZGraphicsRuntime_ = true;
             storeResult(instruction);
+            emitExceptionDispatch(functionName);
             return;
         }
         if (callee.rfind("__zhttp_", 0) == 0) {
@@ -1087,27 +1140,227 @@ private:
         throw std::runtime_error("native backend: unsupported comparison opcode '" + opcode + "'");
     }
 
+    void clearPendingException() {
+        movImm(RAX, 0);
+        storeGlobal(kPendingExceptionGlobal, RAX);
+    }
+
+    std::vector<std::string> deferSitesForUnwind(std::size_t scopeDepth) const {
+        std::vector<std::string> result;
+        for (auto site = deferredSites_.rbegin(); site != deferredSites_.rend(); ++site) {
+            if (site->scopeDepth >= scopeDepth) {
+                result.push_back(site->id);
+            }
+        }
+        return result;
+    }
+
+    void emitDeferredCleanup(
+        const std::vector<std::string>& siteIds,
+        const std::string& functionName
+    ) {
+        loadGlobal(kPendingExceptionGlobal, RAX);
+        movStore(slot(kCleanupOriginalSlot), RAX);
+        movStoreZero(slot(kCleanupFirstSlot));
+        clearPendingException();
+
+        for (const std::string& siteId : siteIds) {
+            const auto found = deferredSiteIndices_.find(siteId);
+            if (found == deferredSiteIndices_.end()) {
+                throw std::runtime_error(
+                    "native backend: unknown deferred call site '" + siteId + "'");
+            }
+            const DeferredSite& site = deferredSites_[found->second];
+            const std::string skipLabel =
+                "__zp_defer_skip_" + std::to_string(uniqueLabel_++);
+
+            movLoad(RAX, slot(site.flagSlot));
+            testRax();
+            emitJump(0x84, skipLabel);
+            movStoreZero(slot(site.flagSlot));
+
+            Instruction deferredCall{"call"};
+            deferredCall.operands.emplace_back(
+                site.callee, Value::Kind::Identifier);
+            for (const std::string& argumentSlot : site.argumentSlots) {
+                deferredCall.operands.emplace_back(
+                    argumentSlot, Value::Kind::Identifier);
+            }
+            emitCallInstruction(deferredCall, functionName);
+
+            loadGlobal(kPendingExceptionGlobal, RAX);
+            testRax();
+            emitJump(0x84, skipLabel);
+            movLoad(R10, slot(kCleanupFirstSlot));
+            testRegister(R10);
+            const std::string alreadyCaptured =
+                "__zp_defer_error_saved_" + std::to_string(uniqueLabel_++);
+            emitJump(0x85, alreadyCaptured);
+            loadGlobal(kPendingExceptionGlobal, RAX);
+            movStore(slot(kCleanupFirstSlot), RAX);
+            localLabels_[alreadyCaptured] = code_.size();
+            clearPendingException();
+            localLabels_[skipLabel] = code_.size();
+        }
+
+        const std::string useCleanupError =
+            "__zp_defer_use_error_" + std::to_string(uniqueLabel_++);
+        const std::string cleanupDone =
+            "__zp_defer_cleanup_done_" + std::to_string(uniqueLabel_++);
+        movLoad(RAX, slot(kCleanupFirstSlot));
+        testRax();
+        emitJump(0x85, useCleanupError);
+        movLoad(RAX, slot(kCleanupOriginalSlot));
+        storeGlobal(kPendingExceptionGlobal, RAX);
+        emitJump(0xFF, cleanupDone);
+        localLabels_[useCleanupError] = code_.size();
+        movLoad(RAX, slot(kCleanupFirstSlot));
+        storeGlobal(kPendingExceptionGlobal, RAX);
+        localLabels_[cleanupDone] = code_.size();
+    }
+
+    void emitExceptionReturn(const std::string& functionName) {
+        const Function* function = module_.findFunction(functionName);
+        if (function && function->returnType == "number") {
+            movImm(RAX, 0);
+            xmmMoveFromGpr(0, RAX);
+        } else {
+            movImm(RAX, 0);
+        }
+        if (usesManagedMemory_) {
+            emitManagedFrameExit();
+        }
+        if (function && function->returnType == "number") {
+            movImm(RAX, 0);
+            xmmMoveFromGpr(0, RAX);
+        } else {
+            movImm(RAX, 0);
+        }
+        emit8(0xC9);
+        emit8(0xC3);
+    }
+
+    void emitExceptionDispatch(const std::string& functionName) {
+        const std::string noException =
+            "__zp_no_exception_" + std::to_string(uniqueLabel_++);
+        const std::string handlerActive =
+            "__zp_handler_active_" + std::to_string(uniqueLabel_++);
+
+        loadGlobal(kPendingExceptionGlobal, RAX);
+        testRax();
+        emitJump(0x84, noException);
+
+        movLoad(R11, slot(kActiveHandlerSlot));
+        testRegister(R11);
+        emitJump(0x85, handlerActive);
+
+        emitDeferredCleanup(
+            deferSitesForUnwind(0), functionName);
+        emitExceptionReturn(functionName);
+
+        localLabels_[handlerActive] = code_.size();
+        movLoad(R11, slot(kActiveHandlerSlot));
+        jumpRegister(R11);
+        localLabels_[noException] = code_.size();
+    }
+
+    void emitCatchEntry(
+        const HandlerSite& handler,
+        const std::string& functionName
+    ) {
+        movLoad(RAX, slot(handler.previousHandlerSlot));
+        movStore(slot(kActiveHandlerSlot), RAX);
+        loadGlobal(kPendingExceptionGlobal, RAX);
+        movStore(slot(handler.caughtExceptionSlot), RAX);
+        clearPendingException();
+
+        emitDeferredCleanup(
+            deferSitesForUnwind(handler.scopeDepth), functionName);
+        emitExceptionDispatch(functionName);
+
+        movLoad(RAX, slot(handler.caughtExceptionSlot));
+        storeVariable(handler.binding, RAX);
+        errorBindings_.insert(handler.binding);
+        valueTypes_[handler.binding] = "string";
+        stringSlots_.insert(handler.binding);
+    }
+
     void emitInstruction(const Instruction& instruction, const std::string& functionName) {
         const std::string& op = instruction.opcode;
-        if (op == "scope_push" || op == "scope_pop") {
+        if (op == "scope_push") {
             return;
         }
-        if (op == "try_push" || op == "try_pop" || op == "throw" ||
-            op == "defer_push") {
-            std::string message =
-                "native backend: exception handling and deferred cleanup are "
-                "not supported";
-            if (!instruction.location.sourceFile.empty()) {
-                message += " at " + instruction.location.sourceFile;
-                if (instruction.location.line > 0) {
-                    message += ":" + std::to_string(instruction.location.line);
-                    if (instruction.location.column > 0) {
-                        message += ":" + std::to_string(instruction.location.column);
-                    }
+        if (op == "scope_pop") {
+            if (!instruction.scopeId.empty()) {
+                const auto found = deferredByScope_.find(instruction.scopeId);
+                if (found != deferredByScope_.end()) {
+                    std::vector<std::string> siteIds(
+                        found->second.rbegin(), found->second.rend());
+                    emitDeferredCleanup(siteIds, functionName);
                 }
             }
-            message += " in function '" + functionName + "'";
-            throw std::runtime_error(std::move(message));
+            emitExceptionDispatch(functionName);
+            return;
+        }
+        if (op == "try_push") {
+            requireOperands(instruction, 2);
+            const auto found =
+                handlerSites_.find(instruction.operands[0].name);
+            if (found == handlerSites_.end()) {
+                throw std::runtime_error(
+                    "native backend: missing handler metadata for '" +
+                    instruction.operands[0].name + "'");
+            }
+            movLoad(RAX, slot(kActiveHandlerSlot));
+            movStore(slot(found->second.previousHandlerSlot), RAX);
+            leaCodeLabel(
+                RAX, blockLabel(functionName, instruction.operands[0].name));
+            movStore(slot(kActiveHandlerSlot), RAX);
+            return;
+        }
+        if (op == "try_pop") {
+            requireOperands(instruction, 1);
+            const auto found =
+                handlerSites_.find(instruction.operands[0].name);
+            if (found == handlerSites_.end()) {
+                throw std::runtime_error(
+                    "native backend: missing handler metadata for '" +
+                    instruction.operands[0].name + "'");
+            }
+            movLoad(RAX, slot(found->second.previousHandlerSlot));
+            movStore(slot(kActiveHandlerSlot), RAX);
+            return;
+        }
+        if (op == "throw") {
+            requireOperands(instruction, 1);
+            loadValue(instruction.operands[0], RAX);
+            storeGlobal(kPendingExceptionGlobal, RAX);
+            emitExceptionDispatch(functionName);
+            return;
+        }
+        if (op == "defer_push") {
+            if (instruction.operands.empty() || instruction.siteId.empty()) {
+                throw std::runtime_error(
+                    "native backend: malformed deferred call instruction");
+            }
+            const auto found = deferredSiteIndices_.find(instruction.siteId);
+            if (found == deferredSiteIndices_.end()) {
+                throw std::runtime_error(
+                    "native backend: missing deferred call metadata for '" +
+                    instruction.siteId + "'");
+            }
+            const DeferredSite& site = deferredSites_[found->second];
+            if (site.arguments.size() + 1 != instruction.operands.size()) {
+                throw std::runtime_error(
+                    "native backend: deferred call argument count changed");
+            }
+            for (std::size_t i = 0; i < site.arguments.size(); ++i) {
+                loadValue(instruction.operands[i + 1], RAX);
+                movStore(slot(site.argumentSlots[i]), RAX);
+            }
+            movImm(RAX, 1);
+            movStore(slot(site.flagSlot), RAX);
+            return;
         }
         if (op == "struct_new") {
             requireOperands(instruction, 1);
@@ -1139,6 +1392,12 @@ private:
         }
         if (op == "member") {
             requireOperands(instruction, 2);
+            if (errorBindings_.contains(instruction.operands[0].name) &&
+                instruction.operands[1].name == "message") {
+                loadValue(instruction.operands[0], RAX);
+                storeResult(instruction);
+                return;
+            }
             if (!windowsAbi_) {
                 throw std::runtime_error(
                     "native backend: managed struct members require the Windows x64 runtime");
@@ -1169,6 +1428,7 @@ private:
             emitImportCall("zpg_structSet", "zgraphics_runtime.dll");
             usesManagedMemory_ = true;
             usesZGraphicsRuntime_ = true;
+            emitExceptionDispatch(functionName);
             return;
         }
         if (op == "is") {
@@ -1190,6 +1450,7 @@ private:
             usesManagedMemory_ = true;
             usesZGraphicsRuntime_ = true;
             storeResult(instruction);
+            emitExceptionDispatch(functionName);
             return;
         }
         if (op.empty() || op == "freeze" || op == "param") return;
@@ -1250,6 +1511,7 @@ private:
                 emitImportCall("zpg_concat", "zgraphics_runtime.dll");
                 usesZGraphicsRuntime_ = true;
                 storeResult(instruction);
+                emitExceptionDispatch(functionName);
                 return;
             }
             if (op.starts_with("cmp_") &&
@@ -1269,6 +1531,7 @@ private:
                 usesManagedMemory_ = true;
                 usesZGraphicsRuntime_ = true;
                 storeResult(instruction);
+                emitExceptionDispatch(functionName);
                 return;
             }
             if (op.starts_with("cmp_")) {
@@ -1328,6 +1591,7 @@ private:
                 emitImportCall("zpg_numberRemainder", "zgraphics_runtime.dll");
                 usesZGraphicsRuntime_ = true;
                 storeResult(instruction);
+                emitExceptionDispatch(functionName);
                 return;
             }
             loadValue(instruction.operands[0], RAX);
@@ -1427,6 +1691,7 @@ private:
                 emitImportCall("zpg_concat", "zgraphics_runtime.dll");
                 usesManagedMemory_ = true;
                 storeVariable(instruction.operands[0].name, RAX);
+                emitExceptionDispatch(functionName);
                 return;
             }
             if ((op == "add_assign" || op == "sub_assign" ||
@@ -1455,6 +1720,7 @@ private:
                 emitImportCall("zpg_numberRemainder", "zgraphics_runtime.dll");
                 storeVariable(instruction.operands[0].name, RAX);
                 usesZGraphicsRuntime_ = true;
+                emitExceptionDispatch(functionName);
                 return;
             }
             if ((op == "and_assign" || op == "or_assign" ||
@@ -1504,6 +1770,7 @@ private:
         }
         if (op == "call") {
             emitCallInstruction(instruction, functionName);
+            emitExceptionDispatch(functionName);
             return;
         }
         if (op == "array") {
@@ -1527,6 +1794,7 @@ private:
             emitImportCall("zpg_arrayCreate", "zgraphics_runtime.dll");
             usesManagedMemory_ = true;
             storeResult(instruction);
+            emitExceptionDispatch(functionName);
             return;
         }
         if (op == "index") {
@@ -1543,6 +1811,7 @@ private:
             emitImportCall("zpg_arrayGet", "zgraphics_runtime.dll");
             usesManagedMemory_ = true;
             storeResult(instruction);
+            emitExceptionDispatch(functionName);
             return;
         }
         if (op == "index_store") {
@@ -1559,6 +1828,7 @@ private:
             loadValue(instruction.operands[2], R8);
             emitImportCall("zpg_arraySet", "zgraphics_runtime.dll");
             usesManagedMemory_ = true;
+            emitExceptionDispatch(functionName);
             return;
         }
         if (op == "select") {
@@ -1645,6 +1915,12 @@ private:
         temporaryUseCounts_.clear();
         localLabels_.clear();
         branchFixups_.clear();
+        handlerSites_.clear();
+        deferredSites_.clear();
+        deferredSiteIndices_.clear();
+        deferredByScope_.clear();
+        scopeDepths_.clear();
+        errorBindings_.clear();
         stackSize_ = 0;
         std::size_t outgoingStackSize = 48;
         for (const auto& parameter : function.parameters) {
@@ -1662,6 +1938,10 @@ private:
         }
         for (const auto& block : function.blocks) {
             for (const auto& instruction : block.instructions) {
+                if (instruction.opcode == "scope_push" &&
+                    !instruction.scopeId.empty()) {
+                    scopeDepths_[instruction.scopeId] = instruction.scopeDepth;
+                }
                 for (const auto& operand : instruction.operands) {
                     if (!operand.name.empty() && operand.name.front() == '%') {
                         ++temporaryUseCounts_[operand.name];
@@ -1710,6 +1990,30 @@ private:
                     outgoingStackSize = std::max(
                         outgoingStackSize,
                         32 + instruction.operands.size() * sizeof(std::uint64_t));
+                }
+            }
+        }
+        for (const auto& block : function.blocks) {
+            for (const auto& instruction : block.instructions) {
+                if (instruction.opcode == "try_push" &&
+                    instruction.operands.size() == 2) {
+                    const std::string& label = instruction.operands[0].name;
+                    const std::string& binding = instruction.operands[1].name;
+                    errorBindings_.insert(binding);
+                    valueTypes_[binding] = "Error";
+                    stringSlots_.insert(binding);
+                    allocateSlot(binding);
+                    HandlerSite handler;
+                    handler.label = label;
+                    handler.binding = binding;
+                    handler.previousHandlerSlot =
+                        "__zp_previous_handler_" + label;
+                    handler.caughtExceptionSlot =
+                        "__zp_caught_exception_" + label;
+                    handler.scopeDepth = instruction.handlerScopeDepth;
+                    allocateSlot(handler.previousHandlerSlot);
+                    allocateSlot(handler.caughtExceptionSlot);
+                    handlerSites_.insert_or_assign(label, std::move(handler));
                 }
             }
         }
@@ -1828,9 +2132,13 @@ private:
                             instruction.result, instruction.operands[0].name);
                     } else if (instruction.opcode == "member" &&
                                instruction.operands.size() == 2) {
-                        const zplus::ir::StructType* structure =
-                            module_.findStructType(inferredType(instruction.operands[0]));
-                        if (structure) {
+                        if (errorBindings_.contains(
+                                instruction.operands[0].name) &&
+                            instruction.operands[1].name == "message") {
+                            inferred |= setInferredType(instruction.result, "string");
+                        } else if (const zplus::ir::StructType* structure =
+                                       module_.findStructType(
+                                           inferredType(instruction.operands[0]))) {
                             const auto field = std::find_if(
                                 structure->fields.begin(), structure->fields.end(),
                                 [&instruction](const auto& candidate) {
@@ -1882,6 +2190,53 @@ private:
         for (const auto& [name, type] : globalTypes_) {
             if (type == "string" || type == "char" || type == "character") {
                 stringSlots_.insert(name);
+            }
+        }
+        allocateSlot(kActiveHandlerSlot);
+        allocateSlot(kCleanupOriginalSlot);
+        allocateSlot(kCleanupFirstSlot);
+        std::size_t deferSequence = 0;
+        for (const auto& block : function.blocks) {
+            for (const auto& instruction : block.instructions) {
+                if (instruction.opcode != "defer_push") continue;
+                if (instruction.siteId.empty() || instruction.scopeId.empty() ||
+                    instruction.operands.empty()) {
+                    throw std::runtime_error(
+                        "native backend: malformed deferred call metadata");
+                }
+                const auto scope = scopeDepths_.find(instruction.scopeId);
+                if (scope == scopeDepths_.end()) {
+                    throw std::runtime_error(
+                        "native backend: deferred call refers to an unknown scope");
+                }
+                DeferredSite site;
+                site.id = instruction.siteId;
+                site.scopeId = instruction.scopeId;
+                site.callee = instruction.operands.front().name;
+                site.scopeDepth = scope->second;
+                site.sequence = deferSequence++;
+                site.flagSlot = "__zp_defer_flag_" + site.id;
+                allocateSlot(site.flagSlot);
+                site.arguments.assign(
+                    instruction.operands.begin() + 1,
+                    instruction.operands.end());
+                for (std::size_t i = 0; i < site.arguments.size(); ++i) {
+                    const std::string argumentSlot =
+                        "__zp_defer_arg_" + site.id + "_" + std::to_string(i);
+                    allocateSlot(argumentSlot);
+                    const std::string type = inferredType(site.arguments[i]);
+                    if (!type.empty()) {
+                        valueTypes_[argumentSlot] = type;
+                    }
+                    if (type == "string" || type == "char" ||
+                        type == "character") {
+                        stringSlots_.insert(argumentSlot);
+                    }
+                    site.argumentSlots.push_back(argumentSlot);
+                }
+                deferredSiteIndices_[site.id] = deferredSites_.size();
+                deferredByScope_[site.scopeId].push_back(site.id);
+                deferredSites_.push_back(std::move(site));
             }
         }
         const std::size_t frameSize = static_cast<std::size_t>(stackSize_) +
@@ -1989,6 +2344,10 @@ private:
                 movStoreZero(displacement);
             }
         }
+        movStoreZero(slot(kActiveHandlerSlot));
+        for (const DeferredSite& site : deferredSites_) {
+            movStoreZero(slot(site.flagSlot));
+        }
         for (std::size_t i = 0; i < function.parameters.size(); ++i) {
             const Parameter& parameter = function.parameters[i];
             if (windowsAbi_ && i < 4) {
@@ -2033,6 +2392,10 @@ private:
 
         for (const auto& block : function.blocks) {
             localLabels_[blockLabel(function.name, block.label)] = code_.size();
+            if (const auto handler = handlerSites_.find(block.label);
+                handler != handlerSites_.end()) {
+                emitCatchEntry(handler->second, function.name);
+            }
             for (const auto& instruction : block.instructions) {
                 emitInstruction(instruction, function.name);
             }
@@ -2078,8 +2441,19 @@ private:
         }
 
         entryOffset_ = code_.size();
+        const std::string uncaughtLabel = "__zp_uncaught_native_exception";
+        const std::string entryDoneLabel = "__zp_entry_done";
         if (windowsAbi_) {
             emit8(0x48); emit8(0x83); emit8(0xEC); emit8(40);
+            const bool usesGraphicsRuntime = std::any_of(
+                importFixups_.begin(), importFixups_.end(),
+                [](const auto& fixup) {
+                    return fixup.library == "zgraphics_runtime.dll";
+                });
+            if (usesGraphicsRuntime) {
+                leaRip(RCX, globalOffsets_.at(kPendingExceptionGlobal));
+                emitImportCall("zpg_setExceptionSlot", "zgraphics_runtime.dll");
+            }
             if (usesManagedMemory_ && !globalOffsets_.empty()) {
                 leaRip(RCX, 0);
                 movImm(RDX, globalOffsets_.size());
@@ -2087,11 +2461,26 @@ private:
             }
             if (module_.findFunction(zplus::ir::kModuleInitializerName)) {
                 emitCall(zplus::ir::kModuleInitializerName);
+                loadGlobal(kPendingExceptionGlobal, RAX);
+                testRax();
+                emitJump(0x85, uncaughtLabel);
             }
             emitCall(entry->name);
             if (entry->returnType == "number") {
                 convertXmmToSignedInteger(RAX, 0);
             }
+            movReg(R10, RAX);
+            loadGlobal(kPendingExceptionGlobal, RAX);
+            testRax();
+            emitJump(0x85, uncaughtLabel);
+            movReg(RAX, R10);
+            emitJump(0xFF, entryDoneLabel);
+            localLabels_[uncaughtLabel] = code_.size();
+            loadGlobal(kPendingExceptionGlobal, RCX);
+            movImm(RDX, 1);
+            emitCall("__zp_write");
+            movImm(RAX, 1);
+            localLabels_[entryDoneLabel] = code_.size();
             if (usesZGraphicsRuntime_) {
                 movStoreRspDisp(32, RAX);
                 emitImportCall("zpg_shutdown", "zgraphics_runtime.dll");
@@ -2116,8 +2505,26 @@ private:
         } else {
             if (module_.findFunction(zplus::ir::kModuleInitializerName)) {
                 emitCall(zplus::ir::kModuleInitializerName);
+                loadGlobal(kPendingExceptionGlobal, RAX);
+                testRax();
+                emitJump(0x85, uncaughtLabel);
             }
             emitCall(entry->name);
+            if (entry->returnType == "number") {
+                convertXmmToSignedInteger(RAX, 0);
+            }
+            movReg(R10, RAX);
+            loadGlobal(kPendingExceptionGlobal, RAX);
+            testRax();
+            emitJump(0x85, uncaughtLabel);
+            movReg(RAX, R10);
+            emitJump(0xFF, entryDoneLabel);
+            localLabels_[uncaughtLabel] = code_.size();
+            loadGlobal(kPendingExceptionGlobal, RDI);
+            movImm(RSI, 1);
+            emitCall("__zp_write");
+            movImm(RAX, 1);
+            localLabels_[entryDoneLabel] = code_.size();
             movReg(RDI, RAX);
             movImm(RAX, 60);
             emit8(0x0F); emit8(0x05);
@@ -2260,6 +2667,12 @@ private:
     std::unordered_map<std::string, std::size_t> functionOffsets_;
     std::unordered_map<std::string, std::size_t> stringOffsets_;
     std::unordered_map<std::string, std::size_t> globalOffsets_;
+    std::unordered_map<std::string, HandlerSite> handlerSites_;
+    std::vector<DeferredSite> deferredSites_;
+    std::unordered_map<std::string, std::size_t> deferredSiteIndices_;
+    std::unordered_map<std::string, std::vector<std::string>> deferredByScope_;
+    std::unordered_map<std::string, std::size_t> scopeDepths_;
+    std::unordered_set<std::string> errorBindings_;
     std::vector<BranchFixup> branchFixups_;
     std::vector<CallFixup> callFixups_;
     std::vector<NativeImage::RelativeFixup> dataFixups_;

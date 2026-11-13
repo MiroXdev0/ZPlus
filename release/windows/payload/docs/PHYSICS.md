@@ -117,9 +117,9 @@ world releases all of its dependent resources. A shape may be unloaded while
 the world is idle; Box2D invalidates its contacts before returning. Do not retain
 handles after destruction.
 
-Interpreter errors are reported as runtime errors. Native runtime errors are
-reported to standard error and terminate the application with a failure status.
-No Z+ code runs in Box2D worker or callback threads.
+Interpreter errors are reported as runtime errors. Native physics runtime errors
+are reported to standard error and terminate the application with a failure
+status. No Z+ code runs in Box2D worker or callback threads.
 
 ## Backends and limitations
 

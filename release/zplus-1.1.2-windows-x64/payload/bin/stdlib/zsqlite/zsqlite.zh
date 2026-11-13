@@ -1,31 +1,31 @@
-pub fn open(path: string) -> number:
+pub fn open(path: string): number {
     return __zsqlite_open(path)
-end
+} end fn
 
-pub fn close(database: number):
+pub fn close(database: number) {
     __zsqlite_close(database)
-end
+} end fn
 
-pub fn execute(database: number, sql: string, parametersJson: string) -> number:
+pub fn execute(database: number, sql: string, parametersJson: string): number {
     return __zsqlite_execute(database, sql, parametersJson)
-end
+} end fn
 
-pub fn query(database: number, sql: string, parametersJson: string) -> string:
+pub fn query(database: number, sql: string, parametersJson: string): string {
     return __zsqlite_query(database, sql, parametersJson)
-end
+} end fn
 
-pub fn changes(database: number) -> number:
+pub fn changes(database: number): number {
     return __zsqlite_changes(database)
-end
+} end fn
 
-pub fn begin(database: number) -> number:
+pub fn begin(database: number): number {
     return execute(database, "BEGIN", "[]")
-end
+} end fn
 
-pub fn commit(database: number) -> number:
+pub fn commit(database: number): number {
     return execute(database, "COMMIT", "[]")
-end
+} end fn
 
-pub fn rollback(database: number) -> number:
+pub fn rollback(database: number): number {
     return execute(database, "ROLLBACK", "[]")
-end
+} end fn

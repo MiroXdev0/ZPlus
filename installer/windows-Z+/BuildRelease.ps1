@@ -12,10 +12,29 @@ $finalDirectory = Join-Path $repositoryRoot 'release\zplus-1.1.2-windows-x64'
 $stagingDirectory = Join-Path $repositoryRoot 'release\zplus-1.1.2-windows-x64.staging'
 $backupDirectory = Join-Path $repositoryRoot 'release\zplus-1.1.2-windows-x64.previous'
 
+function Copy-NonemptyTree {
+    param([string]$SourceDirectory, [string]$DestinationDirectory)
+
+    $sourceRoot = (Resolve-Path -LiteralPath $SourceDirectory).Path
+    New-Item -ItemType Directory -Path $DestinationDirectory -Force | Out-Null
+    foreach ($file in Get-ChildItem -LiteralPath $sourceRoot -File -Recurse -Force) {
+        if ($file.Length -eq 0) {
+            continue
+        }
+        $relative = [IO.Path]::GetRelativePath($sourceRoot, $file.FullName)
+        $destination = Join-Path $DestinationDirectory $relative
+        New-Item -ItemType Directory -Path (Split-Path $destination -Parent) -Force | Out-Null
+        Copy-Item -LiteralPath $file.FullName -Destination $destination
+    }
+}
+
 if (-not (Test-Path -LiteralPath $zbuild -PathType Leaf)) {
     throw "ZBuild was not found at '$zbuild'. Build target zbuild first."
 }
-foreach ($required in @('zp.exe', 'zgraphics_runtime.dll', 'sqlite3.dll', 'zbuild-templates')) {
+foreach ($required in @(
+    'zp.exe', 'zgraphics_runtime.dll', 'zaudio_runtime.dll',
+    'zphysics_runtime.dll', 'sqlite3.dll', 'zbuild-templates'
+)) {
     if (-not (Test-Path -LiteralPath (Join-Path $compilerBuild $required))) {
         throw "Required compiler distribution file or directory is missing: $required"
     }
@@ -82,20 +101,25 @@ try {
     Copy-Item -LiteralPath (Join-Path $projectOutput 'zgraphics_runtime.dll') -Destination $stagingDirectory
     Copy-Item -LiteralPath (Join-Path $projectOutput 'sqlite3.dll') -Destination $stagingDirectory
 
-    foreach ($binary in @('zp.exe', 'zgraphics_runtime.dll', 'sqlite3.dll', 'zbuild.exe')) {
+    foreach ($binary in @(
+        'zp.exe', 'zgraphics_runtime.dll', 'zaudio_runtime.dll',
+        'zphysics_runtime.dll', 'sqlite3.dll', 'zbuild.exe'
+    )) {
         Copy-Item -LiteralPath (Join-Path $compilerBuild $binary) -Destination $payloadBin
     }
-    Copy-Item -Path (Join-Path $repositoryRoot 'stdlib\*') -Destination $payloadStdlib -Recurse
+    Copy-NonemptyTree -SourceDirectory (Join-Path $repositoryRoot 'stdlib') -DestinationDirectory $payloadStdlib
     Copy-Item -LiteralPath (Join-Path $compilerBuild 'zbuild-templates') -Destination $payloadBin -Recurse
 
     $docs = Join-Path $payload 'docs'
     $examples = Join-Path $payload 'examples'
     New-Item -ItemType Directory -Path $docs, $examples | Out-Null
-    Copy-Item -Path (Join-Path $repositoryRoot 'docs\*') -Destination $docs -Recurse
-    Copy-Item -Path (Join-Path $repositoryRoot 'examples\*') -Destination $examples -Recurse
+    Copy-NonemptyTree -SourceDirectory (Join-Path $repositoryRoot 'docs') -DestinationDirectory $docs
+    Copy-NonemptyTree -SourceDirectory (Join-Path $repositoryRoot 'examples') -DestinationDirectory $examples
     Copy-Item -LiteralPath (Join-Path $repositoryRoot 'SYNTAX.md') -Destination $docs
     Copy-Item -LiteralPath (Join-Path $repositoryRoot 'LICENSE.txt') -Destination $payload
     Copy-Item -LiteralPath (Join-Path $repositoryRoot 'installer\windows\THIRD-PARTY-NOTICES.txt') -Destination $payload
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot 'release\windows\payload\THIRD-PARTY-NOTICES') `
+        -Destination $payload -Recurse
     Copy-Item -LiteralPath (Join-Path $repositoryRoot 'release\windows\ZPlusLogo.png') -Destination $docs
     Copy-Item -LiteralPath (Join-Path $projectRoot 'README.md') -Destination (Join-Path $stagingDirectory 'INSTALLER-README.md')
     Copy-Item -LiteralPath (Join-Path $repositoryRoot 'LICENSE.txt') -Destination $stagingDirectory

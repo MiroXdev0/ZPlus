@@ -55,21 +55,95 @@ if(unhandled_result EQUAL 0 OR
     message(FATAL_ERROR "unhandled throw did not produce an error\n${unhandled_output}${unhandled_error}")
 endif()
 
-set(native_output "${WORK_DIR}/error_handling.native")
+set(native_program "${SOURCE_DIR}/tests/runtime/native_error_handling.zp")
+set(native_expected
+    "try cleanup\ninner: boom\nraised again\nnested\nlast\nreturn cleanup\n7\ncleanup failure\nrethrow: boom\nouter\n")
 execute_process(
-    COMMAND "${ZP}" build "${program}" -o "${native_output}"
-    RESULT_VARIABLE native_result
-    OUTPUT_VARIABLE native_output_text
-    ERROR_VARIABLE native_error
+    COMMAND "${ZP}" run "${native_program}"
+    RESULT_VARIABLE native_interpreter_result
+    OUTPUT_VARIABLE native_interpreter_output
+    ERROR_VARIABLE native_interpreter_error
     TIMEOUT 30
 )
-if(native_result EQUAL 0)
-    message(FATAL_ERROR "native backend unexpectedly accepted interpreter-only exception opcodes")
-endif()
-if(NOT "${native_output_text}${native_error}" MATCHES
-   "not supported" OR
-   NOT "${native_output_text}${native_error}" MATCHES
-   "error_handling\\.zp:[0-9]+:[0-9]+")
+if(NOT native_interpreter_result EQUAL 0 OR
+   NOT "${native_interpreter_output}" STREQUAL "${native_expected}")
     message(FATAL_ERROR
-        "native backend did not report the unsupported feature with its source location\n${native_output_text}${native_error}")
+        "native error-handling fixture failed in interpreter mode\n${native_interpreter_output}${native_interpreter_error}")
+endif()
+
+set(native_executable "${WORK_DIR}/native_error_handling.exe")
+execute_process(
+    COMMAND "${ZP}" build "${native_program}" -o "${native_executable}"
+    RESULT_VARIABLE native_build_result
+    OUTPUT_VARIABLE native_build_output
+    ERROR_VARIABLE native_build_error
+    TIMEOUT 30
+)
+if(NOT native_build_result EQUAL 0)
+    message(FATAL_ERROR
+        "native exception/defer program failed to build\n${native_build_output}${native_build_error}")
+endif()
+
+execute_process(
+    COMMAND "${native_executable}"
+    RESULT_VARIABLE native_run_result
+    OUTPUT_VARIABLE native_run_output
+    ERROR_VARIABLE native_run_error
+    TIMEOUT 30
+)
+if(NOT native_run_result EQUAL 0 OR
+   NOT "${native_run_output}" STREQUAL "${native_expected}")
+    message(FATAL_ERROR
+        "native/interpreter exception/defer parity failed (${native_run_result})\nexpected:\n${native_expected}\nactual:\n${native_run_output}${native_run_error}")
+endif()
+
+set(full_native_executable "${WORK_DIR}/error_handling.native")
+execute_process(
+    COMMAND "${ZP}" build "${program}" -o "${full_native_executable}"
+    RESULT_VARIABLE full_native_build_result
+    OUTPUT_VARIABLE full_native_build_output
+    ERROR_VARIABLE full_native_build_error
+    TIMEOUT 30
+)
+if(NOT full_native_build_result EQUAL 0)
+    message(FATAL_ERROR
+        "full native error-handling fixture failed to build\n${full_native_build_output}${full_native_build_error}")
+endif()
+execute_process(
+    COMMAND "${full_native_executable}"
+    RESULT_VARIABLE full_native_run_result
+    OUTPUT_VARIABLE full_native_run_output
+    ERROR_VARIABLE full_native_run_error
+    TIMEOUT 30
+)
+if(NOT full_native_run_result EQUAL 0 OR
+   NOT "${full_native_run_output}" STREQUAL "${expected}")
+    message(FATAL_ERROR
+        "full native/interpreter error-handling parity failed (${full_native_run_result})\nexpected:\n${expected}\nactual:\n${full_native_run_output}${full_native_run_error}")
+endif()
+
+set(native_unhandled "${WORK_DIR}/unhandled_throw.native")
+execute_process(
+    COMMAND "${ZP}" build "${SOURCE_DIR}/tests/runtime/unhandled_throw.zp"
+            -o "${native_unhandled}"
+    RESULT_VARIABLE unhandled_build_result
+    OUTPUT_VARIABLE unhandled_build_output
+    ERROR_VARIABLE unhandled_build_error
+    TIMEOUT 30
+)
+if(NOT unhandled_build_result EQUAL 0)
+    message(FATAL_ERROR
+        "uncaught native throw failed to build\n${unhandled_build_output}${unhandled_build_error}")
+endif()
+execute_process(
+    COMMAND "${native_unhandled}"
+    RESULT_VARIABLE native_unhandled_result
+    OUTPUT_VARIABLE native_unhandled_output
+    ERROR_VARIABLE native_unhandled_error
+    TIMEOUT 20
+)
+if(native_unhandled_result EQUAL 0 OR
+   NOT "${native_unhandled_output}${native_unhandled_error}" MATCHES "unhandled problem")
+    message(FATAL_ERROR
+        "uncaught native exception was not reported (${native_unhandled_result})\n${native_unhandled_output}${native_unhandled_error}")
 endif()
