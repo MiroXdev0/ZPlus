@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(ZPlus
-    VERSION 1.1.2
+    VERSION 1.1.5
     LANGUAGES CXX
 )
 
@@ -100,6 +100,7 @@ add_executable(zp
     runtime/StandardLibrary.cpp
     runtime/installer/Platform.cpp
 )
+target_compile_definitions(zp PRIVATE "ZPLUS_VERSION=\"${PROJECT_VERSION}\"")
 
 add_library(zplus_graphics STATIC
     ZGraphics/Core/Window.cpp
@@ -116,6 +117,23 @@ if(WIN32)
     )
     target_sources(zp PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/zplus_icon.rc")
     target_sources(zbuild PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/zplus_icon.rc")
+    function(zplus_add_version_resource target description filename filetype)
+        set(ZPLUS_FILE_DESCRIPTION "${description}")
+        set(ZPLUS_ORIGINAL_FILENAME "${filename}")
+        set(ZPLUS_FILE_TYPE "${filetype}")
+        set(version_resource "${CMAKE_CURRENT_BINARY_DIR}/${target}_version.rc")
+        configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/resources/zplus_version.rc.in"
+            "${version_resource}"
+            @ONLY
+        )
+        target_sources(${target} PRIVATE "${version_resource}")
+        if(MSVC)
+            target_link_options(${target} PRIVATE /Brepro)
+        endif()
+    endfunction()
+    zplus_add_version_resource(zp "Z+ Compiler" "zp.exe" VFT_APP)
+    zplus_add_version_resource(zbuild "Z+ Build Tool" "zbuild.exe" VFT_APP)
     target_sources(zplus_graphics PRIVATE
         ZGraphics/Platform/WindowsWindow.cpp
     )
@@ -169,6 +187,9 @@ target_include_directories(zaudio_runtime PRIVATE runtime/audio)
 target_link_libraries(zaudio_runtime PRIVATE zaudio_engine)
 target_compile_definitions(zaudio_runtime PRIVATE ZAUDIO_RUNTIME_EXPORTS)
 set_target_properties(zaudio_runtime PROPERTIES OUTPUT_NAME zaudio_runtime)
+if(WIN32)
+    zplus_add_version_resource(zaudio_runtime "Z+ Audio Runtime" "zaudio_runtime.dll" VFT_DLL)
+endif()
 add_dependencies(zp zaudio_runtime)
 
 set(ZPLUS_AUDIO_RUNTIME_ARGUMENT
@@ -192,6 +213,9 @@ target_include_directories(zphysics_runtime PRIVATE runtime/physics)
 target_link_libraries(zphysics_runtime PRIVATE zphysics_engine)
 target_compile_definitions(zphysics_runtime PRIVATE ZPHYSICS_RUNTIME_EXPORTS)
 set_target_properties(zphysics_runtime PROPERTIES OUTPUT_NAME zphysics_runtime)
+if(WIN32)
+    zplus_add_version_resource(zphysics_runtime "Z+ Physics Runtime" "zphysics_runtime.dll" VFT_DLL)
+endif()
 add_dependencies(zp zphysics_runtime)
 
 set(ZPLUS_PHYSICS_RUNTIME_ARGUMENT
@@ -201,6 +225,9 @@ set(ZPLUS_PHYSICS_RUNTIME_ARGUMENT
 add_library(zplus_input_runtime SHARED runtime/InputRuntime.cpp)
 target_include_directories(zplus_input_runtime PRIVATE runtime)
 set_target_properties(zplus_input_runtime PROPERTIES OUTPUT_NAME zplus_input_runtime)
+if(WIN32)
+    zplus_add_version_resource(zplus_input_runtime "Z+ Input Runtime" "zplus_input_runtime.dll" VFT_DLL)
+endif()
 add_dependencies(zp zplus_input_runtime)
 
 set(ZPLUS_INPUT_RUNTIME_ARGUMENT
@@ -273,6 +300,8 @@ if(WIN32)
     set_target_properties(zplus_graphics_runtime PROPERTIES
         OUTPUT_NAME zgraphics_runtime
     )
+    zplus_add_version_resource(
+        zplus_graphics_runtime "Z+ Graphics Runtime" "zgraphics_runtime.dll" VFT_DLL)
     add_dependencies(zp zplus_graphics_runtime zaudio_runtime zphysics_runtime)
     set(ZPLUS_GRAPHICS_RUNTIME_ARGUMENT
         "-DRUNTIME_FILE=$<TARGET_FILE:zplus_graphics_runtime>"

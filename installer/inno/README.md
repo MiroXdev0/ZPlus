@@ -29,4 +29,8 @@ On success, the installer is written to `installer\inno\output\ZPlus-<version>-S
 - Provides Start Menu shortcuts and an unchecked optional desktop shortcut.
 - On uninstall, removes only this install's PATH entry and files registered as part of the installer. No recursive directory cleanup is configured, so user-created or modified untracked files are left in place.
 
-The installer version is taken from `zp version`. The generated setup executable is not Authenticode-signed.
+The installer version is taken from `zp version` and matches the CMake project
+version embedded in the compiler and runtimes. Release executables contain
+Windows version metadata identifying Z+ and the publisher. The build remains
+unsigned unless a trusted Authenticode certificate is used by a release
+operator; this repository does not include signing credentials.

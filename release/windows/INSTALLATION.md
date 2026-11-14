@@ -1,5 +1,10 @@
 # Z+ Windows installer
 
+> Historical documentation: this page describes the Z+ 1.1.2 installer. The
+> current 1.1.5 installer is built by `installer/inno/Build-Installer.ps1`;
+> see [`installer/inno/README.md`](../../installer/inno/README.md) and the
+> [1.1.5 antivirus submission information](ZPlus-1.1.5-AV-SUBMISSION.md).
+
 The Windows x64 setup application is a per-user installer for Z+ 1.1.2 Stable.
 Its default destination is `%LOCALAPPDATA%\Programs\ZPlus`; it does not require
 administrator access. It packages the compiler, its built runtimes, the

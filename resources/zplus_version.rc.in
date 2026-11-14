@@ -1,0 +1,30 @@
+#include <windows.h>
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
+ PRODUCTVERSION @PROJECT_VERSION_MAJOR@,@PROJECT_VERSION_MINOR@,@PROJECT_VERSION_PATCH@,0
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE @ZPLUS_FILE_TYPE@
+ FILESUBTYPE 0
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName", "Miroslav Aleksandrov\0"
+            VALUE "FileDescription", "@ZPLUS_FILE_DESCRIPTION@\0"
+            VALUE "FileVersion", "@PROJECT_VERSION@\0"
+            VALUE "InternalName", "@ZPLUS_ORIGINAL_FILENAME@\0"
+            VALUE "OriginalFilename", "@ZPLUS_ORIGINAL_FILENAME@\0"
+            VALUE "ProductName", "Z+ Programming Language\0"
+            VALUE "ProductVersion", "@PROJECT_VERSION@\0"
+            VALUE "LegalCopyright", "Copyright (c) Miroslav Aleksandrov\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END

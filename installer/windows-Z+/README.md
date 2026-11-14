@@ -1,5 +1,10 @@
 # Z+ Windows installer
 
+> Archived Z+ 1.1.2 native GUI installer workflow. The current Z+ 1.1.5
+> Windows release installer is built with Inno Setup; see
+> [installer/inno/README.md](../inno/README.md). The version-locked 1.1.2
+> workflow and release files below are retained for historical builds.
+
 The setup application and installation workflow are written in Z+. The
 `[build].windows_gui = true` project setting emits a PE executable with the
 Windows GUI subsystem, so Explorer launches it without creating a console.

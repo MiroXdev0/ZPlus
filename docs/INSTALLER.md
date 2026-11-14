@@ -1,4 +1,7 @@
-# Z+ Windows installer
+# Z+ Windows installer (1.1.2 archive)
+
+> Historical release documentation. The current 1.1.5 Windows installer is
+> built with Inno Setup; see [installer/inno/README.md](../installer/inno/README.md).
 
 The Windows x64 setup application is a per-user installer for Z+ 1.1.2 Stable.
 Its default destination is `%LOCALAPPDATA%\Programs\ZPlus`; it does not require

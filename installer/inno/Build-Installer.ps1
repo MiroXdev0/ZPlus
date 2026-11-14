@@ -213,6 +213,32 @@ try {
     New-Item -ItemType Directory -Path $temporaryDirectory -Force | Out-Null
     $stageDirectory = Join-Path $temporaryDirectory 'stage'
     Copy-DirectoryContents -SourceDirectory $binaryDirectory -DestinationDirectory (Join-Path $stageDirectory 'bin')
+    $stagedBinaryDirectory = Join-Path $stageDirectory 'bin'
+    $stagedCompiler = Join-Path $stagedBinaryDirectory 'zp.exe'
+    $stagedCompilerVersion = Get-CompilerVersion -CompilerPath $stagedCompiler
+    if ($stagedCompilerVersion -ne $version) {
+        throw "Staged compiler version $stagedCompilerVersion does not match bin compiler version $version."
+    }
+    $stagedZbuild = Join-Path $stagedBinaryDirectory 'zbuild.exe'
+    $stagedZbuildVersion = (& $stagedZbuild --version 2>&1 | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or $stagedZbuildVersion -notmatch '^ZBuild \S+$') {
+        throw "The staged ZBuild executable failed its version check: '$stagedZbuildVersion'."
+    }
+    foreach ($relativePath in @(
+        'zp.exe',
+        'zbuild.exe',
+        'zgraphics_runtime.dll',
+        'zaudio_runtime.dll',
+        'zphysics_runtime.dll',
+        'zplus_input_runtime.dll'
+    )) {
+        $stagedPath = Join-Path $stagedBinaryDirectory $relativePath
+        $stagedVersionInfo = (Get-Item -LiteralPath $stagedPath).VersionInfo
+        if ($stagedVersionInfo.FileVersion.Trim() -ne $version -or
+            $stagedVersionInfo.ProductVersion.Trim() -ne $version) {
+            throw "Staged '$relativePath' does not contain Z+ $version Windows version metadata."
+        }
+    }
     Copy-DirectoryContents -SourceDirectory (Join-Path $repositoryRoot 'docs') -DestinationDirectory (Join-Path $stageDirectory 'docs')
     Copy-DirectoryContents -SourceDirectory (Join-Path $repositoryRoot 'examples') -DestinationDirectory (Join-Path $stageDirectory 'examples')
     $documentationLogoDirectory = Join-Path $stageDirectory 'docs\logo'
@@ -249,6 +275,11 @@ try {
     $installerPath = Join-Path $resolvedOutputDirectory "ZPlus-$version-Setup.exe"
     if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf)) {
         throw "Inno Setup reported success but the expected installer was not created: $installerPath"
+    }
+    $installerVersionInfo = (Get-Item -LiteralPath $installerPath).VersionInfo
+    if ($installerVersionInfo.FileVersion.Trim() -ne $version -or
+        $installerVersionInfo.ProductVersion.Trim() -ne $version) {
+        throw "The generated installer does not contain Z+ $version Windows version metadata."
     }
     Write-Host "Built Z+ $version installer with ZBuild $zbuildVersion from '$binaryDirectory': $installerPath"
 }

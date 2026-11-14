@@ -5,3 +5,5 @@ the C# installer. It is based on the official light-surface logo in
 `../logo/`; transparent padding preserves the artwork's original proportions
 in square icon slots. `zplus.rc.in` embeds the icon into the Windows command-line
 executables without adding branding to their terminal output.
+`zplus_version.rc.in` adds the CMake project version and Z+ publisher/product
+metadata to `zp`, ZBuild, and the Z+ runtime DLLs.

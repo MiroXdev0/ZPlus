@@ -1,0 +1,81 @@
+{
+  "product": "Z+",
+  "version": "1.1.5",
+  "platform": "Windows x86_64",
+  "publisher": "Miroslav Aleksandrov",
+  "buildDateUtc": "2026-11-14T09:53:15Z",
+  "toolchain": {
+    "installer": "Inno Setup 7.1.1",
+    "compiler": "MSVC 19.51",
+    "releaseConfiguration": "Release"
+  },
+  "installerFilename": "ZPlus-1.1.5-Setup.exe",
+  "installerOutputPath": "installer/inno/output/ZPlus-1.1.5-Setup.exe",
+  "signingStatus": "Unsigned; no trusted Authenticode code-signing certificate was available.",
+  "artifacts": [
+    {
+      "name": "ZPlus-1.1.5-Setup.exe",
+      "path": "release/windows/ZPlus-1.1.5-Setup.exe",
+      "role": "Windows x86_64 installer",
+      "sizeBytes": 5967580,
+      "sha256": "8F1500C97854533C0C76CED5B311968B7899DEE4C8455588FFDACD687AD81A77",
+      "authenticode": "NotSigned"
+    },
+    {
+      "name": "zp.exe",
+      "path": "bin/zp.exe",
+      "role": "Z+ compiler",
+      "sizeBytes": 2639360,
+      "sha256": "721770A3F643B88C6E3B91092B150FB972ED68DF9E03939AD5AEF56EABB7B528",
+      "authenticode": "NotSigned"
+    },
+    {
+      "name": "zbuild.exe",
+      "path": "bin/zbuild.exe",
+      "role": "ZBuild command-line tool",
+      "sizeBytes": 817152,
+      "sha256": "7109A88905BC203371B1B694CC216EEE2E84A69FDFA720E82C09EE2558C7CEFF",
+      "authenticode": "NotSigned"
+    },
+    {
+      "name": "zgraphics_runtime.dll",
+      "path": "bin/zgraphics_runtime.dll",
+      "role": "Z+ graphics runtime",
+      "sizeBytes": 891392,
+      "sha256": "2EC75776D45FAF69C54ACEBF95E8C457E42AF8B40F1EB79ED966F528AF69A758",
+      "authenticode": "NotSigned"
+    },
+    {
+      "name": "zaudio_runtime.dll",
+      "path": "bin/zaudio_runtime.dll",
+      "role": "Z+ audio runtime",
+      "sizeBytes": 819712,
+      "sha256": "D05CCD5455B88675F244D144F129A68D65191D0B2B9D76BBDA5B6D3EC97421EC",
+      "authenticode": "NotSigned"
+    },
+    {
+      "name": "zphysics_runtime.dll",
+      "path": "bin/zphysics_runtime.dll",
+      "role": "Z+ physics runtime",
+      "sizeBytes": 459264,
+      "sha256": "DFCD8D2ABB64703EA2AA4F448D640FEE62A6DDA00C6647FEF3FBA5CD40FC0364",
+      "authenticode": "NotSigned"
+    },
+    {
+      "name": "zplus_input_runtime.dll",
+      "path": "bin/zplus_input_runtime.dll",
+      "role": "Z+ input runtime",
+      "sizeBytes": 266240,
+      "sha256": "4F08BD1ED4D7B9243457D44BD4B00CCE799B973FCD7DF5501D9832DDE549029A",
+      "authenticode": "NotSigned"
+    },
+    {
+      "name": "sqlite3.dll",
+      "path": "bin/sqlite3.dll",
+      "role": "Third-party SQLite dependency",
+      "sizeBytes": 1595634,
+      "sha256": "12B2E294FC93A175DCB6789E6B503780D899DF668F717FA55FBEAC97F4E3EBE9",
+      "authenticode": "NotSigned"
+    }
+  ]
+}
