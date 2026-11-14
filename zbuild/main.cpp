@@ -17,7 +17,7 @@
 
 namespace {
 
-constexpr const char* version = "0.1.0";
+constexpr const char* version = "0.1.6";
 
 std::filesystem::path executablePath(const char* argumentZero) {
 #ifdef _WIN32
@@ -26,7 +26,7 @@ std::filesystem::path executablePath(const char* argumentZero) {
     const DWORD length = GetModuleFileNameW(
         nullptr, path.data(), static_cast<DWORD>(path.size()));
     if (length == 0 || length >= path.size())
-        throw std::runtime_error("cannot determine the ZBuild executable path");
+        throw std::runtime_error("cannot determine the ZpBuild executable path");
     return std::filesystem::path(std::wstring(path.data(), length));
 #else
     return std::filesystem::absolute(argumentZero);

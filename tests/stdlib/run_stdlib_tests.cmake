@@ -3,6 +3,26 @@ if(NOT DEFINED ZP OR NOT DEFINED SOURCE_DIR OR NOT DEFINED WORK_DIR)
 endif()
 
 file(MAKE_DIRECTORY "${WORK_DIR}/interpreter")
+set(terminal_file_work "${WORK_DIR}/terminal-input-zfile")
+file(MAKE_DIRECTORY "${terminal_file_work}")
+set(terminal_file_input "${WORK_DIR}/terminal-input-zfile.stdin")
+file(WRITE "${terminal_file_input}" "add\nRemember to test\n")
+execute_process(
+    COMMAND "${ZP}" run "${SOURCE_DIR}/tests/stdlib/terminal_input_with_zfile.zp"
+    WORKING_DIRECTORY "${terminal_file_work}"
+    INPUT_FILE "${terminal_file_input}"
+    RESULT_VARIABLE terminal_file_result
+    OUTPUT_VARIABLE terminal_file_output
+    ERROR_VARIABLE terminal_file_error
+    TIMEOUT 20
+)
+if(NOT terminal_file_result EQUAL 0 OR
+   NOT "${terminal_file_output}" STREQUAL "Remember to test\n")
+    message(FATAL_ERROR
+        "terminal input with zfile failed (${terminal_file_result})\n"
+        "${terminal_file_output}${terminal_file_error}")
+endif()
+
 set(source "${SOURCE_DIR}/tests/stdlib/smoke.zp")
 set(expected "sqrt-ok\npow-ok\nabs-ok\nmin-max-ok\nrounding-ok\ntrig-ok\ninverse-trig-ok\nlog-exp-ok\nALICE\nalpha,beta\nbcd\nxxx\nlower-ok\nreplace-ok\nprefix-suffix-ok\nstring-reverse-ok\nstring-length-ok\nrepeat-zero-ok\nsubstring-end-ok\nunicode-length-ok\nЖ\n🙂Жé\nÉЖ\néж\né\né🙂Ж\néя\nreverse-ok\nsort-ok\ncollections-copy-ok\nsum-ok\naverage-ok\ncollection-min-max-ok\nunique-ok\ncollection-search-ok\nfirst-last-ok\nempty-ok\nrandom-ok\nrandom-seed-ok\nchoice-ok\nrandom-boolean-ok\nshuffle-ok\nreport.txt\nnormalize-ok\nextension-ok\ndirectory-ok\nabsolute-ok\nvisible\nenv-exists\ntime-ok\ndate-parts-ok\nclock-parts-ok\nname=alice\nfile-exists-ok\nfile-size-ok\nfile-append-ok\nfile-lines-write-ok\nfile-lines-read-ok\nfile-lines-final-line-ok\nfile-lines-crlf-ok\nfile-lines-empty-ok\nfile-lines-delete-ok\ndirectory-list-ok\nnested-dir-ok\nroot-dir-ok\nargs-count-ok\nargs-has-ok\nargs-all-ok\nenv-args-ok\nhome-dir-ok\ncurrent-dir-ok\nstdlib-gc-string-ok\nstdlib-gc-array-ok\nlog-ok\nfile-delete-ok\n")
 

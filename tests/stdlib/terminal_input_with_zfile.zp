@@ -1,0 +1,15 @@
+use zfile as file
+
+start {
+    let command: string = read()
+    if command == "add" {
+        let task: string = read()
+        file.writeLines("tasks.txt", [task])
+    } else {
+        file.writeLines("tasks.txt", [])
+    } end if
+
+    for task in file.readLines("tasks.txt") {
+        say(task)
+    } end for
+} stop

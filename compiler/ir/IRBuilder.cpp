@@ -326,10 +326,13 @@ void IRBuilder::buildProgram(
     Module& module
 ) const {
 
-    const auto isArrayBuiltin = [](const std::string& name) {
+    const auto isSourceBuiltin = [](const std::string& name) {
         return name == "length" || name == "push" || name == "pop" ||
             name == "clear" || name == "insert" || name == "remove" ||
-            name == "contains";
+            name == "contains" || name == "read" ||
+            name == "read_number" || name == "read_integer" ||
+            name == "read_boolean" || name == "say" ||
+            name == "printz" || name == "printm";
     };
     std::vector<const zplus::ast::VariableDeclaration*> moduleVariables;
     std::unordered_map<std::string, std::size_t> functionNameCounts;
@@ -376,7 +379,7 @@ void IRBuilder::buildProgram(
                 : nullptr;
             function && !function->moduleName.empty()) {
             if (functionNameCounts[function->name] == 1 &&
-                !isArrayBuiltin(function->name)) {
+                !isSourceBuiltin(function->name)) {
                 module.functionAliases[function->name] = function->internalName;
             }
         }

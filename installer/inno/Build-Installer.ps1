@@ -1,0 +1,231 @@
+[CmdletBinding()]
+param(
+    [string]$OutputDirectory = (Join-Path $PSScriptRoot 'output'),
+    [string]$IsccPath
+)
+
+$ErrorActionPreference = 'Stop'
+$requiredInnoVersion = '7.1.1'
+$repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$binaryDirectory = Join-Path $repositoryRoot 'bin'
+$temporaryDirectory = Join-Path ([IO.Path]::GetTempPath()) ("zplus-inno-" + [guid]::NewGuid().ToString('N'))
+
+function Get-IsccCompiler {
+    param([string]$RequestedPath)
+
+    $candidates = [Collections.Generic.List[string]]::new()
+    if ($RequestedPath) {
+        if (-not (Test-Path -LiteralPath $RequestedPath -PathType Leaf)) {
+            throw "The specified ISCC.exe does not exist: $RequestedPath"
+        }
+        $candidates.Add((Resolve-Path -LiteralPath $RequestedPath).Path)
+    } else {
+        $onPath = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+        if ($onPath) {
+            $candidates.Add($onPath.Source)
+        }
+
+        foreach ($programFiles in @(${env:ProgramFiles(x86)}, $env:ProgramFiles)) {
+            if ($programFiles) {
+                $candidates.Add((Join-Path $programFiles 'Inno Setup 7.1.1\ISCC.exe'))
+                $candidates.Add((Join-Path $programFiles 'Inno Setup 7\ISCC.exe'))
+            }
+        }
+
+        foreach ($registryRoot in @(
+            'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
+            'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall',
+            'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
+        )) {
+            foreach ($key in (Get-ChildItem -LiteralPath $registryRoot -ErrorAction SilentlyContinue)) {
+                $app = Get-ItemProperty -LiteralPath $key.PSPath -ErrorAction SilentlyContinue
+                if ($app.DisplayName -eq "Inno Setup $requiredInnoVersion" -and $app.InstallLocation) {
+                    $candidates.Add((Join-Path $app.InstallLocation 'ISCC.exe'))
+                }
+            }
+        }
+    }
+
+    $checked = [Collections.Generic.List[string]]::new()
+    foreach ($candidate in $candidates | Select-Object -Unique) {
+        if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            continue
+        }
+        $startInfo = New-Object Diagnostics.ProcessStartInfo
+        $startInfo.FileName = $candidate
+        $startInfo.Arguments = '--version'
+        $startInfo.UseShellExecute = $false
+        $startInfo.CreateNoWindow = $true
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
+        $versionProcess = New-Object Diagnostics.Process
+        $versionProcess.StartInfo = $startInfo
+        if (-not $versionProcess.Start()) {
+            throw "Could not start ISCC at '$candidate' to verify its version."
+        }
+        $versionOutput = $versionProcess.StandardOutput.ReadToEnd()
+        $versionError = $versionProcess.StandardError.ReadToEnd()
+        $versionProcess.WaitForExit()
+        $exitCode = $versionProcess.ExitCode
+        $version = $versionOutput.Trim()
+        if (-not $version) {
+            $version = $versionError.Trim()
+        }
+        $versionProcess.Dispose()
+        $checked.Add("$candidate ($version)")
+        if ($exitCode -eq 0 -and $version -eq $requiredInnoVersion) {
+            return [pscustomobject]@{ Path = $candidate; Version = $version }
+        }
+        if ($RequestedPath) {
+            throw "ISCC at '$candidate' does not report the required Inno Setup version $requiredInnoVersion. Version output: '$version'."
+        }
+    }
+
+    $details = if ($checked.Count -gt 0) { " Found: $($checked -join '; ')." } else { '' }
+    throw "Inno Setup $requiredInnoVersion (ISCC.exe) is required. Install that exact version or pass -IsccPath to its compiler.$details"
+}
+
+function Copy-DirectoryContents {
+    param([string]$SourceDirectory, [string]$DestinationDirectory)
+
+    if (-not (Test-Path -LiteralPath $SourceDirectory -PathType Container)) {
+        throw "Required distribution directory is missing: $SourceDirectory"
+    }
+    New-Item -ItemType Directory -Path $DestinationDirectory -Force | Out-Null
+    foreach ($entry in Get-ChildItem -LiteralPath $SourceDirectory -Force) {
+        Copy-Item -LiteralPath $entry.FullName -Destination $DestinationDirectory -Recurse -Force
+    }
+}
+
+function Get-CompilerVersion {
+    param([string]$CompilerPath)
+
+    $output = (& $CompilerPath version 2>&1 | Out-String).Trim()
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -ne 0 -or $output -notmatch '^Z\+ Compiler (?<version>\d+\.\d+\.\d+)$') {
+        throw "Could not read a stable version from '$CompilerPath'. Output: '$output'."
+    }
+    return $Matches.version
+}
+
+function New-SetupIcon {
+    param([string]$LogoPath, [string]$IconPath)
+    Add-Type -AssemblyName System.Drawing
+    if (-not ('ZPlusInstallerNativeIcon' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class ZPlusInstallerNativeIcon
+{
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool DestroyIcon(IntPtr handle);
+}
+'@
+    }
+    $source = [System.Drawing.Image]::FromFile($LogoPath)
+    $bitmap = [System.Drawing.Bitmap]::new(32, 32)
+    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+    $handle = [IntPtr]::Zero
+    try {
+        $graphics.Clear([System.Drawing.Color]::Transparent)
+        $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $scale = [Math]::Min(30.0 / $source.Width, 30.0 / $source.Height)
+        $width = [Math]::Max(1, [int][Math]::Round($source.Width * $scale))
+        $height = [Math]::Max(1, [int][Math]::Round($source.Height * $scale))
+        $graphics.DrawImage($source, [int](32 - $width) / 2, [int](32 - $height) / 2, $width, $height)
+        $handle = $bitmap.GetHicon()
+        $icon = [System.Drawing.Icon]::FromHandle($handle)
+        $stream = [IO.File]::Create($IconPath)
+        try { $icon.Save($stream) } finally { $stream.Dispose(); $icon.Dispose() }
+    }
+    finally {
+        if ($handle -ne [IntPtr]::Zero) { [void][ZPlusInstallerNativeIcon]::DestroyIcon($handle) }
+        $graphics.Dispose()
+        $bitmap.Dispose()
+        $source.Dispose()
+    }
+}
+
+try {
+    $compiler = Get-IsccCompiler -RequestedPath $IsccPath
+    Write-Host "Using Inno Setup $($compiler.Version): $($compiler.Path)"
+
+    $version = Get-CompilerVersion -CompilerPath (Join-Path $binaryDirectory 'zp.exe')
+    $requiredFiles = @(
+        'zp.exe',
+        'zbuild.exe',
+        'zgraphics_runtime.dll',
+        'zaudio_runtime.dll',
+        'zphysics_runtime.dll',
+        'sqlite3.dll',
+        'zplus_input_runtime.dll',
+        'stdlib\zfile\zfile.zh',
+        'stdlib\zmath\zmath.zh',
+        'zbuild-templates\Console\zproject.toml'
+    )
+    foreach ($relativePath in $requiredFiles) {
+        $path = Join-Path $binaryDirectory $relativePath
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            throw "The local Z+ $version distribution is missing required file '$relativePath' in '$binaryDirectory'."
+        }
+    }
+
+    $zbuildVersion = (& (Join-Path $binaryDirectory 'zbuild.exe') --version 2>&1 | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or $zbuildVersion -notmatch '^ZBuild \S+$') {
+        throw "The local ZBuild executable failed its version check: '$zbuildVersion'."
+    }
+
+    $logoPath = Join-Path $repositoryRoot 'Z+_VS_code\icons\zplus.icon.png'
+    foreach ($sourcePath in @(
+        $logoPath,
+        (Join-Path $repositoryRoot 'LICENSE.txt'),
+        (Join-Path $repositoryRoot 'release\windows\THIRD-PARTY-NOTICES.txt')
+    )) {
+        if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
+            throw "Required installer resource is missing: $sourcePath"
+        }
+    }
+
+    New-Item -ItemType Directory -Path $temporaryDirectory -Force | Out-Null
+    $stageDirectory = Join-Path $temporaryDirectory 'stage'
+    Copy-DirectoryContents -SourceDirectory $binaryDirectory -DestinationDirectory (Join-Path $stageDirectory 'bin')
+    Copy-DirectoryContents -SourceDirectory (Join-Path $repositoryRoot 'docs') -DestinationDirectory (Join-Path $stageDirectory 'docs')
+    Copy-DirectoryContents -SourceDirectory (Join-Path $repositoryRoot 'examples') -DestinationDirectory (Join-Path $stageDirectory 'examples')
+    foreach ($document in @(
+        @{ Source = 'README.md'; Destination = 'PROJECT-README.md' },
+        @{ Source = 'SYNTAX.md'; Destination = 'LANGUAGE-SYNTAX.md' },
+        @{ Source = 'MODULES.md'; Destination = 'MODULES.md' },
+        @{ Source = 'NATIVE_BACKEND.md'; Destination = 'NATIVE_BACKEND.md' }
+    )) {
+        Copy-Item -LiteralPath (Join-Path $repositoryRoot $document.Source) `
+            -Destination (Join-Path $stageDirectory "docs\$($document.Destination)")
+    }
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot 'LICENSE.txt') -Destination $stageDirectory
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot 'release\windows\THIRD-PARTY-NOTICES.txt') `
+        -Destination $stageDirectory
+
+    $iconPath = Join-Path $temporaryDirectory 'ZPlus.ico'
+    New-SetupIcon -LogoPath $logoPath -IconPath $iconPath
+    $resolvedOutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
+    New-Item -ItemType Directory -Path $resolvedOutputDirectory -Force | Out-Null
+    $scriptPath = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot 'ZPlus.iss')).Path
+    & $compiler.Path "/DAppVersion=$version" "/DStageDirectory=$stageDirectory" "/DAppIcon=$iconPath" "--output-dir=$resolvedOutputDirectory" $scriptPath
+    $compileExitCode = $LASTEXITCODE
+    if ($compileExitCode -ne 0) {
+        throw "Inno Setup $requiredInnoVersion failed with exit code $compileExitCode."
+    }
+    $installerPath = Join-Path $resolvedOutputDirectory "ZPlus-$version-Setup.exe"
+    if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf)) {
+        throw "Inno Setup reported success but the expected installer was not created: $installerPath"
+    }
+    Write-Host "Built Z+ $version installer with ZBuild $zbuildVersion from '$binaryDirectory': $installerPath"
+}
+catch {
+    [Console]::Error.WriteLine("Installer build failed: $($_.Exception.Message)")
+    exit 1
+}
+finally {
+    if (Test-Path -LiteralPath $temporaryDirectory) {
+        Remove-Item -LiteralPath $temporaryDirectory -Recurse -Force
+    }
+}
