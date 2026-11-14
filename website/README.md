@@ -14,6 +14,8 @@ Open `http://localhost:8000`. Set the `PORT` environment variable to use another
 
 No build step, client-side dependency, secret, API key, or analytics service is used. Release information is fetched from the public GitHub Releases API for `MiroXdev0/ZPluse-release`; the official Releases page is shown as a fallback. Progress is stored in this browser's local storage.
 
+The shared transparent logo artwork is maintained in the repository's `logo/` directory. The website header uses the dark-surface artwork; the favicon selects the corresponding light or dark artwork from the visitor's color-scheme preference.
+
 ## Accuracy and scope
 
 The learning course has 52 numbered lessons. The syntax, examples, backend limits, and module behavior are grounded in the repository's current `docs/syntax.md`, `MODULES.md`, `docs/ZBUILD.md`, and `stdlib/README.md`. The reference identifies features that are not implemented rather than presenting them as available. Examples are intended to be checked with `zp check`; interpreter/native support can differ.

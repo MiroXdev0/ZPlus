@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo/Z%2B%20Emblem%20-%20for%20ligth%20theme.png" width="460" alt="Z+ emblem">
+</p>
+
 # Z+
 
 Z+ is a small compiled language with a lexer, parser, semantic analyzer, shared intermediate representation, interpreter, and an x86-64 native backend.

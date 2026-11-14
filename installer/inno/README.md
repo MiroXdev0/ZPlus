@@ -17,7 +17,7 @@
    .\installer\inno\Build-Installer.ps1 -IsccPath "C:\Program Files\Inno Setup 7\ISCC.exe"
    ```
 
-The installer preserves the `bin\` layout, including `zp.exe`, `zbuild.exe`, runtime DLLs, standard-library modules, and ZBuild templates. It also includes the repository documentation, examples, license, third-party notices, and the existing Z+ logo. Temporary staging files are removed after the build.
+The installer preserves the `bin\` layout, including `zp.exe`, `zbuild.exe`, runtime DLLs, standard-library modules, and ZBuild templates. It also includes the repository documentation, examples, license, and third-party notices. The setup icon, Inno wizard image, and installed shortcuts are generated from the official light-surface logo in `logo\`; the original logo remains unchanged. Temporary staging files are removed after the build.
 
 On success, the installer is written to `installer\inno\output\ZPlus-<version>-Setup.exe`; the script prints its full path and verifies that the file exists. The script does not download release assets or require the GitHub Releases API.
 

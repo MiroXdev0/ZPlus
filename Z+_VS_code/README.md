@@ -7,7 +7,7 @@ Z+ Language Support provides syntax highlighting and editor tools for `.zp` prog
 Install the packaged `zplus-language-*.vsix` file with **Extensions: Install from VSIX...**, or run:
 
 ```powershell
-code --install-extension .\zplus-language-0.6.0.vsix
+code --install-extension .\zpluse-language-1.1.4.vsix
 ```
 
 ## Requirements and compiler setup
@@ -40,7 +40,7 @@ ZBuild project commands require a `zproject.toml` in the active file's directory
 ## Editor features
 
 - TextMate highlighting for implemented language tokens, strings, characters, line/block comments, types, declarations, built-ins, and operators.
-- Optional **Z+ File Icons** theme: select it with **Preferences: File Icon Theme** to show the Z+ logo on `.zp` and `.zh` files. Other extensions continue using VS Code's default file icons.
+- Optional **Z+ File Icons** theme: select it with **Preferences: File Icon Theme** to show the official light-surface logo in light themes and dark-surface logo in dark themes on `.zp` and `.zh` files. Other extensions continue using VS Code's default file icons.
 - Completion for keywords, built-ins, local declarations and public imported declarations. After typing `module.`, completion offers that module's public members.
 - Signature help, hover information, and Go to Definition for local and imported symbols, including qualified module references.
 - Imported private declarations are excluded from suggestions; compiler diagnostics remain authoritative for inaccessible references.

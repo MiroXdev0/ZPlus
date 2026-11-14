@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "c:\\Users\\miros\\OneDrive\\Desktop\\Projects\\Z+ compiler\\installer\\windows-C#\\ZPlusInstaller.csproj": {}
+    "C:\\Users\\miros\\OneDrive\\Desktop\\Projects\\Z+ compiler\\installer\\windows-C#\\ZPlusInstaller.csproj": {}
   },
   "projects": {
-    "c:\\Users\\miros\\OneDrive\\Desktop\\Projects\\Z+ compiler\\installer\\windows-C#\\ZPlusInstaller.csproj": {
+    "C:\\Users\\miros\\OneDrive\\Desktop\\Projects\\Z+ compiler\\installer\\windows-C#\\ZPlusInstaller.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\Users\\miros\\OneDrive\\Desktop\\Projects\\Z+ compiler\\installer\\windows-C#\\ZPlusInstaller.csproj",
+        "projectUniqueName": "C:\\Users\\miros\\OneDrive\\Desktop\\Projects\\Z+ compiler\\installer\\windows-C#\\ZPlusInstaller.csproj",
         "projectName": "ZPlus-1.1.2-Setup",
-        "projectPath": "c:\\Users\\miros\\OneDrive\\Desktop\\Projects\\Z+ compiler\\installer\\windows-C#\\ZPlusInstaller.csproj",
+        "projectPath": "C:\\Users\\miros\\OneDrive\\Desktop\\Projects\\Z+ compiler\\installer\\windows-C#\\ZPlusInstaller.csproj",
         "packagesPath": "C:\\Users\\miros\\.nuget\\packages\\",
-        "outputPath": "c:\\Users\\miros\\OneDrive\\Desktop\\Projects\\Z+ compiler\\installer\\windows-C#\\obj\\",
+        "outputPath": "C:\\Users\\miros\\OneDrive\\Desktop\\Projects\\Z+ compiler\\installer\\windows-C#\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

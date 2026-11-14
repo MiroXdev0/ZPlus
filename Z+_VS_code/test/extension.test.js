@@ -197,7 +197,7 @@ function documentFrom(text, filePath = path.join(os.tmpdir(), "example.zp")) {
 
 test("manifest, grammar, language configuration and snippets are loadable", () => {
     assert.equal(manifest.contributes.languages[0].id, "zplus");
-    assert.equal(manifest.version, "0.6.0");
+    assert.equal(manifest.version, "1.1.4");
     assert.deepEqual(manifest.contributes.languages[0].extensions, [".zp", ".zh"]);
     assert.ok(fs.existsSync(path.join(extensionRoot, manifest.contributes.grammars[0].path)));
     assert.equal(grammar.scopeName, "source.zplus");
@@ -230,6 +230,31 @@ test("manifest, grammar, language configuration and snippets are loadable", () =
     ]) {
         assert.ok(manifest.contributes.commands.some(item => item.command === command), command);
     }
+});
+
+test("extension branding uses the official logo variants for light and dark surfaces", () => {
+    const officialLight = fs.readFileSync(path.join(projectRoot, "logo", "Z+ Emblem - for ligth theme.png"));
+    const officialDark = fs.readFileSync(path.join(projectRoot, "logo", "Z+ Emblem - for dark theme.png"));
+    const readDimensions = png => [png.readUInt32BE(16), png.readUInt32BE(20)];
+    const marketplaceIcon = fs.readFileSync(path.join(extensionRoot, manifest.icon));
+    const lightFileIcon = fs.readFileSync(path.join(extensionRoot, "icons", "zplus-file.png"));
+    const darkFileIcon = fs.readFileSync(path.join(extensionRoot, "icons", "zplus-file-dark.png"));
+
+    assert.equal(manifest.icon, "icons/zplus.icon.png");
+    assert.deepEqual(readDimensions(officialLight), [1536, 1024]);
+    assert.deepEqual(readDimensions(officialDark), [1536, 1024]);
+    for (const [name, icon] of [
+        ["Marketplace", marketplaceIcon],
+        ["Light-theme file", lightFileIcon],
+        ["Dark-theme file", darkFileIcon]
+    ]) {
+        assert.deepEqual(readDimensions(icon), [512, 512], `${name} icon should use a square canvas`);
+        assert.equal(icon[25], 6, `${name} icon should preserve RGBA transparency`);
+    }
+    assert.notDeepEqual(marketplaceIcon, lightFileIcon,
+        "the Marketplace icon should be a separately sized asset from the file icon");
+    assert.notDeepEqual(lightFileIcon, darkFileIcon,
+        "light and dark file themes should use distinct logo variants");
 });
 
 test("activation registers commands and editor providers", () => {

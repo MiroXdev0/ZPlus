@@ -7,6 +7,9 @@
 #ifndef AppIcon
   #error "Build with Build-Installer.ps1 so AppIcon is generated from the repository logo."
 #endif
+#ifndef AppWizardImage
+  #error "Build with Build-Installer.ps1 so AppWizardImage is generated from the repository logo."
+#endif
 
 #define AppName "Z+"
 #define AppPublisher "Miroslav Aleksandrov"
@@ -32,9 +35,10 @@ MinVersion=10.0
 OutputDir=output
 OutputBaseFilename=ZPlus-{#AppVersion}-Setup
 SetupIconFile={#AppIcon}
+WizardSmallImageFile={#AppWizardImage}
 SetupLogging=yes
 UninstallDisplayName=Z+ {#AppVersion}
-UninstallDisplayIcon={app}\bin\zp.exe
+UninstallDisplayIcon={app}\ZPlus.ico
 WizardStyle=modern
 CloseApplications=yes
 RestartIfNeededByRun=no
@@ -50,12 +54,13 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription:
 
 [Files]
 Source: "{#StageDirectory}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#AppIcon}"; DestDir: "{app}"; DestName: "ZPlus.ico"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\Z+ Command Prompt"; Filename: "{cmd}"; Parameters: "/K """"{app}\bin\zp.exe"" --help"""; WorkingDir: "{app}"
+Name: "{group}\Z+ Command Prompt"; Filename: "{cmd}"; Parameters: "/K """"{app}\bin\zp.exe"" --help"""; WorkingDir: "{app}"; IconFilename: "{app}\ZPlus.ico"
 Name: "{group}\Z+ Installation Folder"; Filename: "{app}"
 Name: "{group}\Uninstall Z+"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\Z+ Command Prompt"; Filename: "{cmd}"; Parameters: "/K """"{app}\bin\zp.exe"" --help"""; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{autodesktop}\Z+ Command Prompt"; Filename: "{cmd}"; Parameters: "/K """"{app}\bin\zp.exe"" --help"""; WorkingDir: "{app}"; IconFilename: "{app}\ZPlus.ico"; Tasks: desktopicon
 
 [Code]
 const

@@ -107,6 +107,15 @@ add_library(zplus_graphics STATIC
 )
 
 if(WIN32)
+    enable_language(RC)
+    file(TO_CMAKE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/resources/ZPlus.ico" ZPLUS_ICON_RC_PATH)
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/zplus.rc.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/zplus_icon.rc"
+        @ONLY
+    )
+    target_sources(zp PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/zplus_icon.rc")
+    target_sources(zbuild PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/zplus_icon.rc")
     target_sources(zplus_graphics PRIVATE
         ZGraphics/Platform/WindowsWindow.cpp
     )

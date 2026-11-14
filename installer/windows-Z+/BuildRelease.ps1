@@ -1,12 +1,21 @@
 param(
-    [switch]$ReplaceExisting
+    [switch]$ReplaceExisting,
+    [string]$CompilerDistributionPath
 )
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path $PSScriptRoot).Path
 $repositoryRoot = (Resolve-Path (Join-Path $projectRoot '..\..')).Path
 $zbuild = Join-Path $repositoryRoot 'build-zbuild\Release\zbuild.exe'
-$compilerBuild = Join-Path $repositoryRoot 'build-zbuild\release-staging'
+$compilerBuild = if ([string]::IsNullOrWhiteSpace($CompilerDistributionPath)) {
+    Join-Path $repositoryRoot 'build-zbuild\release-staging'
+}
+else {
+    if (-not (Test-Path -LiteralPath $CompilerDistributionPath -PathType Container)) {
+        throw "Compiler distribution directory was not found: '$CompilerDistributionPath'."
+    }
+    (Resolve-Path -LiteralPath $CompilerDistributionPath).Path
+}
 $projectOutput = Join-Path $projectRoot 'dist\release\bin'
 $finalDirectory = Join-Path $repositoryRoot 'release\zplus-1.1.2-windows-x64'
 $stagingDirectory = Join-Path $repositoryRoot 'release\zplus-1.1.2-windows-x64.staging'
@@ -42,6 +51,13 @@ foreach ($required in @(
     if ($LASTEXITCODE -ne 0 -or ($versionOutput -join "`n") -notmatch '1\.1\.2') {
         throw "The compiler build is not Z+ 1.1.2; refusing to package it."
     }
+}
+$stdlibSource = Join-Path $compilerBuild 'stdlib'
+if (-not (Test-Path -LiteralPath (Join-Path $stdlibSource 'zstring\zstring.zh'))) {
+    if (-not [string]::IsNullOrWhiteSpace($CompilerDistributionPath)) {
+        throw "The selected compiler distribution does not include its matching standard library: '$stdlibSource'."
+    }
+    $stdlibSource = Join-Path $repositoryRoot 'stdlib'
 }
 $expectedFinal = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot 'release\zplus-1.1.2-windows-x64'))
 $expectedStaging = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot 'release\zplus-1.1.2-windows-x64.staging'))
@@ -107,7 +123,7 @@ try {
     )) {
         Copy-Item -LiteralPath (Join-Path $compilerBuild $binary) -Destination $payloadBin
     }
-    Copy-NonemptyTree -SourceDirectory (Join-Path $repositoryRoot 'stdlib') -DestinationDirectory $payloadStdlib
+    Copy-NonemptyTree -SourceDirectory $stdlibSource -DestinationDirectory $payloadStdlib
     Copy-Item -LiteralPath (Join-Path $compilerBuild 'zbuild-templates') -Destination $payloadBin -Recurse
 
     $docs = Join-Path $payload 'docs'
@@ -117,13 +133,18 @@ try {
     Copy-NonemptyTree -SourceDirectory (Join-Path $repositoryRoot 'examples') -DestinationDirectory $examples
     Copy-Item -LiteralPath (Join-Path $repositoryRoot 'SYNTAX.md') -Destination $docs
     Copy-Item -LiteralPath (Join-Path $repositoryRoot 'LICENSE.txt') -Destination $payload
-    Copy-Item -LiteralPath (Join-Path $repositoryRoot 'installer\windows\THIRD-PARTY-NOTICES.txt') -Destination $payload
+    $notices = Join-Path $repositoryRoot 'release\windows\THIRD-PARTY-NOTICES.txt'
+    Copy-Item -LiteralPath $notices -Destination $payload
     Copy-Item -LiteralPath (Join-Path $repositoryRoot 'release\windows\payload\THIRD-PARTY-NOTICES') `
         -Destination $payload -Recurse
-    Copy-Item -LiteralPath (Join-Path $repositoryRoot 'release\windows\ZPlusLogo.png') -Destination $docs
+    $logoSource = Join-Path $repositoryRoot 'logo\Z+ Emblem - for dark theme.png'
+    if (-not (Test-Path -LiteralPath $logoSource -PathType Leaf)) {
+        throw "The official dark-surface Z+ logo is missing: $logoSource"
+    }
+    Copy-Item -LiteralPath $logoSource -Destination (Join-Path $docs 'ZPlusLogo.png')
     Copy-Item -LiteralPath (Join-Path $projectRoot 'README.md') -Destination (Join-Path $stagingDirectory 'INSTALLER-README.md')
     Copy-Item -LiteralPath (Join-Path $repositoryRoot 'LICENSE.txt') -Destination $stagingDirectory
-    Copy-Item -LiteralPath (Join-Path $repositoryRoot 'installer\windows\THIRD-PARTY-NOTICES.txt') -Destination $stagingDirectory
+    Copy-Item -LiteralPath $notices -Destination $stagingDirectory
 
     $manifestPath = Join-Path $stagingDirectory 'payload.sha256'
     $records = [System.Collections.Generic.List[string]]::new()

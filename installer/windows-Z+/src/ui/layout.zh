@@ -95,12 +95,10 @@ pub fn frame(window: number, page: number, title: string, subtitle: string, logo
     graphics.rectangle(window, 0, 0, 980, 78, "#171F26", true, 1)
     graphics.line(window, 28, 78, 952, 78, "#2A353D", 1)
     if file.exists(logoPath) {
-        graphics.image(window, logoPath, 30, 18, 42, 42)
-    } else {
-        graphics.text(window, "Z+", 31, 19, "#39D2C1", 29)
+        graphics.image(window, logoPath, 30, 18, 63, 42)
     } end if
-    graphics.text(window, "Z+ SETUP", 86, 17, "#EAF1F4", 17)
-    graphics.text(window, "1.1.2  |  STABLE", 86, 42, "#8FA1AA", 12)
+    graphics.text(window, "Z+ SETUP", 102, 17, "#EAF1F4", 17)
+    graphics.text(window, "1.1.2  |  STABLE", 102, 42, "#8FA1AA", 12)
 
     graphics.rectangle(window, 28, 102, 220, 488, "#171F26", true, 1)
     graphics.text(window, "SETUP", 50, 124, "#758790", 11)

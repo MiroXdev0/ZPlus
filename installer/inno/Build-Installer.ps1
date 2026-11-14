@@ -146,6 +146,30 @@ public static class ZPlusInstallerNativeIcon
     }
 }
 
+function New-SetupWizardImage {
+    param([string]$LogoPath, [string]$ImagePath)
+
+    Add-Type -AssemblyName System.Drawing
+    $source = [System.Drawing.Image]::FromFile($LogoPath)
+    $bitmap = [System.Drawing.Bitmap]::new(
+        55, 55, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+    try {
+        $graphics.Clear([System.Drawing.Color]::White)
+        $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $scale = [Math]::Min(51.0 / $source.Width, 51.0 / $source.Height)
+        $width = [Math]::Max(1, [int][Math]::Round($source.Width * $scale))
+        $height = [Math]::Max(1, [int][Math]::Round($source.Height * $scale))
+        $graphics.DrawImage($source, [int](55 - $width) / 2, [int](55 - $height) / 2, $width, $height)
+        $bitmap.Save($ImagePath, [System.Drawing.Imaging.ImageFormat]::Bmp)
+    }
+    finally {
+        $graphics.Dispose()
+        $bitmap.Dispose()
+        $source.Dispose()
+    }
+}
+
 try {
     $compiler = Get-IsccCompiler -RequestedPath $IsccPath
     Write-Host "Using Inno Setup $($compiler.Version): $($compiler.Path)"
@@ -175,7 +199,7 @@ try {
         throw "The local ZBuild executable failed its version check: '$zbuildVersion'."
     }
 
-    $logoPath = Join-Path $repositoryRoot 'Z+_VS_code\icons\zplus.icon.png'
+    $logoPath = Join-Path $repositoryRoot 'logo\Z+ Emblem - for ligth theme.png'
     foreach ($sourcePath in @(
         $logoPath,
         (Join-Path $repositoryRoot 'LICENSE.txt'),
@@ -191,6 +215,10 @@ try {
     Copy-DirectoryContents -SourceDirectory $binaryDirectory -DestinationDirectory (Join-Path $stageDirectory 'bin')
     Copy-DirectoryContents -SourceDirectory (Join-Path $repositoryRoot 'docs') -DestinationDirectory (Join-Path $stageDirectory 'docs')
     Copy-DirectoryContents -SourceDirectory (Join-Path $repositoryRoot 'examples') -DestinationDirectory (Join-Path $stageDirectory 'examples')
+    $documentationLogoDirectory = Join-Path $stageDirectory 'docs\logo'
+    New-Item -ItemType Directory -Path $documentationLogoDirectory -Force | Out-Null
+    Copy-Item -LiteralPath $logoPath `
+        -Destination (Join-Path $documentationLogoDirectory 'Z+ Emblem - for ligth theme.png')
     foreach ($document in @(
         @{ Source = 'README.md'; Destination = 'PROJECT-README.md' },
         @{ Source = 'SYNTAX.md'; Destination = 'LANGUAGE-SYNTAX.md' },
@@ -205,11 +233,15 @@ try {
         -Destination $stageDirectory
 
     $iconPath = Join-Path $temporaryDirectory 'ZPlus.ico'
+    $wizardImagePath = Join-Path $temporaryDirectory 'ZPlusWizard.bmp'
     New-SetupIcon -LogoPath $logoPath -IconPath $iconPath
+    New-SetupWizardImage -LogoPath $logoPath -ImagePath $wizardImagePath
     $resolvedOutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
     New-Item -ItemType Directory -Path $resolvedOutputDirectory -Force | Out-Null
     $scriptPath = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot 'ZPlus.iss')).Path
-    & $compiler.Path "/DAppVersion=$version" "/DStageDirectory=$stageDirectory" "/DAppIcon=$iconPath" "--output-dir=$resolvedOutputDirectory" $scriptPath
+    & $compiler.Path "/DAppVersion=$version" "/DStageDirectory=$stageDirectory" `
+        "/DAppIcon=$iconPath" "/DAppWizardImage=$wizardImagePath" `
+        "--output-dir=$resolvedOutputDirectory" $scriptPath
     $compileExitCode = $LASTEXITCODE
     if ($compileExitCode -ne 0) {
         throw "Inno Setup $requiredInnoVersion failed with exit code $compileExitCode."

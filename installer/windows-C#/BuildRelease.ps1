@@ -142,9 +142,9 @@ The source file bundled in miniaudio's extras directory identifies this work
 as public domain and contains its license notice.
 '@ | Set-Content -LiteralPath (Join-Path $noticesDir 'stb_vorbis-NOTICE.txt') -Encoding utf8
 
-$logoSource = Join-Path $root 'Z+_VS_code\icons\zplus.icon.png'
+$logoSource = Join-Path $root 'logo\Z+ Emblem - for dark theme.png'
 if (-not (Test-Path $logoSource -PathType Leaf)) {
-    throw "The existing Z+ logo is missing: $logoSource"
+    throw "The official dark-surface Z+ logo is missing: $logoSource"
 }
 Copy-Item -LiteralPath $logoSource -Destination (Join-Path $releaseDir 'ZPlusLogo.png')
 Copy-Item -LiteralPath (Join-Path $root 'LICENSE.txt') -Destination $releaseDir

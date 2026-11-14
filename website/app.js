@@ -5,7 +5,17 @@
   const search = document.querySelector("#site-search");
   const searchResults = document.querySelector("#search-results");
   const releasesUrl = "https://github.com/MiroXdev0/ZPluse-release/releases";
-  const releasesApi = "https://api.github.com/repos/MiroXdev0/ZPluse-release/releases?per_page=30";
+  const releasesApi = "https://api.github.com/repos/MiroXdev0/ZPluse-release/releases?per_page=100";
+  const releaseAssetPrefix = "/MiroXdev0/ZPluse-release/releases/download/";
+  const downloadTargets = [{
+    id: "windows-x86_64",
+    label: "Windows x86_64",
+    filePattern: /\.exe$/i,
+    installerPattern: /\b(?:setup|installer)\b/i,
+    platformPattern: /\b(?:windows|win64)\b/i,
+    architecturePattern: /\b(?:x64|amd64|x86\s+64)\b/i,
+    conflictPattern: /\b(?:linux|macos|darwin|osx|arm64|aarch64|i386|i686|win32|x86\s+32)\b/i
+  }];
   const progressKey = "zplus-learning-progress-v1";
   let releaseRequest;
 
@@ -101,7 +111,7 @@
 
   function renderFooter() {
     footer.innerHTML = `<div class="footer-inner">
-      <a class="brand" href="/"><span class="brand-mark">Z+</span><span class="brand-word">Language</span></a>
+      <a class="brand" href="/"><img class="brand-logo" src="/assets/zplus-logo-dark.png" alt=""><span class="brand-word">Language</span></a>
       <p>A programming language by Miroslav Aleksandrov.</p>
       <div class="footer-links">
         ${link("/download", "Download")}
@@ -155,27 +165,171 @@
     return `<div class="state-panel" role="status"><span class="spinner"></span><p>${escapeHtml(text)}</p></div>`;
   }
 
+  function nextReleasePage(response) {
+    const header = response.headers.get("Link") || "";
+    const match = header.match(/<([^>]+)>;\s*rel="next"/);
+    if (!match) return null;
+    const next = new URL(match[1]);
+    if (next.origin !== "https://api.github.com" || next.pathname !== "/repos/MiroXdev0/ZPluse-release/releases") {
+      throw new Error("GitHub returned an unexpected Releases pagination link.");
+    }
+    return next.href;
+  }
+
+  async function fetchReleasePages() {
+    const releases = [];
+    const visited = new Set();
+    let url = releasesApi;
+    while (url && !visited.has(url)) {
+      visited.add(url);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      let response;
+      try {
+        response = await fetch(url, {
+          headers: {
+            Accept: "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28"
+          },
+          cache: "default",
+          signal: controller.signal
+        });
+      } catch (error) {
+        if (controller.signal.aborted) {
+          throw new Error("The GitHub Releases request timed out. Check your connection or browse the official Releases page.");
+        }
+        throw new Error(`Could not connect to GitHub Releases: ${error.message}`);
+      } finally {
+        clearTimeout(timeout);
+      }
+      if (!response.ok) {
+        const remaining = response.headers.get("X-RateLimit-Remaining");
+        if (response.status === 429 || response.status === 403 && remaining === "0") {
+          throw new Error("GitHub's unauthenticated API rate limit was reached. Try again later or browse the official Releases page.");
+        }
+        if (response.status === 403) {
+          throw new Error("GitHub denied the Releases API request (HTTP 403), possibly due to its unauthenticated rate limit.");
+        }
+        throw new Error(`GitHub returned HTTP ${response.status} while loading releases.`);
+      }
+      const page = await response.json();
+      if (!Array.isArray(page)) throw new Error("The GitHub Releases response was not a release list.");
+      releases.push(...page.filter(release => release && !release.draft && typeof release.tag_name === "string"));
+      url = nextReleasePage(response);
+    }
+    return releases;
+  }
+
   async function fetchReleases() {
     if (!releaseRequest) {
-      releaseRequest = fetch(releasesApi, { headers: { Accept: "application/vnd.github+json" } }).then(async response => {
-        if (!response.ok) throw new Error(`GitHub returned HTTP ${response.status}`);
-        const data = await response.json();
-        if (!Array.isArray(data)) throw new Error("The GitHub Releases response was not a release list.");
-        return data.filter(release => !release.draft);
+      releaseRequest = fetchReleasePages().catch(error => {
+        releaseRequest = undefined;
+        throw error;
       });
     }
     return releaseRequest;
   }
 
-  function releaseCard(release, prominent = false) {
+  function parseVersionTag(tag) {
+    const match = String(tag || "").match(/^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/);
+    if (!match) return null;
+    return {
+      major: Number(match[1]),
+      minor: Number(match[2]),
+      patch: Number(match[3]),
+      prerelease: match[4] ? match[4].split(".") : []
+    };
+  }
+
+  function compareVersionTags(leftTag, rightTag) {
+    const left = parseVersionTag(leftTag);
+    const right = parseVersionTag(rightTag);
+    if (!left || !right) return null;
+    for (const component of ["major", "minor", "patch"]) {
+      if (left[component] !== right[component]) return left[component] < right[component] ? -1 : 1;
+    }
+    if (!left.prerelease.length || !right.prerelease.length) {
+      if (left.prerelease.length !== right.prerelease.length) return left.prerelease.length ? -1 : 1;
+      return 0;
+    }
+    const count = Math.max(left.prerelease.length, right.prerelease.length);
+    for (let index = 0; index < count; index += 1) {
+      if (left.prerelease[index] === undefined) return -1;
+      if (right.prerelease[index] === undefined) return 1;
+      const leftNumeric = /^\d+$/.test(left.prerelease[index]);
+      const rightNumeric = /^\d+$/.test(right.prerelease[index]);
+      if (leftNumeric && rightNumeric) {
+        const a = Number(left.prerelease[index]);
+        const b = Number(right.prerelease[index]);
+        if (a !== b) return a < b ? -1 : 1;
+      } else if (leftNumeric !== rightNumeric) {
+        return leftNumeric ? -1 : 1;
+      } else if (left.prerelease[index] !== right.prerelease[index]) {
+        return left.prerelease[index] < right.prerelease[index] ? -1 : 1;
+      }
+    }
+    return 0;
+  }
+
+  function releaseTimestamp(release) {
+    const timestamp = Date.parse(release.published_at || release.created_at || "");
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  }
+
+  function compareReleasesNewestFirst(left, right) {
+    const versionOrder = compareVersionTags(left.tag_name, right.tag_name);
+    if (versionOrder !== null && versionOrder !== 0) return -versionOrder;
+    if (versionOrder === null && parseVersionTag(left.tag_name)) return -1;
+    if (versionOrder === null && parseVersionTag(right.tag_name)) return 1;
+    return releaseTimestamp(right) - releaseTimestamp(left);
+  }
+
+  function githubAssetUrl(asset) {
+    if (!asset || typeof asset.browser_download_url !== "string" ||
+        asset.state && asset.state !== "uploaded") return null;
+    try {
+      const url = new URL(asset.browser_download_url);
+      if (url.protocol !== "https:" || url.hostname !== "github.com" ||
+          !url.pathname.startsWith(releaseAssetPrefix)) return null;
+      return url.href;
+    } catch {
+      return null;
+    }
+  }
+
+  function validReleasePageUrl(release) {
+    if (typeof release.html_url !== "string") return releasesUrl;
+    try {
+      const url = new URL(release.html_url);
+      return url.protocol === "https:" && url.hostname === "github.com" &&
+        url.pathname.startsWith("/MiroXdev0/ZPluse-release/releases/tag/")
+        ? url.href
+        : releasesUrl;
+    } catch {
+      return releasesUrl;
+    }
+  }
+
+  function normalizedPlatformText(value) {
+    return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  }
+
+  function findPlatformAsset(release, platform) {
     const assets = Array.isArray(release.assets) ? release.assets : [];
-    const releaseDate = release.published_at ? new Date(release.published_at).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : "";
-    return `<article class="release-card ${prominent ? "release-featured" : ""}">
-      <div class="release-heading"><div><p class="eyebrow">${release.prerelease ? "Prerelease" : prominent ? "Latest stable" : "Stable release"}${releaseDate ? ` · ${escapeHtml(releaseDate)}` : ""}</p><h3>${escapeHtml(release.tag_name || release.name || "Untitled release")}</h3></div>${release.html_url ? `<a class="subtle-link" href="${escapeHtml(release.html_url)}" target="_blank" rel="noreferrer">Release notes ↗</a>` : ""}</div>
-      ${release.name && release.name !== release.tag_name ? `<p>${escapeHtml(release.name)}</p>` : ""}
-      ${release.body ? `<details class="release-notes"><summary>Read release notes</summary><pre>${escapeHtml(release.body)}</pre></details>` : `<p class="muted">No release notes were published.</p>`}
-      <div class="asset-list">${assets.length ? assets.map(asset => `<a class="asset-link" href="${escapeHtml(asset.browser_download_url)}" target="_blank" rel="noreferrer"><span class="download-symbol">↓</span><span><strong>${escapeHtml(asset.name)}</strong><small>${formatBytes(asset.size)}</small></span><b>Download ↗</b></a>`).join("") : `<p class="muted">No downloadable assets are attached to this release.</p>`}</div>
-    </article>`;
+    const releaseText = normalizedPlatformText(`${release.name || ""} ${release.body || ""}`);
+    return assets.find(asset => {
+      const name = normalizedPlatformText(asset.name);
+      const url = githubAssetUrl(asset);
+      if (!name || !url || !platform.filePattern.test(asset.name) ||
+          !platform.installerPattern.test(name) || platform.conflictPattern.test(name)) return false;
+      const combined = `${releaseText} ${name}`;
+      return platform.platformPattern.test(combined) && platform.architecturePattern.test(combined);
+    }) || null;
+  }
+
+  function releaseAssets(release) {
+    return (Array.isArray(release.assets) ? release.assets : [])
+      .filter(asset => typeof asset.name === "string" && githubAssetUrl(asset));
   }
 
   function formatBytes(size) {
@@ -185,26 +339,68 @@
     return `${(size / (1024 * 1024)).toFixed(1)} MB`;
   }
 
+  function formatReleaseDate(release) {
+    const timestamp = releaseTimestamp(release);
+    return timestamp
+      ? new Date(timestamp).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })
+      : "Publication date unavailable";
+  }
+
+  function releaseDetails(release, latestStable) {
+    const target = downloadTargets[0];
+    const asset = findPlatformAsset(release, target);
+    const assets = releaseAssets(release);
+    const title = release.name && release.name !== release.tag_name ? release.name : "";
+    const stableLabel = release.prerelease ? "Prerelease" : release.id === latestStable?.id ? "Latest stable" : "Stable release";
+    const assetList = assets.length
+      ? `<div class="asset-list">${assets.map(item => `<a class="asset-link ${item === asset ? "asset-compatible" : ""}" href="${escapeHtml(githubAssetUrl(item))}" target="_blank" rel="noreferrer"><span class="download-symbol">↓</span><span><strong>${escapeHtml(item.name)}</strong><small>${formatBytes(item.size)}${item === asset ? ` · ${escapeHtml(target.label)} installer` : ""}</small></span><b>Download ↗</b></a>`).join("")}</div>`
+      : `<p class="muted">This release has no downloadable assets.</p>`;
+    const downloadAction = asset
+      ? `<a class="button button-primary release-download-button" href="${escapeHtml(githubAssetUrl(asset))}" target="_blank" rel="noreferrer"><span>Download for ${escapeHtml(target.label)}</span><small>${escapeHtml(asset.name)}</small></a>`
+      : `<div class="release-unavailable"><strong>No ${escapeHtml(target.label)} installer in this release.</strong><p>No download button is shown unless a matching installer asset is attached to this release. Browse the original release page for its published compatibility details.</p></div>`;
+    return `<article class="release-card release-featured">
+      <div class="release-heading"><div><p class="eyebrow">${stableLabel} · Published ${escapeHtml(formatReleaseDate(release))}</p><h2>${escapeHtml(release.tag_name)}</h2></div><a class="subtle-link" href="${escapeHtml(validReleasePageUrl(release))}" target="_blank" rel="noreferrer">GitHub release ↗</a></div>
+      ${title ? `<p class="release-title">${escapeHtml(title)}</p>` : ""}
+      <p class="release-platform"><span class="live-dot"></span>${asset ? `Compatible download: ${escapeHtml(target.label)}` : `Checking for ${escapeHtml(target.label)} installer`}</p>
+      ${downloadAction}
+      ${release.body ? `<details class="release-notes" open><summary>Release notes</summary><pre>${escapeHtml(release.body)}</pre></details>` : `<div class="release-notes"><p class="muted">No release notes were published.</p></div>`}
+      <section class="release-assets"><h3>Available assets</h3>${assetList}</section>
+    </article>`;
+  }
+
   async function downloadPage() {
     main.innerHTML = `<section class="page-hero compact"><p class="eyebrow">Official builds</p><h1>Download Z+</h1><p>Release information and downloads come directly from the official GitHub Releases API. This page never guesses an asset URL.</p></section><div id="release-content">${loadingPanel("Checking the official release feed…")}</div>`;
     try {
-      const releases = await fetchReleases();
-      const stable = releases.filter(release => !release.prerelease).sort((a, b) => Date.parse(b.published_at || b.created_at) - Date.parse(a.published_at || a.created_at));
-      const prereleases = releases.filter(release => release.prerelease).sort((a, b) => Date.parse(b.published_at || b.created_at) - Date.parse(a.published_at || a.created_at));
+      const releases = (await fetchReleases()).sort(compareReleasesNewestFirst);
+      const stable = releases.filter(release => !release.prerelease);
       const target = document.querySelector("#release-content");
       const howTo = `<section class="install-guide"><div><p class="eyebrow">After downloading</p><h2>Install, then verify.</h2><ol><li>Download the Windows installer or distribution archive published with a stable release.</li><li>Run the installer, or extract the complete archive and follow its included installation instructions.</li><li>Open a new PowerShell window and run <code>zp --version</code>.</li><li>Check and run a source file with <code>zp check hello.zp</code> and <code>zp run hello.zp</code>.</li></ol></div>${codeBlock(`start {
     say("Z+ is ready.")
 } stop`, "hello.zp")}</section>`;
-      if (!stable.length) {
-        target.innerHTML = `<div class="state-panel state-warning"><span class="state-icon">!</span><div><h2>No stable release is currently published.</h2><p>The official GitHub API returned no published stable releases. We will not substitute a guessed version or download link.</p><a class="button button-primary" href="${releasesUrl}" target="_blank" rel="noreferrer">Open official Releases ↗</a></div></div>
-          ${prereleases.length ? `<section class="release-section"><div class="section-heading"><p class="eyebrow">For testing</p><h2>Prereleases</h2><p>Prereleases may change and are not the recommended starting point.</p></div>${prereleases.map(item => releaseCard(item)).join("")}</section>` : ""}
-          ${howTo}`;
+      if (!releases.length) {
+        target.innerHTML = `<div class="state-panel state-warning"><span class="state-icon">!</span><div><h2>No releases are currently available.</h2><p>The official GitHub API returned no published releases. No version or download link has been guessed.</p><a class="button button-primary" href="${releasesUrl}" target="_blank" rel="noreferrer">Open official Releases ↗</a></div></div>${howTo}`;
         return;
       }
-      target.innerHTML = `<section class="release-section"><div class="section-heading"><p class="eyebrow">Current stable</p><h2>Choose a published build.</h2><p>Version, notes, and asset links are supplied by GitHub at page load.</p></div>${releaseCard(stable[0], true)}</section>
-        ${stable.length > 1 ? `<section class="release-section"><div class="section-heading"><p class="eyebrow">History</p><h2>Previous stable releases</h2></div><div class="release-list">${stable.slice(1).map(item => releaseCard(item)).join("")}</div></section>` : ""}
-        ${prereleases.length ? `<section class="release-section"><div class="section-heading"><p class="eyebrow">Early testing</p><h2>Prereleases</h2><p>These are separate from the stable recommendation.</p></div><div class="release-list">${prereleases.map(item => releaseCard(item)).join("")}</div></section>` : ""}
-        ${howTo}`;
+      const latestStable = stable[0] || null;
+      const selectedRelease = latestStable || releases[0];
+      const latestLabel = latestStable
+        ? `<p class="latest-stable"><span class="live-dot"></span><span>Latest stable</span><strong>${escapeHtml(latestStable.tag_name)}</strong></p>`
+        : `<p class="latest-stable latest-stable-empty">No stable release is published. Prereleases are marked in the version list.</p>`;
+      const options = releases.map(release => {
+        const label = `${release.tag_name}${release.prerelease ? " · Prerelease" : ""}`;
+        return `<option value="${escapeHtml(String(release.id ?? release.tag_name))}">${escapeHtml(label)}</option>`;
+      }).join("");
+      target.innerHTML = `<section class="release-section release-browser"><div class="release-toolbar"><div class="version-control"><label for="release-version">Select a release version</label><select id="release-version">${options}</select><small>Versions are sorted newest to oldest.</small></div>${latestLabel}</div><div id="selected-release" aria-live="polite"></div></section>${howTo}`;
+      const select = target.querySelector("#release-version");
+      const detail = target.querySelector("#selected-release");
+      const releasesById = new Map(releases.map(release => [String(release.id ?? release.tag_name), release]));
+      select.value = String(selectedRelease.id ?? selectedRelease.tag_name);
+      const showSelectedRelease = () => {
+        const release = releasesById.get(select.value);
+        if (release) detail.innerHTML = releaseDetails(release, latestStable);
+      };
+      select.addEventListener("change", showSelectedRelease);
+      showSelectedRelease();
     } catch (error) {
       console.warn("Unable to load official Z+ releases.", error);
       const target = document.querySelector("#release-content");

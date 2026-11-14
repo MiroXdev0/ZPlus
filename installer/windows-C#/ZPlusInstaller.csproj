@@ -14,6 +14,7 @@
     <DebugType>none</DebugType>
     <AssemblyName>ZPlus-1.1.2-Setup</AssemblyName>
     <RootNamespace>ZPlus.Setup</RootNamespace>
+    <ApplicationIcon>..\..\resources\ZPlus.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(PackageManifestSha256)' != ''">

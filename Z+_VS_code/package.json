@@ -2,7 +2,7 @@
     "name": "zplus-language",
     "displayName": "Z+ Language Support",
     "description": "Official VS Code language support for the Z+ programming language.",
-    "version": "0.6.0",
+    "version": "1.1.4",
     "publisher": "zplus",
     "license": "MIT",
     "main": "./extension.js",

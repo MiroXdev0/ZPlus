@@ -28,7 +28,12 @@ Then assemble the installer and its payload:
 The script builds the project through ZBuild, stages only the compiler,
 standard library, runtime DLLs, ZBuild templates, documentation, examples,
 license, and third-party notices, and creates a SHA-256 manifest for every
-payload file. It refuses to overwrite an existing versioned release directory.
+payload file. It includes the official dark-surface logo in the installer UI.
+It refuses to overwrite an existing versioned release directory. To build
+from an existing, version-matched compiler distribution instead of
+`build-zbuild\release-staging`, pass `-CompilerDistributionPath` and that
+distribution's `bin` directory; the script still verifies the compiler
+version before packaging.
 
 ## Output
 
