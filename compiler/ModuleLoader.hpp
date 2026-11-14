@@ -22,6 +22,7 @@ struct ModuleDiagnostic {
 struct LoadedProgram {
     std::unique_ptr<ast::Program> program;
     std::vector<ModuleDiagnostic> diagnostics;
+    std::vector<std::filesystem::path> sourceFiles;
 };
 
 class ModuleLoader {

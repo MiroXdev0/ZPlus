@@ -1,5 +1,6 @@
 build/
 build-zbuild/
+*.vscode/
 
 *.dll
 

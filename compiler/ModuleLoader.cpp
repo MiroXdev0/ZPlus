@@ -18,6 +18,20 @@
 namespace zplus {
 namespace {
 
+std::filesystem::path pathFromUtf8(const std::string& value) {
+    std::u8string encoded;
+    encoded.reserve(value.size());
+    for (const unsigned char character : value) {
+        encoded.push_back(static_cast<char8_t>(character));
+    }
+    return std::filesystem::path(encoded);
+}
+
+std::string pathToUtf8(const std::filesystem::path& path) {
+    const auto value = path.u8string();
+    return {reinterpret_cast<const char*>(value.data()), value.size()};
+}
+
 std::filesystem::path executableDirectory() {
 #ifdef _WIN32
     std::wstring path(32768, L'\0');
@@ -36,19 +50,22 @@ std::filesystem::path executableDirectory() {
 }
 
 std::filesystem::path standardLibraryDirectory() {
-#ifdef _MSC_VER
-    char* configured = nullptr;
-    std::size_t configuredLength = 0;
-    if (_dupenv_s(&configured, &configuredLength, "ZPLUS_STDLIB_PATH") == 0 &&
-        configured) {
-        const std::string value(configured);
-        std::free(configured);
-        if (!value.empty()) return std::filesystem::path(value);
+#ifdef _WIN32
+    const DWORD required = GetEnvironmentVariableW(L"ZPLUS_STDLIB_PATH", nullptr, 0);
+    if (required > 0) {
+        std::wstring configured(static_cast<std::size_t>(required), L'\0');
+        const DWORD length = GetEnvironmentVariableW(
+            L"ZPLUS_STDLIB_PATH", configured.data(), required);
+        if (length == 0 || length >= required) {
+            throw std::runtime_error("cannot read ZPLUS_STDLIB_PATH");
+        }
+        configured.resize(length);
+        return std::filesystem::path(configured);
     }
 #else
     if (const char* configured = std::getenv("ZPLUS_STDLIB_PATH");
         configured && *configured) {
-        return std::filesystem::path(configured);
+        return pathFromUtf8(configured);
     }
 #endif
     const auto executableDir = executableDirectory();
@@ -61,17 +78,21 @@ std::filesystem::path standardLibraryDirectory() {
         }
     }
 #ifdef ZPLUS_STDLIB_DIR
-    return std::filesystem::path(ZPLUS_STDLIB_DIR);
+    return pathFromUtf8(ZPLUS_STDLIB_DIR);
 #else
     return {};
 #endif
 }
 
 std::string pathKey(const std::filesystem::path& path) {
-    std::string key = path.generic_string();
+    const auto encoded = path.generic_u8string();
+    std::string key(
+        reinterpret_cast<const char*>(encoded.data()), encoded.size());
 #ifdef _WIN32
     std::transform(key.begin(), key.end(), key.begin(), [](unsigned char ch) {
-        return static_cast<char>(std::tolower(ch));
+        return ch >= 'A' && ch <= 'Z'
+            ? static_cast<char>(ch - 'A' + 'a')
+            : static_cast<char>(ch);
     });
 #endif
     return key;
@@ -125,15 +146,16 @@ LoadedProgram ModuleLoader::load(
         : std::filesystem::canonical(entryPath, error);
     if (error) {
         addDiagnostic(
-            "cannot resolve entry source file '" + entryPath.string() + "'",
-            entryPath.string()
+            "cannot resolve entry source file '" + pathToUtf8(entryPath) + "'",
+            pathToUtf8(entryPath)
         );
         return std::move(result_);
     }
     if (entrySource && !std::filesystem::is_directory(entryPath_.parent_path(), error)) {
         addDiagnostic(
-            "cannot resolve entry source directory '" + entryPath_.parent_path().string() + "'",
-            entryPath_.string()
+            "cannot resolve entry source directory '" +
+                pathToUtf8(entryPath_.parent_path()) + "'",
+            pathToUtf8(entryPath_)
         );
         return std::move(result_);
     }
@@ -144,7 +166,7 @@ LoadedProgram ModuleLoader::load(
     if (entryExtension != ".zp" && !(entrySource && entryExtension == ".zh")) {
         addDiagnostic(
             "entry source file must use the .zp extension",
-            entryPath_.string()
+            pathToUtf8(entryPath_)
         );
         return std::move(result_);
     }
@@ -155,7 +177,7 @@ LoadedProgram ModuleLoader::load(
     }
 
     result_.program = std::make_unique<ast::Program>();
-    result_.program->location.sourceFile = entryPath_.string();
+    result_.program->location.sourceFile = pathToUtf8(entryPath_);
     for (auto& statements : moduleStatements_) {
         for (auto& statement : statements) {
             result_.program->statements.push_back(std::move(statement));
@@ -177,8 +199,8 @@ bool ModuleLoader::loadModule(
         : std::filesystem::canonical(requestedPath, pathError);
     if (pathError) {
         addDiagnostic(
-            "module file '" + requestedPath.string() + "' does not exist or cannot be read",
-            requestedPath.string()
+            "module file '" + pathToUtf8(requestedPath) + "' does not exist or cannot be read",
+            pathToUtf8(requestedPath)
         );
         return false;
     }
@@ -193,7 +215,7 @@ bool ModuleLoader::loadModule(
             chain << *current;
         }
         chain << " -> " << identity;
-        addDiagnostic(chain.str(), canonicalPath.string());
+        addDiagnostic(chain.str(), pathToUtf8(canonicalPath));
         return false;
     }
 
@@ -202,9 +224,9 @@ bool ModuleLoader::loadModule(
         if (!requestedName.empty() && knownName != moduleNamesByPath_.end() &&
             knownName->second != requestedName) {
             addDiagnostic(
-                "module '" + canonicalPath.string() + "' is used with conflicting names '" +
+                "module '" + pathToUtf8(canonicalPath) + "' is used with conflicting names '" +
                     knownName->second + "' and '" + requestedName + "'",
-                canonicalPath.string()
+                pathToUtf8(canonicalPath)
             );
             return false;
         }
@@ -218,8 +240,8 @@ bool ModuleLoader::loadModule(
         });
         if (extension != ".zh") {
             addDiagnostic(
-                "module file '" + canonicalPath.string() + "' must use the .zh extension",
-                canonicalPath.string()
+                "module file '" + pathToUtf8(canonicalPath) + "' must use the .zh extension",
+                pathToUtf8(canonicalPath)
             );
             return false;
         }
@@ -232,8 +254,8 @@ bool ModuleLoader::loadModule(
         std::ifstream input(canonicalPath, std::ios::binary);
         if (!input) {
             addDiagnostic(
-                "cannot open module file '" + canonicalPath.string() + "'",
-                canonicalPath.string()
+                "cannot open module file '" + pathToUtf8(canonicalPath) + "'",
+                pathToUtf8(canonicalPath)
             );
             return false;
         }
@@ -242,12 +264,12 @@ bool ModuleLoader::loadModule(
         source = buffer.str();
     }
 
-    lexer::Lexer lexer(source, canonicalPath.string());
+    lexer::Lexer lexer(source, pathToUtf8(canonicalPath));
     auto tokens = lexer.tokenize();
     for (const auto& error : lexer.errors()) {
         addDiagnostic(
             error.message,
-            canonicalPath.string(),
+            pathToUtf8(canonicalPath),
             error.line,
             error.column,
             "E1000"
@@ -260,7 +282,7 @@ bool ModuleLoader::loadModule(
     for (const auto& error : parser.errors()) {
         addDiagnostic(
             error.message,
-            canonicalPath.string(),
+            pathToUtf8(canonicalPath),
             error.line,
             error.column,
             "E1001"
@@ -269,7 +291,7 @@ bool ModuleLoader::loadModule(
     if (!result_.diagnostics.empty() || !program) return false;
 
     const std::string moduleName = requestedName.empty()
-        ? moduleIdentifier(canonicalPath.stem().string())
+        ? moduleIdentifier(pathToUtf8(canonicalPath.stem()))
         : moduleIdentifier(requestedName);
     if (!entryModule) {
         const auto sameName = modulePathsByName_.find(moduleName);
@@ -277,7 +299,7 @@ bool ModuleLoader::loadModule(
             addDiagnostic(
                 "ambiguous module name '" + moduleName + "' refers to both '" +
                     sameName->second + "' and '" + identity + "'; use a distinct alias",
-                canonicalPath.string()
+                pathToUtf8(canonicalPath)
             );
             return false;
         }
@@ -292,7 +314,7 @@ bool ModuleLoader::loadModule(
 
         std::string modulePath = use->path;
         std::replace(modulePath.begin(), modulePath.end(), '\\', '/');
-        const std::filesystem::path usePath(modulePath);
+        const std::filesystem::path usePath = pathFromUtf8(modulePath);
         const bool bareDottedModule =
             usePath.parent_path().empty() &&
             modulePath.find('.') != std::string::npos &&
@@ -306,7 +328,7 @@ bool ModuleLoader::loadModule(
             hasDrivePrefix(modulePath)) {
             addDiagnostic(
                 "absolute module paths are not permitted; use a path relative to the importing file",
-                canonicalPath.string(),
+                pathToUtf8(canonicalPath),
                 use->location.line,
                 use->location.column
             );
@@ -320,17 +342,18 @@ bool ModuleLoader::loadModule(
             standardModuleName) {
             std::filesystem::path standardModule = standardLibraryDirectory();
             if (modulePath.find('.') == std::string::npos) {
-                standardModule /= modulePath;
-                standardModule /= modulePath + ".zh";
+                standardModule /= pathFromUtf8(modulePath);
+                standardModule /= pathFromUtf8(modulePath + ".zh");
             } else {
                 std::size_t begin = 0;
                 std::size_t separator = modulePath.find('.');
                 while (separator != std::string::npos) {
-                    standardModule /= modulePath.substr(begin, separator - begin);
+                    standardModule /= pathFromUtf8(
+                        modulePath.substr(begin, separator - begin));
                     begin = separator + 1;
                     separator = modulePath.find('.', begin);
                 }
-                standardModule /= modulePath.substr(begin) + ".zh";
+                standardModule /= pathFromUtf8(modulePath.substr(begin) + ".zh");
             }
             existenceError.clear();
             if (std::filesystem::exists(standardModule, existenceError) && !existenceError) {
@@ -341,15 +364,15 @@ bool ModuleLoader::loadModule(
         if (!std::filesystem::exists(resolvedPath, existenceError) || existenceError) {
             addDiagnostic(
                 "module '" + use->path + "' was not found relative to '" +
-                    canonicalPath.parent_path().string() + "'",
-                canonicalPath.string(),
+                    pathToUtf8(canonicalPath.parent_path()) + "'",
+                pathToUtf8(canonicalPath),
                 use->location.line,
                 use->location.column
             );
             activePaths.pop_back();
             return false;
         }
-        std::string defaultAlias = std::filesystem::path(modulePath).stem().string();
+        std::string defaultAlias = pathToUtf8(pathFromUtf8(modulePath).stem());
         if (standardModuleName) {
             const auto separator = modulePath.find('.');
             if (bareDottedModule && separator != std::string::npos) {
@@ -408,9 +431,9 @@ bool ModuleLoader::loadModule(
                 if (!declaration || !isModuleDeclaration(*declaration)) {
                     if (declaration) {
                         addDiagnostic(
-                            "module '" + canonicalPath.string() +
+                            "module '" + pathToUtf8(canonicalPath) +
                                 "' start block may contain declarations only",
-                            canonicalPath.string(),
+                            pathToUtf8(canonicalPath),
                             declaration->location.line,
                             declaration->location.column
                         );
@@ -425,9 +448,9 @@ bool ModuleLoader::loadModule(
 
         if (!dynamic_cast<ast::ImportDeclaration*>(statement.get())) {
             addDiagnostic(
-                "module '" + canonicalPath.string() +
+                "module '" + pathToUtf8(canonicalPath) +
                     "' may contain only module directives and declarations in its start block",
-                canonicalPath.string(),
+                pathToUtf8(canonicalPath),
                 statement->location.line,
                 statement->location.column
             );
@@ -437,6 +460,7 @@ bool ModuleLoader::loadModule(
     }
 
     loadedPaths_.insert(identity);
+    result_.sourceFiles.push_back(canonicalPath);
     moduleStatements_.push_back(std::move(statements));
     return true;
 }

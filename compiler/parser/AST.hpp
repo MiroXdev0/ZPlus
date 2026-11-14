@@ -1,10 +1,12 @@
 #pragma once
 
 #include "../lexer/Token.hpp"
+#include "../semantic/Type.hpp"
 
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -195,6 +197,7 @@ struct Node {
     Location location;
 
     NodeKind kind = NodeKind::Unknown;
+    mutable std::optional<zplus::semantic::Type> resolvedType;
 
     // Optional ID for tooling, debugging, AST dumps, etc.
     std::uint64_t id = 0;

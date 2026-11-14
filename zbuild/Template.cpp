@@ -1,4 +1,5 @@
 #include "Template.hpp"
+#include "Filesystem.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -33,6 +34,11 @@ std::string lower(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(),
         [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
     return value;
+}
+
+std::string genericPathToUtf8(const std::filesystem::path& path) {
+    const auto value = path.generic_u8string();
+    return {reinterpret_cast<const char*>(value.data()), value.size()};
 }
 
 std::string parseQuoted(const std::string& value, std::size_t line) {
@@ -111,7 +117,8 @@ std::map<std::string, std::string> parseManifestValues(
     const std::filesystem::path& path
 ) {
     std::ifstream input(path);
-    if (!input) throw std::runtime_error("cannot open template manifest '" + path.string() + "'");
+    if (!input) throw std::runtime_error(
+        "cannot open template manifest '" + pathToUtf8(path) + "'");
     std::map<std::string, std::string> values;
     std::string line;
     std::size_t lineNumber = 0;
@@ -148,7 +155,8 @@ std::map<std::string, std::string> parseManifestValues(
                 ": empty or duplicate key");
         }
     }
-    if (!input.eof()) throw std::runtime_error("failed reading template manifest '" + path.string() + "'");
+    if (!input.eof()) throw std::runtime_error(
+        "failed reading template manifest '" + pathToUtf8(path) + "'");
     return values;
 }
 
@@ -174,11 +182,33 @@ std::vector<std::string> optionalArray(
 
 std::string environmentVariable(const char* name) {
 #ifdef _WIN32
-    char* value = nullptr;
-    std::size_t length = 0;
-    if (_dupenv_s(&value, &length, name) != 0 || !value) return {};
-    const std::unique_ptr<char, decltype(&std::free)> storage(value, &std::free);
-    return std::string(storage.get(), length ? length - 1 : 0);
+    const std::wstring wideName(name, name + std::char_traits<char>::length(name));
+    const DWORD required = GetEnvironmentVariableW(wideName.c_str(), nullptr, 0);
+    if (required == 0) return {};
+    std::wstring wideValue(static_cast<std::size_t>(required), L'\0');
+    const DWORD length = GetEnvironmentVariableW(
+        wideName.c_str(), wideValue.data(), required);
+    if (length == 0 || length >= required) {
+        throw std::runtime_error(
+            "cannot read environment variable '" + std::string(name) + "'");
+    }
+    wideValue.resize(length);
+    const int utf8Length = WideCharToMultiByte(
+        CP_UTF8, WC_ERR_INVALID_CHARS, wideValue.data(),
+        static_cast<int>(wideValue.size()), nullptr, 0, nullptr, nullptr);
+    if (utf8Length <= 0) {
+        throw std::runtime_error(
+            "environment variable '" + std::string(name) + "' is not valid Unicode");
+    }
+    std::string value(static_cast<std::size_t>(utf8Length), '\0');
+    if (WideCharToMultiByte(
+            CP_UTF8, WC_ERR_INVALID_CHARS, wideValue.data(),
+            static_cast<int>(wideValue.size()), value.data(), utf8Length,
+            nullptr, nullptr) != utf8Length) {
+        throw std::runtime_error(
+            "failed converting environment variable '" + std::string(name) + "'");
+    }
+    return value;
 #else
     const char* value = std::getenv(name);
     return value ? value : "";
@@ -197,7 +227,7 @@ TemplateInfo readTemplate(const std::filesystem::path& directory, bool builtIn) 
         (void)value;
         if (!supported.contains(key)) {
             throw std::runtime_error("template manifest has unsupported key '" + key +
-                "' in '" + manifest.string() + "'");
+                "' in '" + pathToUtf8(manifest) + "'");
         }
     }
 
@@ -224,7 +254,7 @@ TemplateInfo readTemplate(const std::filesystem::path& directory, bool builtIn) 
     if (result.name.empty() || result.description.empty() || result.version.empty() ||
         result.requiredZPlusVersion.empty() || result.defaultTargetType.empty()) {
         throw std::runtime_error("template manifest contains an empty required value: '" +
-            manifest.string() + "'");
+            pathToUtf8(manifest) + "'");
     }
     if (!result.available && result.unavailableReason.empty()) {
         throw std::runtime_error("unavailable template '" + result.name +
@@ -242,7 +272,7 @@ TemplateInfo readTemplate(const std::filesystem::path& directory, bool builtIn) 
             result.defaultTargetType + "'");
     }
     const auto validateRelative = [&](const std::string& value, const char* field) {
-        const std::filesystem::path relative(value);
+        const std::filesystem::path relative = pathFromUtf8(value);
         if (relative.empty() || relative.is_absolute() ||
             relative.has_root_name() || relative.has_root_directory()) {
             throw std::runtime_error("template '" + result.name + "' has an unsafe " +
@@ -253,7 +283,9 @@ TemplateInfo readTemplate(const std::filesystem::path& directory, bool builtIn) 
             throw std::runtime_error("template '" + result.name + "' has an unsafe " +
                 field + " path '" + value + "'");
         }
-        if (relative.generic_string() != value) {
+        const auto normalizedUtf8 = relative.generic_u8string();
+        if (std::string(
+                reinterpret_cast<const char*>(normalizedUtf8.data()), normalizedUtf8.size()) != value) {
             throw std::runtime_error("template '" + result.name + "' has a non-normalized " +
                 field + " path '" + value + "'");
         }
@@ -267,7 +299,7 @@ TemplateInfo readTemplate(const std::filesystem::path& directory, bool builtIn) 
                 "' lists a file more than once: '" + file + "'");
         }
         filePaths.insert(file);
-        const auto candidate = directory / file;
+        const auto candidate = directory / pathFromUtf8(file);
         std::error_code statusError;
         const auto status = std::filesystem::symlink_status(candidate, statusError);
         std::error_code fileError;
@@ -318,11 +350,11 @@ TemplateInfo readTemplate(const std::filesystem::path& directory, bool builtIn) 
 std::filesystem::path defaultCustomDirectory() {
 #ifdef _WIN32
     if (const std::string appData = environmentVariable("APPDATA"); !appData.empty()) {
-        return std::filesystem::path(appData) / "ZBuild" / "templates";
+        return pathFromUtf8(appData) / "ZBuild" / "templates";
     }
 #else
     if (const std::string xdg = environmentVariable("XDG_CONFIG_HOME"); !xdg.empty()) {
-        return std::filesystem::path(xdg) / "zbuild" / "templates";
+        return pathFromUtf8(xdg) / "zbuild" / "templates";
     }
 #endif
     const std::string home = environmentVariable(
@@ -334,10 +366,10 @@ std::filesystem::path defaultCustomDirectory() {
         );
     if (!home.empty()) {
 #ifdef _WIN32
-        return std::filesystem::path(home) / "AppData" / "Roaming" /
+        return pathFromUtf8(home) / "AppData" / "Roaming" /
             "ZBuild" / "templates";
 #else
-        return std::filesystem::path(home) / ".config" / "zbuild" / "templates";
+        return pathFromUtf8(home) / ".config" / "zbuild" / "templates";
 #endif
     }
     return {};
@@ -361,10 +393,12 @@ std::string currentYear() {
 
 std::string readText(const std::filesystem::path& path) {
     std::ifstream input(path, std::ios::binary);
-    if (!input) throw std::runtime_error("cannot read template file '" + path.string() + "'");
+    if (!input) throw std::runtime_error(
+        "cannot read template file '" + pathToUtf8(path) + "'");
     std::ostringstream result;
     result << input.rdbuf();
-    if (input.bad()) throw std::runtime_error("failed reading template file '" + path.string() + "'");
+    if (input.bad()) throw std::runtime_error(
+        "failed reading template file '" + pathToUtf8(path) + "'");
     return result.str();
 }
 
@@ -419,21 +453,23 @@ std::filesystem::path resolvedTemplateFile(
     const TemplateInfo& info,
     const std::string& relative
 ) {
-    const auto path = info.root / std::filesystem::path(relative);
+    const auto path = info.root / pathFromUtf8(relative);
     std::error_code statusError;
     const auto status = std::filesystem::symlink_status(path, statusError);
     if (!statusError && std::filesystem::is_symlink(status)) {
-        throw std::runtime_error("template file symlinks are not allowed: '" + path.string() + "'");
+        throw std::runtime_error(
+            "template file symlinks are not allowed: '" + pathToUtf8(path) + "'");
     }
     std::error_code error;
     const auto canonical = std::filesystem::canonical(path, error);
     if (statusError || error || !std::filesystem::is_regular_file(canonical)) {
         throw std::runtime_error("template file is missing or not a regular file: '" +
-            path.string() + "'");
+            pathToUtf8(path) + "'");
     }
     const auto relativeToRoot = canonical.lexically_relative(info.root);
     if (relativeToRoot.empty() || *relativeToRoot.begin() == "..") {
-        throw std::runtime_error("template file escapes its root: '" + path.string() + "'");
+        throw std::runtime_error(
+            "template file escapes its root: '" + pathToUtf8(path) + "'");
     }
     return canonical;
 }
@@ -444,7 +480,7 @@ TemplateRegistry::TemplateRegistry(std::filesystem::path executablePath)
     : executablePath_(std::move(executablePath)) {
     if (const std::string overrideDirectory = environmentVariable("ZBUILD_TEMPLATES_DIR");
         !overrideDirectory.empty()) {
-        customDirectory_ = overrideDirectory;
+        customDirectory_ = pathFromUtf8(overrideDirectory);
     } else {
         customDirectory_ = defaultCustomDirectory();
     }
@@ -470,7 +506,7 @@ std::vector<TemplateInfo> TemplateRegistry::list() const {
         for (std::filesystem::directory_iterator it(directory), end; it != end; ++it) {
             if (it->is_symlink()) {
                 throw std::runtime_error("template directories may not contain symlinked entries: '" +
-                    it->path().string() + "'");
+                    pathToUtf8(it->path()) + "'");
             }
             if (it->is_directory()) childDirectories.push_back(it->path());
         }
@@ -509,7 +545,7 @@ std::vector<TemplateInfo> TemplateRegistry::list() const {
         std::set<std::string> itemNames{key};
         if (customNames.contains(key)) {
             throw std::runtime_error("duplicate custom template name '" + item.name +
-                "' in '" + item.root.string() + "'");
+                "' in '" + pathToUtf8(item.root) + "'");
         }
         bool shadowsBuiltIn = false;
         for (const auto& alias : item.aliases) {
@@ -521,7 +557,7 @@ std::vector<TemplateInfo> TemplateRegistry::list() const {
             }
             if (customNames.contains(aliasKey) || !itemNames.insert(aliasKey).second) {
                 throw std::runtime_error("duplicate custom template name or alias '" +
-                    alias + "' in '" + item.root.string() + "'");
+                    alias + "' in '" + pathToUtf8(item.root) + "'");
             }
         }
         if (shadowsBuiltIn) continue;
@@ -640,7 +676,7 @@ void TemplateRegistry::initialize(
 
     std::unordered_map<std::string, std::string> variables{
         {"PROJECT_NAME", projectName},
-        {"PROJECT_DIRECTORY", absoluteDestination.generic_string()},
+        {"PROJECT_DIRECTORY", genericPathToUtf8(absoluteDestination)},
         {"PROJECT_VERSION", projectVersion},
         {"AUTHOR", author},
         {"YEAR", currentYear()},
@@ -686,11 +722,11 @@ void TemplateRegistry::initialize(
                     const auto status = std::filesystem::symlink_status(current);
                     if (std::filesystem::is_symlink(status)) {
                         throw std::runtime_error("template destination may not traverse symlink '" +
-                            current.string() + "'");
+                            pathToUtf8(current) + "'");
                     }
                     if (!std::filesystem::is_directory(status)) {
                         throw std::runtime_error("template directory conflicts with existing file '" +
-                            current.string() + "'");
+                            pathToUtf8(current) + "'");
                     }
                     break;
                 }
@@ -702,8 +738,8 @@ void TemplateRegistry::initialize(
         };
 
         for (const auto& directory : info.directories) {
-            ensureDirectories(directory);
-            std::filesystem::create_directories(staging / directory);
+            ensureDirectories(pathFromUtf8(directory));
+            std::filesystem::create_directories(staging / pathFromUtf8(directory));
         }
         std::set<std::string> uniqueFiles;
         for (const auto& relative : info.files) {
@@ -712,12 +748,12 @@ void TemplateRegistry::initialize(
                     "' lists file more than once: '" + relative + "'");
             }
             const auto source = resolvedTemplateFile(info, relative);
-            const auto output = absoluteDestination / relative;
+            const auto output = absoluteDestination / pathFromUtf8(relative);
             if (entryExists(output)) {
                 throw std::runtime_error("refusing to overwrite existing file '" +
-                    output.string() + "'");
+                    pathToUtf8(output) + "'");
             }
-            const auto destinationStage = staging / relative;
+            const auto destinationStage = staging / pathFromUtf8(relative);
             std::filesystem::create_directories(destinationStage.parent_path());
             const std::string contents = replaceVariables(
                 readText(source), variables, relative);
@@ -727,15 +763,17 @@ void TemplateRegistry::initialize(
             if (!staged) throw std::runtime_error("failed writing staged template file '" + relative + "'");
         }
 
-        if (!info.files.empty()) ensureDirectories(std::filesystem::path(info.files.front()).parent_path());
+        if (!info.files.empty()) {
+            ensureDirectories(pathFromUtf8(info.files.front()).parent_path());
+        }
         for (const auto& relative : info.files) {
-            const auto output = absoluteDestination / relative;
-            ensureDirectories(std::filesystem::path(relative).parent_path());
+            const auto output = absoluteDestination / pathFromUtf8(relative);
+            ensureDirectories(pathFromUtf8(relative).parent_path());
             if (entryExists(output)) {
                 throw std::runtime_error("refusing to overwrite existing file '" +
-                    output.string() + "'");
+                    pathToUtf8(output) + "'");
             }
-            std::filesystem::rename(staging / relative, output);
+            std::filesystem::rename(staging / pathFromUtf8(relative), output);
             installedFiles.push_back(output);
         }
         std::filesystem::remove_all(staging);

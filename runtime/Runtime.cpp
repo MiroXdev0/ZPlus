@@ -2361,6 +2361,18 @@ static RuntimeValue executeCall(
         return builtinTime();
     }
 
+    if (!function && *callee == "to_string") {
+        if (instruction.operands.size() != 2) {
+            throw std::runtime_error("to_string expects exactly one argument");
+        }
+        const RuntimeValue value = resolveValue(instruction.operands[1], environment);
+        if (!isNumber(value)) {
+            throw std::invalid_argument("to_string expects a number");
+        }
+        return managedHeap().makeString(
+            zplus::runtime::formatNumber(std::get<double>(value)));
+    }
+
     if (!function && *callee == "length") {
         if (instruction.operands.size() != 2) {
             throw std::runtime_error("length expects exactly one argument");

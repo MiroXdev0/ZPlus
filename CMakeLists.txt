@@ -2,9 +2,11 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(ZPlus
-    VERSION 1.1.5
+    VERSION 1.1.6
     LANGUAGES CXX
 )
+
+set(ZBUILD_VERSION "0.3.0")
 
 include(CTest)
 
@@ -43,16 +45,23 @@ FetchContent_MakeAvailable(box2d)
 
 add_library(zbuild_engine STATIC
     zbuild/Build.cpp
+    zbuild/BuildGraph.cpp
+    zbuild/Cache.cpp
     zbuild/Config.cpp
+    zbuild/Dependencies.cpp
+    zbuild/Filesystem.cpp
     zbuild/Hash.cpp
     zbuild/Process.cpp
     zbuild/Template.cpp
+    runtime/Json.cpp
 )
+target_compile_definitions(zbuild_engine PRIVATE "ZBUILD_VERSION=\"${ZBUILD_VERSION}\"")
 target_include_directories(zbuild_engine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/zbuild
 )
 add_executable(zbuild zbuild/main.cpp)
 target_link_libraries(zbuild PRIVATE zbuild_engine)
+target_compile_definitions(zbuild PRIVATE "ZBUILD_VERSION=\"${ZBUILD_VERSION}\"")
 add_custom_command(TARGET zbuild POST_BUILD
     COMMAND ${CMAKE_COMMAND}
         "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/zbuild/templates"
@@ -74,7 +83,29 @@ add_custom_command(TARGET zbuild POST_BUILD
         "-DSTDLIB_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/stdlib"
         -P "${CMAKE_SOURCE_DIR}/cmake/CopyReleaseZBuild.cmake"
     VERBATIM
-    COMMENT "Installing the Release zbuild executable into bin/"
+    COMMENT "Installing the Release zbuild compatibility executable into bin/"
+)
+add_executable(zpbuild zbuild/main.cpp)
+target_link_libraries(zpbuild PRIVATE zbuild_engine)
+target_compile_definitions(zpbuild PRIVATE "ZBUILD_VERSION=\"${ZBUILD_VERSION}\"")
+add_custom_command(TARGET zpbuild POST_BUILD
+    COMMAND ${CMAKE_COMMAND}
+        "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/zbuild/templates"
+        "-DDESTINATION_DIR=$<TARGET_FILE_DIR:zpbuild>/zbuild-templates"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CopyDirectoryIfDifferent.cmake"
+    COMMAND ${CMAKE_COMMAND}
+        "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/stdlib"
+        "-DDESTINATION_DIR=$<TARGET_FILE_DIR:zpbuild>/stdlib"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CopyDirectoryIfDifferent.cmake"
+    COMMAND ${CMAKE_COMMAND}
+        "-DCONFIG=$<CONFIG>"
+        "-DSOURCE_FILE=$<TARGET_FILE:zpbuild>"
+        "-DDESTINATION_DIR=${ZPLUS_RELEASE_BIN_DIR}"
+        "-DTEMPLATE_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/zbuild/templates"
+        "-DSTDLIB_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/stdlib"
+        -P "${CMAKE_SOURCE_DIR}/cmake/CopyReleaseZBuild.cmake"
+    VERBATIM
+    COMMENT "Installing the Release ZPBuild CLI into bin/"
 )
 
 add_executable(zp
@@ -117,10 +148,29 @@ if(WIN32)
     )
     target_sources(zp PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/zplus_icon.rc")
     target_sources(zbuild PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/zplus_icon.rc")
+    target_sources(zpbuild PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/zplus_icon.rc")
     function(zplus_add_version_resource target description filename filetype)
+        if(ARGC GREATER 4)
+            set(ZPLUS_RESOURCE_VERSION "${ARGV4}")
+        else()
+            set(ZPLUS_RESOURCE_VERSION "${PROJECT_VERSION}")
+        endif()
+        string(REPLACE "." ";" resource_version_parts "${ZPLUS_RESOURCE_VERSION}")
+        list(LENGTH resource_version_parts resource_version_length)
+        if(NOT resource_version_length EQUAL 3)
+            message(FATAL_ERROR "Version resources require a three-part version: ${ZPLUS_RESOURCE_VERSION}")
+        endif()
+        list(GET resource_version_parts 0 ZPLUS_RESOURCE_VERSION_MAJOR)
+        list(GET resource_version_parts 1 ZPLUS_RESOURCE_VERSION_MINOR)
+        list(GET resource_version_parts 2 ZPLUS_RESOURCE_VERSION_PATCH)
         set(ZPLUS_FILE_DESCRIPTION "${description}")
         set(ZPLUS_ORIGINAL_FILENAME "${filename}")
         set(ZPLUS_FILE_TYPE "${filetype}")
+        if(target STREQUAL "zbuild" OR target STREQUAL "zpbuild")
+            set(ZPLUS_PRODUCT_NAME "ZPBuild")
+        else()
+            set(ZPLUS_PRODUCT_NAME "Z+ Programming Language")
+        endif()
         set(version_resource "${CMAKE_CURRENT_BINARY_DIR}/${target}_version.rc")
         configure_file(
             "${CMAKE_CURRENT_SOURCE_DIR}/resources/zplus_version.rc.in"
@@ -133,7 +183,9 @@ if(WIN32)
         endif()
     endfunction()
     zplus_add_version_resource(zp "Z+ Compiler" "zp.exe" VFT_APP)
-    zplus_add_version_resource(zbuild "Z+ Build Tool" "zbuild.exe" VFT_APP)
+    zplus_add_version_resource(
+        zbuild "ZPBuild Compatibility CLI" "zbuild.exe" VFT_APP "${ZBUILD_VERSION}")
+    zplus_add_version_resource(zpbuild "ZPBuild CLI" "zpbuild.exe" VFT_APP "${ZBUILD_VERSION}")
     target_sources(zplus_graphics PRIVATE
         ZGraphics/Platform/WindowsWindow.cpp
     )
@@ -153,6 +205,7 @@ target_include_directories(zplus_graphics PUBLIC
 target_link_libraries(zp PRIVATE zplus_graphics)
 find_package(Threads REQUIRED)
 target_link_libraries(zp PRIVATE Threads::Threads)
+target_link_libraries(zbuild_engine PUBLIC Threads::Threads)
 add_library(zaudio_engine STATIC
     runtime/audio/AudioEngine.cpp
     runtime/audio/AudioError.cpp
@@ -372,6 +425,7 @@ if(MSVC)
     target_compile_options(zp PRIVATE /W4)
     target_compile_options(zbuild_engine PRIVATE /W4)
     target_compile_options(zbuild PRIVATE /W4)
+    target_compile_options(zpbuild PRIVATE /W4)
     target_compile_options(zplus_graphics PRIVATE /W4)
     target_compile_options(zp_native_backend PRIVATE /W4)
     if(WIN32)
@@ -381,11 +435,20 @@ else()
     target_compile_options(zp PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(zbuild_engine PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(zbuild PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(zpbuild PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(zplus_graphics PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(zp_native_backend PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
 if(BUILD_TESTING)
+    add_test(NAME zpbuild_version COMMAND zpbuild --version)
+    set_tests_properties(zpbuild_version PROPERTIES
+        PASS_REGULAR_EXPRESSION "ZPBuild 0\\.3\\.0"
+    )
+    add_test(NAME zbuild_compatibility_version COMMAND zbuild --version)
+    set_tests_properties(zbuild_compatibility_version PROPERTIES
+        PASS_REGULAR_EXPRESSION "ZPBuild 0\\.3\\.0"
+    )
     add_executable(zbuild_unit_tests
         tests/zbuild/unit_tests.cpp
     )

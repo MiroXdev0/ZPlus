@@ -52,7 +52,7 @@ execute_process(
     ERROR_VARIABLE zbuild_error
     TIMEOUT 20
 )
-if(NOT zbuild_result EQUAL 0 OR NOT "${zbuild_output}" MATCHES "ZBuild")
+if(NOT zbuild_result EQUAL 0 OR NOT "${zbuild_output}" MATCHES "ZPBuild")
     message(FATAL_ERROR "Packaged ZBuild version check failed\n${zbuild_output}${zbuild_error}")
 endif()
 

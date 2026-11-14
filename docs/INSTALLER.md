@@ -6,7 +6,7 @@
 The Windows x64 setup application is a per-user installer for Z+ 1.1.2 Stable.
 Its default destination is `%LOCALAPPDATA%\Programs\ZPlus`; it does not require
 administrator access. It packages the compiler, its built runtimes, the
-standard library, the ZBuild tool and templates, documentation, examples, the
+standard library, the ZPBuild tool and templates, documentation, examples, the
 Z+ license, and third-party notices. Optional components are selectable in the
 installer.
 

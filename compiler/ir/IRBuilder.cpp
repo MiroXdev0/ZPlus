@@ -43,21 +43,29 @@ bool blockTerminated(const BasicBlock* block) {
     return isTerminator(block->instructions.back());
 }
 
-std::string irTypeName(const zplus::ast::Type* type) {
-    if (!type) return "unknown";
+zplus::semantic::Type irType(const zplus::ast::Type* type) {
+    using zplus::semantic::Type;
+    if (!type) return Type::unknown();
     switch (type->kind) {
-        case zplus::ast::Type::Kind::Number: return "number";
-        case zplus::ast::Type::Kind::String: return "string";
-        case zplus::ast::Type::Kind::Character: return "char";
-        case zplus::ast::Type::Kind::Boolean: return "bool";
-        case zplus::ast::Type::Kind::Void: return "void";
-        case zplus::ast::Type::Kind::Custom: return type->name;
+        case zplus::ast::Type::Kind::Number: return Type::number();
+        case zplus::ast::Type::Kind::String: return Type::string();
+        case zplus::ast::Type::Kind::Character: return Type::character();
+        case zplus::ast::Type::Kind::Boolean: return Type::boolean();
+        case zplus::ast::Type::Kind::Void: return Type::voidType();
+        case zplus::ast::Type::Kind::Custom: return Type::custom(type->name);
         case zplus::ast::Type::Kind::Array:
-            return irTypeName(type->elementType.get()) + "[]";
+            return Type::array(irType(type->elementType.get()));
         case zplus::ast::Type::Kind::Pointer:
-            return irTypeName(type->elementType.get()) + "*";
-        default: return "unknown";
+            return Type::pointer(irType(type->elementType.get()));
+        default: return Type::unknown();
     }
+}
+
+zplus::semantic::Type resolvedType(
+    const zplus::ast::Node& node,
+    const zplus::ast::Type* syntax = nullptr
+) {
+    return node.resolvedType.value_or(irType(syntax));
 }
 
 // ============================================================
@@ -999,15 +1007,9 @@ void IRBuilder::buildVariable(
         : (statement.internalName.empty()
                ? statement.name
                : statement.internalName);
-    currentBlock->emit(
-        Instruction{
-            "alloc",
-            {},
-            {
-                Value{variableName}
-            }
-        }
-    );
+    Value target{variableName, Value::Kind::Identifier};
+    target.type = resolvedType(statement, statement.type.get());
+    currentBlock->emit(Instruction{"alloc", {}, {target}});
 
     if (statement.initializer) {
 
@@ -1030,7 +1032,7 @@ void IRBuilder::buildVariable(
                 "store",
                 {},
                 {
-                    Value{variableName},
+                    target,
                     value
                 }
             }
@@ -2106,8 +2108,10 @@ void IRBuilder::buildFunction(
     BasicBlock* currentBlock = &entry;
 
     if (receiverOffset != 0) {
+        Value receiver{"this", Value::Kind::Identifier};
+        receiver.type = zplus::semantic::Type::custom(statement.ownerClass);
         currentBlock->emit(
-            Instruction{"param", {}, {Value{"this"}}}
+            Instruction{"param", {}, {receiver}}
         );
     }
 
@@ -2115,17 +2119,18 @@ void IRBuilder::buildFunction(
         if (!parameter) {
             continue;
         }
+        Value argument{
+            parameter->bindingName.empty()
+                ? parameter->name
+                : parameter->bindingName,
+            Value::Kind::Identifier
+        };
+        argument.type = resolvedType(*parameter, parameter->type.get());
         currentBlock->emit(
             Instruction{
                 "param",
                 {},
-                {
-                    Value{
-                        parameter->bindingName.empty()
-                            ? parameter->name
-                            : parameter->bindingName
-                    }
-                }
+                {argument}
             }
         );
     }
@@ -2178,12 +2183,19 @@ void IRBuilder::prepareFunction(
 
     Function& function = module.createFunction(functionName);
     function.location = statement.location;
-    function.returnType = statement.returnType
-        ? irTypeName(statement.returnType.get())
-        : "void";
+    const zplus::semantic::Type signature = resolvedType(statement);
+    function.returnType = signature.kind == zplus::semantic::TypeKind::Function &&
+            signature.returnType
+        ? *signature.returnType
+        : (statement.returnType
+               ? irType(statement.returnType.get())
+               : zplus::semantic::Type::voidType());
     if (!statement.ownerClass.empty()) {
-        function.parameters.emplace_back("this", statement.ownerClass);
+        function.parameters.emplace_back(
+            "this", zplus::semantic::Type::custom(statement.ownerClass));
     }
+    function.requiredParameterCount =
+        statement.ownerClass.empty() ? 0 : 1;
     for (const auto& parameter : statement.parameters) {
         if (!parameter) {
             continue;
@@ -2192,8 +2204,12 @@ void IRBuilder::prepareFunction(
             parameter->bindingName.empty()
                 ? parameter->name
                 : parameter->bindingName,
-            irTypeName(parameter->type.get())
+            resolvedType(*parameter, parameter->type.get())
         );
+        if (function.requiredParameterCount == function.parameters.size() - 1 &&
+            !parameter->defaultValue) {
+            ++function.requiredParameterCount;
+        }
     }
 
     for (std::size_t i = 0; i < statement.parameters.size(); ++i) {
@@ -2209,9 +2225,10 @@ void IRBuilder::prepareFunction(
 
         Function& helper = module.createFunction(helperName);
         helper.location = parameter->location;
-        helper.returnType = irTypeName(parameter->type.get());
+        helper.returnType = resolvedType(*parameter, parameter->type.get());
         if (!statement.ownerClass.empty()) {
-            helper.parameters.emplace_back("this", statement.ownerClass);
+            helper.parameters.emplace_back(
+                "this", zplus::semantic::Type::custom(statement.ownerClass));
         }
         for (std::size_t preceding = 0; preceding < i; ++preceding) {
             const auto& previous = statement.parameters[preceding];
@@ -2222,9 +2239,10 @@ void IRBuilder::prepareFunction(
                 previous->bindingName.empty()
                     ? previous->name
                     : previous->bindingName,
-                irTypeName(previous->type.get())
+                resolvedType(*previous, previous->type.get())
             );
         }
+        helper.requiredParameterCount = helper.parameters.size();
     }
 }
 
@@ -2468,7 +2486,7 @@ void IRBuilder::buildStruct(
         if (!field) continue;
         StructField irField;
         irField.name = field->name;
-        irField.type = irTypeName(field->type.get());
+        irField.type = resolvedType(*field, field->type.get());
         if (field->defaultValue) {
             const auto* literal =
                 as<zplus::ast::Literal>(field->defaultValue.get());
@@ -2518,7 +2536,7 @@ void IRBuilder::buildClass(
             if (!field) continue;
             StructField irField;
             irField.name = field->name;
-            irField.type = irTypeName(field->type.get());
+            irField.type = resolvedType(*field, field->type.get());
             if (field->initializer) {
                 const auto* literal =
                     as<zplus::ast::Literal>(field->initializer.get());
@@ -2528,25 +2546,6 @@ void IRBuilder::buildClass(
                 }
                 irField.defaultValue = buildLiteral(*literal);
                 irField.hasDefault = true;
-                if (irField.type == "unknown") {
-                    switch (literal->kind) {
-                        case zplus::ast::Literal::Kind::Number:
-                            irField.type = "number";
-                            break;
-                        case zplus::ast::Literal::Kind::String:
-                            irField.type = "string";
-                            break;
-                        case zplus::ast::Literal::Kind::Character:
-                            irField.type = "char";
-                            break;
-                        case zplus::ast::Literal::Kind::Boolean:
-                            irField.type = "bool";
-                            break;
-                        case zplus::ast::Literal::Kind::Null:
-                            irField.type = "null";
-                            break;
-                    }
-                }
             }
             type.fields.push_back(std::move(irField));
         }
@@ -2824,6 +2823,26 @@ Value IRBuilder::buildExpression(
             for (std::size_t i = begin; i < block.instructions.size(); ++i) {
                 if (block.instructions[i].location.sourceFile.empty()) {
                     block.instructions[i].location = expression.location;
+                }
+            }
+        }
+    }
+    if (expression.resolvedType) {
+        result.type = *expression.resolvedType;
+        for (auto& block : function.blocks) {
+            const auto prior = instructionCounts.find(&block);
+            const std::size_t begin = prior == instructionCounts.end()
+                ? 0
+                : prior->second;
+            for (std::size_t i = begin; i < block.instructions.size(); ++i) {
+                Instruction& instruction = block.instructions[i];
+                if (!result.name.empty() && instruction.result == result.name) {
+                    instruction.resultType = result.type;
+                }
+                if (instruction.opcode == "alloc" &&
+                    !instruction.operands.empty() &&
+                    instruction.operands[0].name == result.name) {
+                    instruction.operands[0].type = result.type;
                 }
             }
         }

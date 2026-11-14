@@ -335,12 +335,18 @@ run_interpreter_case(
     "empty array passed\ninitialized array read and write passed\narray argument mutation passed\nnested array mutation passed\narrays\nboolean array passed\narray references survived collection\nnative \nunreachable arrays reclaimed\nmanaged array collection passed\n"
 )
 run_interpreter_case(
+    array_length_and_to_string
+    "empty=0\nsingle=1\nwords=3\nflags=2\nnested=2\npositive=42\nnegative=-17\nzero=0\ndecimal=2.5\nexpression=7\nfactorial=120\n"
+)
+run_interpreter_case(
     dynamic_arrays
     "push and aliases passed\ninsert remove and pop passed\ncontains passed\nsmall integer contains passed\nfunction mutation and return passed\ninsert at end passed\nnested array mutation passed\nstring array passed\nglobal array passed\ngeometric growth passed\nheap accounting passed\nclear and reuse passed\nreachable arrays and strings survived collection\nunreachable arrays reclaimed\n"
 )
 run_check_failure(invalid_default_parameters "parameters without defaults cannot follow")
 run_check_failure(invalid_enum_member "enum 'Status' has no member 'Unknown'")
 run_check_failure(invalid_class_member "class 'Counter' has no field or method 'missing'")
+run_check_failure(length_invalid_argument "length expects an array")
+run_check_failure(to_string_invalid_argument "to_string expects a number, got 'string'")
 run_check_failure(
     dynamic_array_type_mismatch
     "push value has type 'string', expected 'number'"
@@ -359,6 +365,11 @@ if(HOST_WINDOWS)
         arrays
         0
         "empty array passed\ninitialized array read and write passed\narray argument mutation passed\nnested array mutation passed\narrays\nboolean array passed\narray references survived collection\nnative \nunreachable arrays reclaimed\nmanaged array collection passed\n"
+    )
+    run_case(
+        array_length_and_to_string
+        0
+        "empty=0\nsingle=1\nwords=3\nflags=2\nnested=2\npositive=42\nnegative=-17\nzero=0\ndecimal=2.5\nexpression=7\nfactorial=120\n"
     )
     run_case(
         dynamic_arrays

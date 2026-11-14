@@ -6,7 +6,7 @@
 
 Z+ is a small compiled language with a lexer, parser, semantic analyzer, shared intermediate representation, interpreter, and an x86-64 native backend.
 
-The current compiler release is **1.1.5 Stable**. The Windows x64 per-user
+The current compiler release is **1.1.6 Stable**. The Windows x64 per-user
 installer and release build instructions are documented in
 [installer/inno/README.md](./installer/inno/README.md).
 
@@ -24,7 +24,7 @@ interpreter on every host and compares interpreter/native output on Windows x64.
 The compiler executable is `build\Release\zp.exe` on Windows Visual Studio builds and `build\zp` on Linux.
 Every successful Release build also synchronizes that executable to `bin\zp.exe` on Windows or `bin/zp` on Linux. Debug builds skip the copy. The synchronization runs after the compiler target succeeds and replaces the destination only with the Release artifact.
 
-The standalone Z+ project build tool is `zbuild` (`zbuild.exe` on Windows). A successful Release build also installs it beside `zp` in `bin/`. See [ZBUILD.md](./docs/ZBUILD.md) for its project format, commands, cache behavior, and current compiler integration limits.
+The standalone Z+ project build system is ZPBuild 0.3.0, invoked as `zpbuild` (`zpbuild.exe` on Windows); `zbuild` remains available as a compatibility alias. It supports compiler-resolved dependency tracking, incremental target builds, bounded parallel execution, build planning, and persistent cache inspection. A successful Release build installs both beside `zp` in `bin/`. See [ZBUILD.md](./docs/ZBUILD.md) for its project format, commands, cache behavior, and current compiler integration limits.
 
 ## Use the compiler
 
@@ -42,6 +42,11 @@ Windows programs. Linux native support is implemented but has not been
 execution-tested in this environment. See
 [the interactive input example](./examples/interactive_input.zp) and
 [SYNTAX.md](./SYNTAX.md#10-built-in-functions) for parsing and EOF behavior.
+
+The generic `length(array)` and numeric `to_string(number)` built-ins are
+available without imports. The interpreter supports them directly; Windows
+x64 native programs support both through the packaged runtime. See the
+[built-in function reference](./SYNTAX.md#10-built-in-functions).
 
 ## Modules
 

@@ -20,13 +20,13 @@ if(NOT result EQUAL 0)
 endif()
 
 if(HOST_WINDOWS)
-    set(executable "${WORK_DIR}/build/release/bin/app.exe")
-    set(input_runtime "${WORK_DIR}/build/release/bin/zplus_input_runtime.dll")
+    set(executable "${WORK_DIR}/build/release/artifacts/app.exe")
+    set(input_runtime "${WORK_DIR}/build/release/artifacts/zplus_input_runtime.dll")
     set(package_input_runtime
         "${WORK_DIR}/build/release/package/zplus_input_runtime.dll")
 else()
-    set(executable "${WORK_DIR}/build/release/bin/app.out")
-    set(input_runtime "${WORK_DIR}/build/release/bin/libzplus_input_runtime.so")
+    set(executable "${WORK_DIR}/build/release/artifacts/app.out")
+    set(input_runtime "${WORK_DIR}/build/release/artifacts/libzplus_input_runtime.so")
     set(package_input_runtime
         "${WORK_DIR}/build/release/package/libzplus_input_runtime.so")
 endif()

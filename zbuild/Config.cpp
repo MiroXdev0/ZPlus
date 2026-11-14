@@ -1,5 +1,7 @@
 #include "Config.hpp"
 
+#include "BuildGraph.hpp"
+#include "Filesystem.hpp"
 #include "Hash.hpp"
 #include "Template.hpp"
 
@@ -194,7 +196,7 @@ void rejectUnknownKeys(
 }
 
 void validateProjectPath(const std::string& value, const std::string& setting) {
-    const std::filesystem::path path(value);
+    const std::filesystem::path path = pathFromUtf8(value);
     if (path.empty() || path.is_absolute()) {
         throw std::runtime_error(setting + " must be a non-empty project-relative path");
     }
@@ -207,11 +209,16 @@ void validateProjectPath(const std::string& value, const std::string& setting) {
 } // namespace
 
 ProjectConfig loadProject(const std::filesystem::path& file) {
+    try {
     std::ifstream input(file);
-    if (!input) throw std::runtime_error("cannot open project configuration: " + file.string());
+    if (!input) {
+        throw std::runtime_error(
+            "cannot open project configuration: " + pathToUtf8(file));
+    }
 
     std::map<std::string, std::map<std::string, Value>> tables;
     std::vector<std::map<std::string, Value>> targets;
+    std::set<std::string> declaredTables;
     std::string section;
     std::size_t lineNumber = 0;
     std::string rawLine;
@@ -233,6 +240,15 @@ ProjectConfig loadProject(const std::filesystem::path& file) {
             if (section.empty()) {
                 throw std::runtime_error("zproject.toml:" + std::to_string(lineNumber) +
                     ": empty table name");
+            }
+            if (section == "target" ||
+                (section.starts_with("target.") && section.size() == 7)) {
+                throw std::runtime_error("zproject.toml:" + std::to_string(lineNumber) +
+                    ": named targets use [target.NAME]");
+            }
+            if (!declaredTables.insert(section).second) {
+                throw std::runtime_error("zproject.toml:" + std::to_string(lineNumber) +
+                    ": duplicate table [" + section + "]");
             }
             continue;
         }
@@ -291,22 +307,67 @@ ProjectConfig loadProject(const std::filesystem::path& file) {
     project.version = requireString(metadata, "version", "0.1.0");
     project.description = requireString(metadata, "description");
     project.entry = requireString(metadata, "entry");
-    project.sourceDirectories = requireArray(metadata, "sources");
+    const auto legacySourceDirectories = requireArray(metadata, "sources");
     project.includeDirectories = requireArray(metadata, "include_dirs");
 
     const auto& build = table("build");
     rejectUnknownKeys(build,
-        {"backend", "mode", "output_dir", "optimization", "jobs", "windows_gui"},
+        {"backend", "mode", "default_profile", "output", "output_dir",
+            "optimization", "jobs", "windows_gui"},
         "[build]");
     project.backend = requireString(build, "backend", "native");
-    project.mode = requireString(build, "mode", "debug");
-    project.outputDirectory = requireString(build, "output_dir", "build");
-    project.optimization = static_cast<int>(requireInteger(build, "optimization", 0));
+    const std::string configuredMode = requireString(build, "mode");
+    const std::string configuredProfile = requireString(build, "default_profile");
+    if (!configuredMode.empty() && !configuredProfile.empty() &&
+        configuredMode != configuredProfile) {
+        throw std::runtime_error(
+            "[build].mode and [build].default_profile cannot select different profiles");
+    }
+    project.mode = !configuredProfile.empty() ? configuredProfile
+        : !configuredMode.empty() ? configuredMode : "debug";
+    const std::string outputDirectory = requireString(build, "output");
+    const std::string legacyOutputDirectory = requireString(build, "output_dir");
+    if (!outputDirectory.empty() && !legacyOutputDirectory.empty() &&
+        outputDirectory != legacyOutputDirectory) {
+        throw std::runtime_error(
+            "[build].output and [build].output_dir cannot specify different directories");
+    }
+    project.outputDirectory = !outputDirectory.empty() ? outputDirectory
+        : !legacyOutputDirectory.empty() ? legacyOutputDirectory : "build";
+    const std::int64_t configuredOptimization =
+        requireInteger(build, "optimization", 0);
+    if (configuredOptimization != 0) {
+        throw std::runtime_error(
+            "build.optimization is unsupported: the current zp compiler has no optimization levels");
+    }
+    project.optimization = 0;
     project.windowsGui = requireBool(build, "windows_gui", false);
     const auto jobs = requireInteger(build, "jobs", 0);
     if (jobs < 0 || jobs > 1024) throw std::runtime_error("build.jobs must be from 0 to 1024");
     project.jobs = static_cast<unsigned>(jobs);
     validateProjectPath(project.outputDirectory, "build.output_dir");
+
+    const auto& sources = table("sources");
+    rejectUnknownKeys(sources, {"directories", "exclude"}, "[sources]");
+    project.sourceDirectories = requireArray(sources, "directories");
+    project.sourceExcludes = requireArray(sources, "exclude");
+    if (project.sourceDirectories.empty()) {
+        project.sourceDirectories = legacySourceDirectories;
+    } else if (!legacySourceDirectories.empty() &&
+               legacySourceDirectories != project.sourceDirectories) {
+        throw std::runtime_error(
+            "configure source directories either in [sources].directories or the legacy "
+            "[project].sources key, not both");
+    }
+    if (project.sourceDirectories.empty()) {
+        const auto entryParent = pathFromUtf8(project.entry).parent_path();
+        if (!project.entry.empty()) {
+            project.sourceDirectories.push_back(
+                entryParent.empty() ? "src" : pathToUtf8(entryParent));
+        }
+    }
+    project.profiles.emplace("debug", BuildProfile{});
+    project.profiles.emplace("release", BuildProfile{});
 
     const auto& compiler = table("compiler");
     rejectUnknownKeys(compiler, {"path", "warnings", "debug_symbols"}, "[compiler]");
@@ -329,6 +390,10 @@ ProjectConfig loadProject(const std::filesystem::path& file) {
     project.testTargets = requireArray(tests, "targets");
     project.testArguments = requireArray(tests, "arguments");
 
+    const auto& targetsTable = table("targets");
+    rejectUnknownKeys(targetsTable, {"default"}, "[targets]");
+    project.defaultTarget = requireString(targetsTable, "default");
+
     if (project.backend != "native" && project.backend != "interpreter") {
         throw std::runtime_error("build.backend must be 'native' or 'interpreter'");
     }
@@ -343,10 +408,6 @@ ProjectConfig loadProject(const std::filesystem::path& file) {
     if (project.mode != "debug" && project.mode != "release") {
         throw std::runtime_error("build.mode must be 'debug' or 'release'");
     }
-    if (project.optimization < 0 || project.optimization > 0) {
-        throw std::runtime_error(
-            "build.optimization is unsupported: the current zp compiler has no optimization levels");
-    }
     if (project.debugSymbols) {
         throw std::runtime_error(
             "compiler.debug_symbols=true is unsupported: the current compiler has no debug-symbol option");
@@ -359,13 +420,25 @@ ProjectConfig loadProject(const std::filesystem::path& file) {
         throw std::runtime_error(
             "compiler include_dirs are not supported by the current zp module resolver; use relative .zh imports");
     }
-    const auto outputPath = (project.root / project.outputDirectory).lexically_normal();
+    const auto outputPath =
+        (project.root / pathFromUtf8(project.outputDirectory)).lexically_normal();
     for (const auto& sourceDirectory : project.sourceDirectories) {
         validateProjectPath(sourceDirectory, "project.sources");
+        const auto resolved =
+            (project.root / pathFromUtf8(sourceDirectory)).lexically_normal();
+        if (!std::filesystem::is_directory(resolved)) {
+            throw std::runtime_error(
+                "[sources].directories contains a missing directory: '" +
+                pathToUtf8(resolved) + "'");
+        }
+    }
+    for (const auto& excludedPath : project.sourceExcludes) {
+        validateProjectPath(excludedPath, "sources.exclude");
     }
     for (const auto& assetDirectory : project.assetDirectories) {
         validateProjectPath(assetDirectory, "assets.directories");
-        const auto assetPath = (project.root / assetDirectory).lexically_normal();
+        const auto assetPath =
+            (project.root / pathFromUtf8(assetDirectory)).lexically_normal();
         const auto outputWithinAssets = outputPath.lexically_relative(assetPath);
         if (!outputWithinAssets.empty() && *outputWithinAssets.begin() != "..") {
             throw std::runtime_error(
@@ -373,15 +446,40 @@ ProjectConfig loadProject(const std::filesystem::path& file) {
         }
         if (!std::filesystem::is_directory(assetPath)) {
             throw std::runtime_error(
-                "asset directory does not exist: '" + assetPath.string() + "'");
+                "asset directory does not exist: '" + pathToUtf8(assetPath) + "'");
         }
     }
 
     for (const auto& [name, values] : tables) {
-        if (name.starts_with("profile.")) {
-            (void)values;
-            throw std::runtime_error(
-                "custom build profiles are unsupported; use the built-in debug or release mode");
+        if (name.starts_with("build.profiles.")) {
+            const std::string profileName = name.substr(15);
+            if (profileName != "debug" && profileName != "release") {
+                throw std::runtime_error(
+                    "unsupported build profile '" + profileName +
+                    "'; only debug and release are currently supported");
+            }
+            rejectUnknownKeys(values, {"optimization", "debug_symbols"},
+                "[" + name + "]");
+            BuildProfile profile;
+            const std::int64_t profileOptimization =
+                requireInteger(values, "optimization", 0);
+            if (profileOptimization != 0) {
+                throw std::runtime_error(
+                    "[" + name + "].optimization is unsupported: zp has no optimization-level option");
+            }
+            profile.optimization = 0;
+            profile.debugSymbols = requireBool(values, "debug_symbols", false);
+            if (profile.debugSymbols) {
+                throw std::runtime_error(
+                    "[" + name + "].debug_symbols=true is unsupported: zp has no debug-symbol option");
+            }
+            project.profiles[profileName] = profile;
+        } else if (name == "build.profiles") {
+            if (!values.empty()) {
+                throw std::runtime_error(
+                    "[build.profiles] must be configured with [build.profiles.debug] "
+                    "or [build.profiles.release]");
+            }
         } else if (name.starts_with("dependencies.")) {
             rejectUnknownKeys(values, {"path"}, "[" + name + "]");
             const std::string dependencyName = name.substr(13);
@@ -390,10 +488,11 @@ ProjectConfig loadProject(const std::filesystem::path& file) {
                 throw std::runtime_error("local dependency '" + dependencyName + "' requires a path");
             }
             project.localDependencies.emplace(
-                dependencyName, std::filesystem::path(path));
+                dependencyName, pathFromUtf8(path));
         } else if (name.empty() || name == "project" || name == "build" ||
                    name == "compiler" || name == "platform" || name == "assets" ||
-                   name == "tests" || name == "dependencies") {
+                   name == "tests" || name == "sources" || name == "targets" ||
+                   name == "dependencies" || name.starts_with("target.")) {
             if (name == "dependencies") {
                 for (const auto& [dependencyName, value] : values) {
                     const auto* path = std::get_if<std::string>(&value);
@@ -402,7 +501,7 @@ ProjectConfig loadProject(const std::filesystem::path& file) {
                             "dependency '" + dependencyName + "' must be a local path string");
                     }
                     project.localDependencies.emplace(
-                        dependencyName, std::filesystem::path(*path));
+                        dependencyName, pathFromUtf8(*path));
                 }
             }
         } else {
@@ -410,46 +509,94 @@ ProjectConfig loadProject(const std::filesystem::path& file) {
         }
     }
 
-    for (const auto& targetTable : targets) {
+    const auto addTarget = [&](const std::map<std::string, Value>& targetTable,
+                               const std::string& tableName) {
         rejectUnknownKeys(targetTable,
-            {"name", "type", "entry", "sources", "dependencies", "backend", "mode", "output_dir"},
-            "[[target]]");
+            {"name", "type", "entry", "sources", "dependencies", "backend",
+                "mode", "output", "output_dir", "command"},
+            tableName);
         TargetConfig target;
-        target.name = requireString(targetTable, "name");
+        const std::string tableTargetName = tableName.starts_with("[target.")
+            ? tableName.substr(8, tableName.size() - 9)
+            : std::string{};
+        target.name = requireString(targetTable, "name", tableTargetName);
+        if (!tableTargetName.empty() && target.name != tableTargetName) {
+            throw std::runtime_error(
+                tableName + ".name must match its table name '" + tableTargetName + "'");
+        }
         target.type = requireString(targetTable, "type", "executable");
         target.entry = requireString(targetTable, "entry");
         target.sources = requireArray(targetTable, "sources");
         target.dependencies = requireArray(targetTable, "dependencies");
         target.backend = requireString(targetTable, "backend");
         target.mode = requireString(targetTable, "mode");
-        target.outputDirectory = requireString(targetTable, "output_dir");
-        if (target.name.empty()) throw std::runtime_error("[[target]].name is required");
-        if (target.type != "executable" && target.type != "test") {
+        const std::string targetOutput = requireString(targetTable, "output");
+        const std::string legacyTargetOutput = requireString(targetTable, "output_dir");
+        if (!targetOutput.empty() && !legacyTargetOutput.empty() &&
+            targetOutput != legacyTargetOutput) {
+            throw std::runtime_error(
+                tableName + " cannot specify different output and output_dir values");
+        }
+        target.outputDirectory = !targetOutput.empty() ? targetOutput : legacyTargetOutput;
+        target.command = requireArray(targetTable, "command");
+        if (target.name.empty()) {
+            throw std::runtime_error(tableName + ".name is required");
+        }
+        if (target.type != "executable" && target.type != "test" &&
+            target.type != "custom") {
             throw std::runtime_error(
                 "target '" + target.name + "' uses unsupported type '" + target.type +
-                "'; the zp backend currently emits standalone executables only");
+                "'; supported target types are executable, test, and custom. "
+                "The zp compiler does not support linkable library targets.");
         }
-        if (target.type == "test" && target.entry.empty()) {
-            throw std::runtime_error("test target '" + target.name + "' requires an entry file");
-        }
-        if (target.entry.empty()) {
+        if (target.type == "custom") {
+            if (target.command.empty()) {
+                throw std::runtime_error(
+                    "custom target '" + target.name + "' requires a non-empty command array");
+            }
+            if (!target.entry.empty()) {
+                throw std::runtime_error(
+                    "custom target '" + target.name + "' must not specify an entry point");
+            }
+        } else if (target.entry.empty()) {
             throw std::runtime_error(
                 "target '" + target.name +
                 "' requires an entry file; the current compiler builds one program entry at a time");
         }
-        validateProjectPath(target.entry, "target '" + target.name + "' entry");
+        if (!target.backend.empty() &&
+            target.backend != "native" && target.backend != "interpreter") {
+            throw std::runtime_error(
+                tableName + ".backend must be 'native' or 'interpreter'");
+        }
+        if (!target.mode.empty() &&
+            target.mode != "debug" && target.mode != "release") {
+            throw std::runtime_error(
+                tableName + ".mode must be 'debug' or 'release'");
+        }
+        if (!target.entry.empty()) {
+            validateProjectPath(target.entry, "target '" + target.name + "' entry");
+        }
         for (const auto& source : target.sources) {
             validateProjectPath(source, "target '" + target.name + "' sources");
         }
         if (!target.outputDirectory.empty()) {
             validateProjectPath(target.outputDirectory, "target '" + target.name + "' output_dir");
         }
-        const auto entry = project.root / target.entry;
-        if (!std::filesystem::is_regular_file(entry)) {
+        const auto entry = project.root / pathFromUtf8(target.entry);
+        if (!target.entry.empty() && !std::filesystem::is_regular_file(entry)) {
             throw std::runtime_error(
-                "target '" + target.name + "' entry does not exist: '" + entry.string() + "'");
+                "target '" + target.name + "' entry does not exist: '" +
+                pathToUtf8(entry) + "'");
         }
         project.targets.push_back(std::move(target));
+    };
+    for (const auto& targetTable : targets) {
+        addTarget(targetTable, "[[target]]");
+    }
+    for (const auto& [name, values] : tables) {
+        if (name.starts_with("target.")) {
+            addTarget(values, "[" + name + "]");
+        }
     }
     if (project.targets.empty() && !project.entry.empty()) {
         project.targets.push_back({"app", "executable", project.entry});
@@ -478,44 +625,39 @@ ProjectConfig loadProject(const std::filesystem::path& file) {
                 target.name + "')");
         }
     }
-    std::map<std::string, const TargetConfig*> targetsByName;
-    for (const auto& target : project.targets) targetsByName.emplace(target.name, &target);
-    for (const auto& target : project.targets) {
-        for (const auto& dependency : target.dependencies) {
-            if (!targetsByName.contains(dependency)) {
-                throw std::runtime_error(
-                    "target '" + target.name + "' depends on missing target '" + dependency + "'");
-            }
-        }
-    }
-    std::map<std::string, int> dependencyStates;
-    std::vector<std::string> dependencyStack;
-    std::function<void(const std::string&)> validateDependency = [&](const std::string& name) {
-        if (dependencyStates[name] == 2) return;
-        if (dependencyStates[name] == 1) {
-            std::ostringstream chain;
-            for (const auto& member : dependencyStack) chain << member << " -> ";
-            chain << name;
-            throw std::runtime_error("circular target dependency: " + chain.str());
-        }
-        dependencyStates[name] = 1;
-        dependencyStack.push_back(name);
-        for (const auto& dependency : targetsByName.at(name)->dependencies) {
-            validateDependency(dependency);
-        }
-        dependencyStack.pop_back();
-        dependencyStates[name] = 2;
-    };
-    for (const auto& target : project.targets) validateDependency(target.name);
     if (project.targets.empty()) {
-        throw std::runtime_error("project must define project.entry or at least one [[target]]");
+        throw std::runtime_error(
+            "project must define project.entry or at least one [[target]]/[target.NAME] table");
+    }
+    (void)targetBuildOrder(project.targets);
+    std::set<std::string> targetNames;
+    for (const TargetConfig& target : project.targets) targetNames.insert(target.name);
+    if (!project.defaultTarget.empty() &&
+        !targetNames.contains(project.defaultTarget)) {
+        throw std::runtime_error(
+            "[targets].default names unknown target '" + project.defaultTarget + "'");
+    }
+    if (project.defaultTarget.empty()) {
+        const auto defaultTarget = std::find_if(
+            project.targets.begin(), project.targets.end(),
+            [](const TargetConfig& target) { return target.type == "executable"; });
+        project.defaultTarget = defaultTarget == project.targets.end()
+            ? project.targets.front().name
+            : defaultTarget->name;
     }
     for (const std::string& testTarget : project.testTargets) {
-        if (!names.contains(testTarget)) {
+        const auto target = std::find_if(
+            project.targets.begin(), project.targets.end(),
+            [&](const TargetConfig& item) { return item.name == testTarget; });
+        if (!names.contains(testTarget) || target == project.targets.end() ||
+            target->type != "test") {
             throw std::runtime_error("[tests].targets names unknown target '" + testTarget + "'");
         }
     }
     return project;
+    } catch (const std::exception& error) {
+        throw std::runtime_error(pathToUtf8(file) + ": " + error.what());
+    }
 }
 
 std::filesystem::path discoverProject(const std::filesystem::path& start) {
@@ -531,7 +673,9 @@ std::filesystem::path discoverProject(const std::filesystem::path& start) {
         if (parent == current) break;
         current = parent;
     }
-    throw std::runtime_error("no zproject.toml found in this directory or its parents");
+    throw std::runtime_error(
+        "no zproject.toml found in this directory or its parents; "
+        "run 'zpbuild init' to create a project");
 }
 
 void writeLockfile(const ProjectConfig& project) {
@@ -541,15 +685,15 @@ void writeLockfile(const ProjectConfig& project) {
         const auto manifest = path / "zproject.toml";
         if (!std::filesystem::is_regular_file(manifest)) {
             throw std::runtime_error(
-                "local dependency '" + name + "' has no zproject.toml at '" + path.string() + "'");
+                "local dependency '" + name + "' has no zproject.toml at '" +
+                pathToUtf8(path) + "'");
         }
         const ProjectConfig dependency = loadProject(manifest);
         dependencies.emplace_back(name, dependency.version + ":" + sha256File(manifest));
     }
     std::sort(dependencies.begin(), dependencies.end());
     const auto lockfile = project.root / "zproject.lock";
-    std::ofstream output(lockfile, std::ios::trunc);
-    if (!output) throw std::runtime_error("cannot write " + lockfile.string());
+    std::ostringstream output;
     output << "format = 1\n";
     output << "project = " << quoteToml(project.name) << '\n';
     output << "version = " << quoteToml(project.version) << '\n';
@@ -557,6 +701,7 @@ void writeLockfile(const ProjectConfig& project) {
         output << "\n[[dependency]]\nname = " << quoteToml(name)
                << "\nversion_integrity = " << quoteToml(integrity) << '\n';
     }
+    writeFileIfChangedAtomically(lockfile, output.str());
 }
 
 } // namespace zbuild

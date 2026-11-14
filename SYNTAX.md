@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This reference describes the language accepted by the Z+ 1.1.2 command-line compiler in this repository. It follows the lexer, parser, semantic analyzer, IR builder, and interpreter—not proposed or aspirational features.
+This reference describes the language accepted by the Z+ 1.1.6 command-line compiler in this repository. It follows the lexer, parser, semantic analyzer, IR builder, and interpreter—not proposed or aspirational features.
 
 The status labels used below mean:
 
@@ -588,6 +588,29 @@ start {
 
 `printm` behaves exactly like `printz` and produces a compiler deprecation warning recommending `printz`. `printz` does not produce a warning. Array programs also have `length(array)`, `push(array, value)`, `pop(array)`, `clear(array)`, `insert(array, index, value)`, `remove(array, index)`, and `contains(array, value)` as described above.
 
+| Built-in | Signature | Return type | Behavior and errors |
+|---|---|---|---|
+| `length(array)` | Any `T[]`, including nested arrays | `number` | Returns the element count, including `0` for an empty array. A non-array argument is a compile-time type error. |
+| `to_string(value)` | `number` | `string` | Formats the number using round-trip decimal formatting, consistent with numeric output. Other argument types produce a compile-time type error. |
+
+```zp
+start {
+    fn add(left: number, right: number): number {
+        return left + right
+    } end fn
+
+    let names: string[] = ["Ada", "Lin"]
+    say("Names: " + to_string(length(names)))
+    say("Result: " + to_string(add(20, 22)))
+} stop
+```
+
+`length` supports every array element type supported by the selected execution
+backend. The interpreter supports arrays of all implemented element types;
+Windows x64 native execution supports managed arrays. `to_string` is supported
+by the interpreter and Windows x64 native runtime. Native string conversion
+and concatenation are not supported by the Linux native backend.
+
 Terminal input is available without an import:
 
 | Built-in | Return type | Behavior |
@@ -883,4 +906,4 @@ start {
 
 `math.zh` must put its exported declarations inside its own declaration-only
 `start` block, as shown above. Unlike the earlier parser-only example, this
-sample exercises runtime class, enum, namespace, and module behavior.
+sample exercises run

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This reference describes the language accepted by the Z+ 1.1.5 command-line compiler in this repository. It follows the lexer, parser, semantic analyzer, IR builder, and interpreter—not proposed or aspirational features.
+This reference describes the language accepted by the Z+ 1.1.6 command-line compiler in this repository. It follows the lexer, parser, semantic analyzer, IR builder, and interpreter—not proposed or aspirational features.
 
 The status labels used below mean:
 

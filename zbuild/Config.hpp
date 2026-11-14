@@ -1,11 +1,17 @@
 #pragma once
 
 #include <filesystem>
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 namespace zbuild {
+
+struct BuildProfile {
+    int optimization = 0;
+    bool debugSymbols = false;
+};
 
 struct TargetConfig {
     std::string name;
@@ -16,6 +22,7 @@ struct TargetConfig {
     std::string backend;
     std::string mode;
     std::string outputDirectory;
+    std::vector<std::string> command;
 };
 
 struct ProjectConfig {
@@ -24,10 +31,13 @@ struct ProjectConfig {
     std::string version = "0.1.0";
     std::string description;
     std::string entry;
+    std::string defaultTarget;
     std::vector<std::string> sourceDirectories;
+    std::vector<std::string> sourceExcludes;
     std::vector<std::string> includeDirectories;
     std::string backend = "native";
     std::string mode = "debug";
+    std::map<std::string, BuildProfile> profiles;
     std::string outputDirectory = "build";
     bool windowsGui = false;
     int optimization = 0;

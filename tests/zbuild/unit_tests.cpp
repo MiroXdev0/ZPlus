@@ -1,4 +1,5 @@
 #include "Config.hpp"
+#include "BuildGraph.hpp"
 #include "Hash.hpp"
 #include "Template.hpp"
 
@@ -10,11 +11,24 @@
 #include <iterator>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace {
 
 void require(bool condition, const char* message) {
     if (!condition) throw std::runtime_error(message);
+}
+
+template <typename Function>
+void requireThrows(Function&& function, const std::string& expected) {
+    try {
+        function();
+    } catch (const std::exception& error) {
+        require(std::string(error.what()).find(expected) != std::string::npos,
+            "exception did not contain the expected diagnostic");
+        return;
+    }
+    throw std::runtime_error("expected operation to fail");
 }
 
 } // namespace
@@ -54,6 +68,65 @@ int main(int, char** argv) {
             require(project.implicitTarget, "generated console project should use a valid implicit target");
             require(project.entry == "src/main.zp", "generated project entry should be configured");
             require(!project.windowsGui, "generated console projects should keep the console subsystem");
+
+            const auto schemaProject = temporary / "Project With Spaces";
+            std::filesystem::create_directories(schemaProject / "src");
+            {
+                std::ofstream source(schemaProject / "src" / "main.zp");
+                source << "start:\nstop\n";
+            }
+            {
+                std::ofstream config(schemaProject / "zproject.toml");
+                config << "[project]\nname = \"SchemaProject\"\nentry = \"src/main.zp\"\n"
+                          "\n[build]\nbackend = \"native\"\ndefault_profile = \"release\"\n"
+                          "output = \"build\"\n"
+                          "\n[build.profiles.debug]\noptimization = 0\n"
+                          "\n[build.profiles.release]\noptimization = 0\n"
+                          "\n[sources]\ndirectories = [\"src\"]\nexclude = [\"vendor\"]\n"
+                          "\n[targets]\ndefault = \"application\"\n"
+                          "\n[target.application]\ntype = \"executable\"\n"
+                          "entry = \"src/main.zp\"\ndependencies = [\"prepare\", \"prepare\"]\n"
+                          "\n[target.prepare]\ntype = \"custom\"\n"
+                          "command = [\"cmake\", \"-E\", \"true\"]\n";
+            }
+            const auto schema =
+                zbuild::loadProject(schemaProject / "zproject.toml");
+            require(schema.mode == "release", "configured default profile should be selected");
+            require(schema.defaultTarget == "application",
+                "configured default target should be parsed");
+            require(schema.sourceDirectories == std::vector<std::string>{"src"},
+                "configured source directories should be parsed");
+            require(schema.sourceExcludes == std::vector<std::string>{"vendor"},
+                "configured source exclusions should be parsed");
+            require(schema.targets.size() == 2,
+                "named executable and custom targets should be parsed");
+
+            zbuild::TargetConfig application;
+            application.name = "application";
+            application.dependencies = {"prepare", "prepare"};
+            zbuild::TargetConfig prepare;
+            prepare.name = "prepare";
+            prepare.type = "custom";
+            zbuild::TargetConfig tool;
+            tool.name = "tool";
+            require(
+                zbuild::targetBuildOrder({tool, application, prepare}, "application") ==
+                    std::vector<std::string>{"prepare", "application"},
+                "build graph should order dependencies first and deduplicate edges");
+            require(
+                zbuild::targetBuildOrder({tool, application, prepare}) ==
+                    std::vector<std::string>{"prepare", "application", "tool"},
+                "build graph order should be deterministic for independent targets");
+            requireThrows(
+                [&] { (void)zbuild::targetBuildOrder({application}, "application"); },
+                "missing target");
+            prepare.dependencies = {"application"};
+            requireThrows(
+                [&] { (void)zbuild::targetBuildOrder({application, prepare}, "application"); },
+                "circular target dependency");
+            requireThrows(
+                [&] { (void)zbuild::targetBuildOrder({application, prepare}, "unknown"); },
+                "unknown target");
 
 #ifdef _WIN32
             const auto guiProject = temporary / "windows-gui";
@@ -135,6 +208,17 @@ int main(int, char** argv) {
                 rejectedProfile = true;
             }
             require(rejectedProfile, "unsupported custom profiles must be rejected");
+            {
+                std::ofstream config(badProject / "zproject.toml", std::ios::trunc);
+                config << "[project]\nname = \"Bad\"\nentry = \"src/main.zp\"\n"
+                          "\n[build]\noptimization = 4294967296\n";
+            }
+            requireThrows(
+                [&] { (void)zbuild::loadProject(badProject / "zproject.toml"); },
+                "optimization is unsupported");
+            requireThrows(
+                [&] { (void)zbuild::loadProject(temporary / "missing" / "zproject.toml"); },
+                "cannot open project configuration");
 
             bool rejectedProjectName = false;
             try {

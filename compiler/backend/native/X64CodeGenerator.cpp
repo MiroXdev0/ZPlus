@@ -24,7 +24,13 @@ using zplus::ir::Instruction;
 using zplus::ir::Module;
 using zplus::ir::Parameter;
 using zplus::ir::Value;
+using zplus::semantic::Type;
+using zplus::semantic::TypeKind;
 using mpp::native::MachineCode;
+
+bool isType(const Type& type, TypeKind kind) {
+    return type.kind == kind;
+}
 
 constexpr char kPendingExceptionGlobal[] = "__zplus_native_pending_exception";
 constexpr char kActiveHandlerSlot[] = "__zp_active_exception_handler";
@@ -886,6 +892,22 @@ private:
             storeResult(instruction);
             return;
         }
+        if (callee == "to_string" && !module_.findFunction(callee)) {
+            if (!windowsAbi_) {
+                throw std::runtime_error(
+                    "native backend: to_string requires the Windows x64 managed string runtime");
+            }
+            if (instruction.operands.size() != 2) {
+                throw std::runtime_error(
+                    "native backend: to_string expects exactly one numeric argument");
+            }
+            loadValue(instruction.operands[1], RCX);
+            emitImportCall("zpg_numberText", "zgraphics_runtime.dll");
+            usesManagedMemory_ = true;
+            usesZGraphicsRuntime_ = true;
+            storeResult(instruction);
+            return;
+        }
         static const std::unordered_map<std::string, std::string> arraySymbols{
             {"push", "zpg_arrayPush"},
             {"pop", "zpg_arrayPop"},
@@ -1066,7 +1088,9 @@ private:
         }
         emitNativeFunctionArguments(instruction, *target);
         emitCall(target->name);
-        if (target->returnType == "number") storeNumericCallResult(instruction);
+        if (isType(target->returnType, TypeKind::Number)) {
+            storeNumericCallResult(instruction);
+        }
         else storeResult(instruction);
     }
 
@@ -1085,7 +1109,7 @@ private:
             }
             for (std::size_t i = 0; i < count; ++i) {
                 const Value& value = instruction.operands[i + 1];
-                if (target.parameters[i].type == "number" && i < 4) {
+                if (isType(target.parameters[i].type, TypeKind::Number) && i < 4) {
                     loadXmmValue(value, static_cast<std::uint8_t>(i));
                 } else {
                     loadValue(value, RAX);
@@ -1108,7 +1132,7 @@ private:
         const auto integerRegisters = argumentRegisters();
         for (std::size_t i = 0; i < count; ++i) {
             const Value& value = instruction.operands[i + 1];
-            if (target.parameters[i].type == "number") {
+            if (isType(target.parameters[i].type, TypeKind::Number)) {
                 if (floatIndex >= 8) {
                     throw std::runtime_error(
                         "native backend: more than eight floating-point parameters are unsupported");
@@ -1288,7 +1312,7 @@ private:
 
     void emitExceptionReturn(const std::string& functionName) {
         const Function* function = module_.findFunction(functionName);
-        if (function && function->returnType == "number") {
+        if (function && isType(function->returnType, TypeKind::Number)) {
             movImm(RAX, 0);
             xmmMoveFromGpr(0, RAX);
         } else {
@@ -1297,7 +1321,7 @@ private:
         if (usesManagedMemory_) {
             emitManagedFrameExit();
         }
-        if (function && function->returnType == "number") {
+        if (function && isType(function->returnType, TypeKind::Number)) {
             movImm(RAX, 0);
             xmmMoveFromGpr(0, RAX);
         } else {
@@ -1943,7 +1967,8 @@ private:
         if (op == "ret") {
             const Function* currentFunction = module_.findFunction(functionName);
             const bool numericReturn =
-                currentFunction && currentFunction->returnType == "number";
+                currentFunction &&
+                isType(currentFunction->returnType, TypeKind::Number);
             if (instruction.operands.empty()) {
                 if (numericReturn) {
                     movImm(RAX, 0);
@@ -1992,11 +2017,12 @@ private:
         std::size_t outgoingStackSize = 48;
         for (const auto& parameter : function.parameters) {
             allocateSlot(parameter.name);
-            if (!parameter.type.empty()) {
-                valueTypes_[parameter.name] = parameter.type;
+            if (parameter.type.kind != TypeKind::Unknown) {
+                valueTypes_[parameter.name] =
+                    zplus::semantic::typeName(parameter.type);
             }
-            if (parameter.type == "string" || parameter.type == "char" ||
-                parameter.type == "character") {
+            if (isType(parameter.type, TypeKind::String) ||
+                isType(parameter.type, TypeKind::Character)) {
                 stringSlots_.insert(parameter.name);
             }
         }
@@ -2213,7 +2239,8 @@ private:
                                 });
                             if (field != structure->fields.end()) {
                                 inferred |= setInferredType(
-                                    instruction.result, field->type);
+                                    instruction.result,
+                                    zplus::semantic::typeName(field->type));
                             }
                         }
                     } else if (instruction.opcode == "store" &&
@@ -2235,7 +2262,8 @@ private:
                         if (const Function* target =
                                 module_.findFunction(instruction.operands[0].name)) {
                             inferred |= setInferredType(
-                                instruction.result, target->returnType);
+                                instruction.result,
+                                zplus::semantic::typeName(target->returnType));
                         } else if (instruction.operands[0].name == "length") {
                             inferred |= setInferredType(instruction.result, "number");
                         } else if (instruction.operands[0].name == "read") {
@@ -2245,6 +2273,8 @@ private:
                             inferred |= setInferredType(instruction.result, "number");
                         } else if (instruction.operands[0].name == "read_boolean") {
                             inferred |= setInferredType(instruction.result, "bool");
+                        } else if (instruction.operands[0].name == "to_string") {
+                            inferred |= setInferredType(instruction.result, "string");
                         } else if ((instruction.operands[0].name == "pop" &&
                                     instruction.operands.size() == 2) ||
                                    (instruction.operands[0].name == "remove" &&
@@ -2365,6 +2395,7 @@ private:
                             callee == "push" || callee == "pop" ||
                             callee == "clear" || callee == "insert" ||
                             callee == "remove" || callee == "contains" ||
+                            callee == "to_string" ||
                             (callee == "length" && !module_.findFunction(callee)) ||
                             callee == "__zgraphics_numberText" ||
                             callee == "__zgraphics_eventText") {
@@ -2436,7 +2467,7 @@ private:
         for (std::size_t i = 0; i < function.parameters.size(); ++i) {
             const Parameter& parameter = function.parameters[i];
             if (windowsAbi_ && i < 4) {
-                if (parameter.type == "number") {
+                if (isType(parameter.type, TypeKind::Number)) {
                     xmmStore(slot(parameter.name), static_cast<std::uint8_t>(i));
                 } else {
                     movStore(slot(parameter.name), argumentRegisters()[i]);
@@ -2449,10 +2480,12 @@ private:
                 }
                 movLoad(RAX, static_cast<std::int32_t>(displacement));
                 movStore(slot(function.parameters[i].name), RAX);
-            } else if (parameter.type == "number") {
+            } else if (isType(parameter.type, TypeKind::Number)) {
                 std::size_t floatIndex = 0;
                 for (std::size_t previous = 0; previous < i; ++previous) {
-                    if (function.parameters[previous].type == "number") ++floatIndex;
+                    if (isType(function.parameters[previous].type, TypeKind::Number)) {
+                        ++floatIndex;
+                    }
                 }
                 if (floatIndex >= 8) {
                     throw std::runtime_error(
@@ -2462,7 +2495,9 @@ private:
             } else {
                 std::size_t integerIndex = 0;
                 for (std::size_t previous = 0; previous < i; ++previous) {
-                    if (function.parameters[previous].type != "number") ++integerIndex;
+                    if (!isType(function.parameters[previous].type, TypeKind::Number)) {
+                        ++integerIndex;
+                    }
                 }
                 if (integerIndex >= argumentRegisters().size()) {
                     throw std::runtime_error(
@@ -2490,7 +2525,7 @@ private:
                 if (usesManagedMemory_) {
                     emitManagedFrameExit();
                 }
-                if (function.returnType == "number") {
+                if (isType(function.returnType, TypeKind::Number)) {
                     movImm(RAX, 0);
                     xmmMoveFromGpr(0, RAX);
                 } else {
@@ -2520,8 +2555,9 @@ private:
             throw std::runtime_error("native entry function '" + entry->name +
                                      "' must not require parameters");
         }
-        if (entry->returnType != "void" && entry->returnType != "number" &&
-            entry->returnType != "boolean") {
+        if (!isType(entry->returnType, TypeKind::Void) &&
+            !isType(entry->returnType, TypeKind::Number) &&
+            !isType(entry->returnType, TypeKind::Boolean)) {
             throw std::runtime_error("native entry function must return number, boolean, or void");
         }
 
@@ -2555,7 +2591,7 @@ private:
                 emitJump(0x85, uncaughtLabel);
             }
             emitCall(entry->name);
-            if (entry->returnType == "number") {
+            if (isType(entry->returnType, TypeKind::Number)) {
                 convertXmmToSignedInteger(RAX, 0);
             }
             movReg(R10, RAX);
@@ -2604,7 +2640,7 @@ private:
                 emitJump(0x85, uncaughtLabel);
             }
             emitCall(entry->name);
-            if (entry->returnType == "number") {
+            if (isType(entry->returnType, TypeKind::Number)) {
                 convertXmmToSignedInteger(RAX, 0);
             }
             movReg(R10, RAX);

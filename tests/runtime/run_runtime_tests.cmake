@@ -64,6 +64,10 @@ run_success(
     "0\n10\n100\n7\n3\nbeta\ntrue\nb\n5\n5\nz+\n2\n"
 )
 run_success(
+    "tests/native/array_length_and_to_string.zp"
+    "empty=0\nsingle=1\nwords=3\nflags=2\nnested=2\npositive=42\nnegative=-17\nzero=0\ndecimal=2.5\nexpression=7\nfactorial=120\n"
+)
+run_success(
     "tests/runtime/structs.zp"
     "true\nfalse\nis player\nAlex\n100\n0\n90\n50\n4\nAlex\n95\n95\n"
 )
@@ -167,6 +171,14 @@ run_success(
 expect_check_error(
     "tests/runtime/array_type_mismatch.zp"
     "array elements must have compatible types"
+)
+expect_check_error(
+    "tests/native/length_invalid_argument.zp"
+    "length expects an array"
+)
+expect_check_error(
+    "tests/native/to_string_invalid_argument.zp"
+    "to_string expects a number, got 'string'"
 )
 expect_check_error(
     "tests/runtime/invalid_string_index.zp"

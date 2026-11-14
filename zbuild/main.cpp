@@ -1,5 +1,6 @@
 #include "Build.hpp"
 #include "Config.hpp"
+#include "Filesystem.hpp"
 #include "Process.hpp"
 #include "Template.hpp"
 
@@ -17,7 +18,11 @@
 
 namespace {
 
-constexpr const char* version = "0.1.6";
+#ifndef ZBUILD_VERSION
+#define ZBUILD_VERSION "development"
+#endif
+
+constexpr const char* version = ZBUILD_VERSION;
 
 std::filesystem::path executablePath(const char* argumentZero) {
 #ifdef _WIN32
@@ -29,38 +34,71 @@ std::filesystem::path executablePath(const char* argumentZero) {
         throw std::runtime_error("cannot determine the ZpBuild executable path");
     return std::filesystem::path(std::wstring(path.data(), length));
 #else
-    return std::filesystem::absolute(argumentZero);
+    return std::filesystem::absolute(zbuild::pathFromUtf8(argumentZero));
 #endif
 }
 
 void printHelp() {
     std::cout
-        << "ZBuild " << version << " - Z+ project build tool\n\n"
-        << "Usage: zbuild <command> [options] [-- program-args]\n\n"
+        << "ZPBuild " << version << " - Z+ project build system\n\n"
+        << "Usage: zpbuild <command> [target] [options] [-- program-args]\n\n"
         << "Commands:\n"
-        << "  init [name]           Create a Console project (use -template NAME)\n"
+        << "  init [name]           Initialize this directory or create a Console project\n"
+        << "  new NAME              Create a project directory (alias for init NAME)\n"
         << "  templates             List built-in and custom project templates\n"
         << "  template info NAME    Show project template metadata\n"
         << "  configure             Validate the project and write zproject.lock\n"
-        << "  build                 Build project targets\n"
+        << "  build [target]        Build configured targets\n"
+        << "  plan [target]         Show rebuild decisions without changing outputs\n"
         << "  run                   Build and run an executable target\n"
+        << "  check [target]        Check configured Z+ entry points\n"
         << "  test                  Build and run configured test targets\n"
         << "  clean                 Remove generated outputs\n"
         << "  rebuild               Clean and build\n"
         << "  info                  Show project metadata\n"
         << "  targets               List configured targets\n"
         << "  graph                 Show target dependencies (--dot for Graphviz)\n"
+        << "  cache info|clean|verify  Inspect or maintain the project cache\n"
         << "  package               Create a release directory\n\n"
         << "Build options:\n"
         << "  --target NAME         Select a target\n"
         << "  --debug | --release   Select the output profile\n"
+        << "  --profile NAME        Select debug or release\n"
+        << "  --backend NAME        Select native or interpreter\n"
         << "  --jobs N              Maximum concurrent target builds\n"
+        << "  --parallel            Use the automatic bounded worker count\n"
+        << "  --no-cache            Bypass cache reads and writes for this invocation\n"
+        << "  --dry-run             Print the build plan without compiling\n"
         << "  --verbose             Print compiler and program output\n"
         << "  --clean-first         Clean the selected profile before building\n"
         << "  --json                Emit machine-readable info or targets\n"
+        << "  --diagnostics=json    Emit machine-readable ZPBuild errors\n"
         << "  --dot                 Emit the graph in Graphviz DOT format\n"
         << "  -h, --help            Show help\n"
-        << "  --version             Show the ZBuild version\n";
+        << "  --version             Show the ZPBuild version\n";
+}
+
+std::string escapeJson(const std::string& value) {
+    std::string result;
+    for (const unsigned char character : value) {
+        switch (character) {
+            case '"': result += "\\\""; break;
+            case '\\': result += "\\\\"; break;
+            case '\n': result += "\\n"; break;
+            case '\r': result += "\\r"; break;
+            case '\t': result += "\\t"; break;
+            default:
+                if (character < 0x20) {
+                    constexpr char hex[] = "0123456789abcdef";
+                    result += "\\u00";
+                    result += hex[character >> 4];
+                    result += hex[character & 0x0f];
+                } else {
+                    result.push_back(static_cast<char>(character));
+                }
+        }
+    }
+    return result;
 }
 
 void printTemplateHelp() {
@@ -82,7 +120,7 @@ unsigned parseJobs(const std::string& value) {
 }
 
 std::string inferredProjectName(const std::filesystem::path& path) {
-    std::string name = path.filename().string();
+    std::string name = zbuild::pathToUtf8(path.filename());
     for (char& ch : name) {
         const auto value = static_cast<unsigned char>(ch);
         if (!((value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z') ||
@@ -103,7 +141,8 @@ std::filesystem::path compilerPath(
     const std::filesystem::path& executable
 ) {
     if (!project.compiler.empty()) {
-        const std::filesystem::path configured(project.compiler);
+        const std::filesystem::path configured =
+            zbuild::pathFromUtf8(project.compiler);
         const auto projectRelative = configured.is_absolute()
             ? configured
             : project.root / configured;
@@ -140,19 +179,22 @@ std::filesystem::path compilerPath(
 
 } // namespace
 
-int main(int argc, char** argv) {
+int runCli(int argc, char** argv) {
 #ifdef _WIN32
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
 #endif
+    bool diagnosticsJson = false;
     try {
         if (argc < 2) {
             printHelp();
             return 2;
         }
-        const std::string command = argv[1];
+        const std::string command = std::string(argv[1]) == "new"
+            ? "init"
+            : argv[1];
         if (command == "--version" || command == "version") {
-            std::cout << "ZBuild " << version << '\n';
+            std::cout << "ZPBuild " << version << '\n';
             return 0;
         }
         if (command == "--help" || command == "-h" || command == "help") {
@@ -185,9 +227,19 @@ int main(int argc, char** argv) {
         std::string projectName;
         std::string projectVersion = "0.1.0";
         std::string author;
+        std::string positionalTarget;
         std::filesystem::path initDestination;
         std::vector<std::string> programArguments;
-        for (int i = 2; i < argc; ++i) {
+        std::string cacheAction;
+        int firstOption = 2;
+        if (command == "cache") {
+            if (argc != 3) {
+                throw std::runtime_error("usage: zpbuild cache info|clean|verify");
+            }
+            cacheAction = argv[2];
+            firstOption = argc;
+        }
+        for (int i = firstOption; i < argc; ++i) {
             const std::string argument = argv[i];
             if (command == "init") {
                 if (argument == "--template") {
@@ -202,9 +254,9 @@ int main(int argc, char** argv) {
                     projectTemplate = argument.substr(10);
                 } else if (argument == "--path") {
                     if (++i >= argc) throw std::runtime_error("--path requires a value");
-                    initDestination = argv[i];
+                    initDestination = zbuild::pathFromUtf8(argv[i]);
                 } else if (argument.starts_with("--path=")) {
-                    initDestination = argument.substr(7);
+                    initDestination = zbuild::pathFromUtf8(argument.substr(7));
                 } else if (argument == "--version") {
                     if (++i >= argc) throw std::runtime_error("--version requires a value for init");
                     projectVersion = argv[i];
@@ -238,6 +290,18 @@ int main(int argc, char** argv) {
             } else if (argument == "--debug") {
                 if (!options.mode.empty()) throw std::runtime_error("choose only one of --debug and --release");
                 options.mode = "debug";
+            } else if (argument == "--profile") {
+                if (++i >= argc) throw std::runtime_error("--profile requires a name");
+                if (!options.mode.empty()) throw std::runtime_error("choose only one profile option");
+                options.mode = argv[i];
+            } else if (argument.starts_with("--profile=")) {
+                if (!options.mode.empty()) throw std::runtime_error("choose only one profile option");
+                options.mode = argument.substr(10);
+            } else if (argument == "--backend") {
+                if (++i >= argc) throw std::runtime_error("--backend requires a name");
+                options.backend = argv[i];
+            } else if (argument.starts_with("--backend=")) {
+                options.backend = argument.substr(10);
             } else if (argument == "--target") {
                 if (++i >= argc) throw std::runtime_error("--target requires a name");
                 options.target = argv[i];
@@ -252,20 +316,45 @@ int main(int argc, char** argv) {
                 options.verbose = true;
             } else if (argument == "--clean-first") {
                 options.cleanFirst = true;
+            } else if (argument == "--parallel") {
+                options.parallel = true;
+            } else if (argument == "--no-cache") {
+                options.noCache = true;
+            } else if (argument == "--dry-run") {
+                options.dryRun = true;
             } else if (argument == "--json") {
                 json = true;
+            } else if (argument == "--diagnostics=json") {
+                diagnosticsJson = true;
             } else if (argument == "--dot") {
                 dot = true;
             } else if (argument == "--force") {
                 options.force = true;
+            } else if (!argument.starts_with('-') &&
+                       (command == "build" || command == "rebuild" ||
+                        command == "plan" ||
+                        command == "run" || command == "test" ||
+                        command == "check" || command == "package")) {
+                if (!positionalTarget.empty()) {
+                    throw std::runtime_error(command + " accepts at most one target name");
+                }
+                positionalTarget = argument;
             } else {
                 throw std::runtime_error("unknown option '" + argument + "'");
             }
         }
+        if (!positionalTarget.empty()) {
+            if (!options.target.empty() && options.target != positionalTarget) {
+                throw std::runtime_error(
+                    "positional target and --target select different targets");
+            }
+            options.target = positionalTarget;
+        }
 
         if (command == "init") {
             const auto workingDirectory = std::filesystem::current_path();
-            const std::filesystem::path positionalPath(projectName);
+            const std::filesystem::path positionalPath =
+                zbuild::pathFromUtf8(projectName);
             const bool positionalPathIsDestination =
                 !projectName.empty() && projectName != "." &&
                 (positionalPath.is_absolute() || positionalPath.has_parent_path());
@@ -289,7 +378,7 @@ int main(int argc, char** argv) {
                 : projectName;
             templates.initialize(
                 projectTemplate, destination, name, projectVersion, author);
-            std::cout << "[init] created " << destination.string() << '\n';
+            std::cout << "[init] created " << zbuild::pathToUtf8(destination) << '\n';
             return 0;
         }
 
@@ -297,11 +386,16 @@ int main(int argc, char** argv) {
         zbuild::ProjectConfig project = zbuild::loadProject(manifest);
         if (command == "configure") {
             zbuild::writeLockfile(project);
-            std::cout << "[configure] " << manifest.string() << " is valid\n";
-            std::cout << "[configure] wrote " << (project.root / "zproject.lock").string() << '\n';
+            std::cout << "[configure] " << zbuild::pathToUtf8(manifest) << " is valid\n";
+            std::cout << "[configure] wrote "
+                      << zbuild::pathToUtf8(project.root / "zproject.lock") << '\n';
             return 0;
         }
 
+        if (command == "cache") {
+            zbuild::BuildEngine engine(std::move(project), {});
+            return engine.cacheCommand(cacheAction);
+        }
         if (command == "clean") {
             zbuild::BuildEngine engine(std::move(project), {});
             engine.clean(options.mode);
@@ -321,7 +415,9 @@ int main(int argc, char** argv) {
         }
 
         if (command != "build" && command != "rebuild" &&
-            command != "run" && command != "test" && command != "package") {
+            command != "plan" &&
+            command != "run" && command != "test" && command != "check" &&
+            command != "package") {
             throw std::runtime_error("unknown command '" + command + "'");
         }
         if (json || dot) {
@@ -331,18 +427,61 @@ int main(int argc, char** argv) {
             options.force = true;
             options.cleanFirst = true;
         }
+        if (command == "plan") options.dryRun = true;
+        if (options.dryRun && command != "build" && command != "plan") {
+            throw std::runtime_error("--dry-run is valid only with build or plan");
+        }
         const auto compiler = compilerPath(project, executablePath(argv[0]));
         zbuild::BuildEngine engine(std::move(project), compiler);
-        if (command == "build" || command == "rebuild") {
+        if (command == "build" || command == "rebuild" || command == "plan") {
             engine.build(options);
             return 0;
         }
+        if (command == "check") return engine.check(options);
         if (command == "run") return engine.run(options, programArguments);
         if (command == "test") return engine.test(options);
         engine.package(options);
         return 0;
     } catch (const std::exception& error) {
-        std::cerr << "zbuild: error: " << error.what() << '\n';
+        if (diagnosticsJson) {
+            std::cerr << "{\"severity\":\"error\",\"code\":\"ZPB0001\",\"message\":\""
+                      << escapeJson(error.what()) << "\"}\n";
+        } else {
+            std::cerr << "error[ZPB0001]: " << error.what() << '\n';
+        }
         return 1;
     }
 }
+
+#ifdef _WIN32
+int wmain(int argc, wchar_t** wideArguments) {
+    std::vector<std::string> converted;
+    std::vector<char*> arguments;
+    converted.reserve(static_cast<std::size_t>(argc));
+    arguments.reserve(static_cast<std::size_t>(argc));
+    for (int i = 0; i < argc; ++i) {
+        const int length = WideCharToMultiByte(
+            CP_UTF8, WC_ERR_INVALID_CHARS, wideArguments[i], -1, nullptr, 0,
+            nullptr, nullptr);
+        if (length <= 0) {
+            std::cerr << "error[ZPB0001]: command-line argument is not valid Unicode\n";
+            return 1;
+        }
+        std::string value(static_cast<std::size_t>(length), '\0');
+        if (WideCharToMultiByte(
+                CP_UTF8, WC_ERR_INVALID_CHARS, wideArguments[i], -1,
+                value.data(), length, nullptr, nullptr) <= 0) {
+            std::cerr << "error[ZPB0001]: failed converting a command-line argument\n";
+            return 1;
+        }
+        value.resize(static_cast<std::size_t>(length - 1));
+        converted.push_back(std::move(value));
+    }
+    for (std::string& value : converted) arguments.push_back(value.data());
+    return runCli(argc, arguments.data());
+}
+#else
+int main(int argc, char** argv) {
+    return runCli(argc, argv);
+}
+#endif

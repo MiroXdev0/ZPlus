@@ -1,0 +1,31 @@
+start {
+    fn add(left: number, right: number): number {
+        return left + right
+    } end fn
+
+    fn factorial(value: number): number {
+        if value <= 1 {
+            return 1
+        } end if
+        return value * factorial(value - 1)
+    } end fn
+
+    let empty: number[] = []
+    let single: char[] = ['x']
+    let words: string[] = ["one", "two", "three"]
+    let flags: bool[] = [true, false]
+    let nested: number[][] = [[1], [2, 3]]
+
+    say("empty=" + to_string(length(empty)))
+    say("single=" + to_string(length(single)))
+    say("words=" + to_string(length(words)))
+    say("flags=" + to_string(length(flags)))
+    say("nested=" + to_string(length(nested)))
+
+    say("positive=" + to_string(42))
+    say("negative=" + to_string(-17))
+    say("zero=" + to_string(0))
+    say("decimal=" + to_string(2.5))
+    say("expression=" + to_string(add(3, 4)))
+    say("factorial=" + to_string(factorial(5)))
+} stop

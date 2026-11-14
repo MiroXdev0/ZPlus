@@ -198,166 +198,21 @@ bool Analyzer::isBoolean(
 std::string Analyzer::typeName(
     const Type& type
 ) const {
-
-    switch (type.kind) {
-
-        case TypeKind::Unknown:
-            return "unknown";
-
-        case TypeKind::Number:
-            return "number";
-
-        case TypeKind::String:
-            return "string";
-
-        case TypeKind::Character:
-            return "char";
-
-        case TypeKind::Boolean:
-            return "boolean";
-
-        case TypeKind::Void:
-            return "void";
-
-        case TypeKind::Null:
-            return "null";
-
-        case TypeKind::Array:
-
-            if (type.elementType) {
-                return typeName(
-                    *type.elementType
-                ) + "[]";
-            }
-
-            return "array";
-
-        case TypeKind::Pointer:
-
-            if (type.elementType) {
-                return typeName(
-                    *type.elementType
-                ) + "*";
-            }
-
-            return "pointer";
-
-        case TypeKind::Function:
-            return "function";
-
-        case TypeKind::Custom:
-            return type.name;
-    }
-
-    return "unknown";
+    return zplus::semantic::typeName(type);
 }
 
 bool Analyzer::typesEqual(
     const Type& left,
     const Type& right
 ) const {
-
-    if (
-        left.kind == TypeKind::Unknown ||
-        right.kind == TypeKind::Unknown
-    ) {
-        return true;
-    }
-
-    if (
-        left.kind != right.kind
-    ) {
-        return false;
-    }
-
-    switch (left.kind) {
-
-        case TypeKind::Custom:
-            return left.name == right.name;
-
-        case TypeKind::Array:
-
-        case TypeKind::Pointer:
-
-            if (
-                !left.elementType ||
-                !right.elementType
-            ) {
-                return true;
-            }
-
-            return typesEqual(
-                *left.elementType,
-                *right.elementType
-            );
-
-        case TypeKind::Function:
-
-            if (
-                !left.returnType ||
-                !right.returnType
-            ) {
-                return true;
-            }
-
-            if (
-                left.parameters.size() !=
-                right.parameters.size()
-            ) {
-                return false;
-            }
-
-            for (
-                std::size_t i = 0;
-                i < left.parameters.size();
-                ++i
-            ) {
-
-                if (
-                    !typesEqual(
-                        left.parameters[i],
-                        right.parameters[i]
-                    )
-                ) {
-                    return false;
-                }
-            }
-
-            return typesEqual(
-                *left.returnType,
-                *right.returnType
-            );
-
-        default:
-            return true;
-    }
+    return zplus::semantic::typesEqual(left, right);
 }
 
 bool Analyzer::isAssignable(
     const Type& target,
     const Type& value
 ) const {
-
-    if (
-        target.kind == TypeKind::Unknown ||
-        value.kind == TypeKind::Unknown
-    ) {
-        return true;
-    }
-
-    if (typesEqual(target, value)) {
-        return true;
-    }
-
-    // null can be assigned to pointers.
-    if (
-        value.kind == TypeKind::Null &&
-        target.kind == TypeKind::Pointer
-    ) {
-        return true;
-    }
-
-    return false;
+    return zplus::semantic::isAssignable(target, value);
 }
 
 
@@ -554,6 +409,7 @@ bool Analyzer::analyze(
     declareBuiltin("read_number", {}, number);
     declareBuiltin("read_integer", {}, number);
     declareBuiltin("read_boolean", {}, boolean);
+    declareBuiltin("to_string", {number}, string);
     declareBuiltin("__zgraphics_createWindow", {string, number, number}, number);
     declareBuiltin("length", {Type::unknown()}, number);
     declareBuiltin("push", {Type::unknown(), Type::unknown()}, voidType);
@@ -1575,6 +1431,7 @@ void Analyzer::analyzeVariable(
         statement.type
             ? declaredType
             : valueType;
+    statement.resolvedType = finalType;
 
     Symbol symbol;
 
@@ -2071,6 +1928,10 @@ void Analyzer::analyzeFunction(
         declareSymbol(symbol);
     }
 
+    if (const Symbol* functionSymbol = findSymbol(symbolName)) {
+        statement.resolvedType = functionSymbol->type;
+    }
+
     const Type previousReturnType =
         currentReturnType_;
 
@@ -2128,6 +1989,7 @@ void Analyzer::analyzeFunction(
                     *parameter->type
                 )
                 : Type::unknown();
+        parameter->resolvedType = parameterType;
 
         parameter->bindingName = createBindingName();
         Symbol symbol;
@@ -2309,6 +2171,7 @@ void Analyzer::analyzeStruct(
         if (field->type) {
 
             const Type fieldType = resolveType(*field->type);
+            field->resolvedType = fieldType;
             if (field->defaultValue) {
                 const Type defaultType = expressionType(*field->defaultValue);
                 if (!isAssignable(fieldType, defaultType)) {
@@ -2322,7 +2185,7 @@ void Analyzer::analyzeStruct(
                 }
             }
         } else if (field->defaultValue) {
-            (void)expressionType(*field->defaultValue);
+            field->resolvedType = expressionType(*field->defaultValue);
         }
     }
 }
@@ -2353,6 +2216,7 @@ void Analyzer::analyzeClass(
             const Type fieldType = resolveType(
                 *field->type
             );
+            field->resolvedType = fieldType;
             if (field->initializer) {
                 const Type initializerType = expressionType(*field->initializer);
                 if (!isAssignable(fieldType, initializerType)) {
@@ -2361,6 +2225,8 @@ void Analyzer::analyzeClass(
                                       "', expected '" + typeName(fieldType) + "'");
                 }
             }
+        } else if (field->initializer) {
+            field->resolvedType = expressionType(*field->initializer);
         }
 
         if (field->initializer) {
@@ -2528,123 +2394,103 @@ void Analyzer::analyzeExport(
 Type Analyzer::expressionType(
     const zplus::ast::Expression& expression
 ) {
-
+    Type result;
     if (
         const auto* node =
             as<zplus::ast::Literal>(
                 &expression
             )
     ) {
-        return typeOfLiteral(
+        result = typeOfLiteral(
             *node
         );
-    }
-
-    if (
+    } else if (
         const auto* node =
             as<zplus::ast::Identifier>(
                 &expression
             )
     ) {
-        return typeOfIdentifier(
+        result = typeOfIdentifier(
             *node
         );
-    }
-
-    if (
+    } else if (
         const auto* node =
             as<zplus::ast::UnaryExpression>(
                 &expression
             )
     ) {
-        return typeOfUnary(
+        result = typeOfUnary(
             *node
         );
-    }
-
-    if (
+    } else if (
         const auto* node =
             as<zplus::ast::BinaryExpression>(
                 &expression
             )
     ) {
-        return typeOfBinary(
+        result = typeOfBinary(
             *node
         );
-    }
-
-    if (
+    } else if (
         const auto* node =
             as<zplus::ast::AssignmentExpression>(
                 &expression
             )
     ) {
-        return typeOfAssignment(
+        result = typeOfAssignment(
             *node
         );
-    }
-
-    if (
+    } else if (
         const auto* node =
             as<zplus::ast::ConditionalExpression>(
                 &expression
             )
     ) {
-        return typeOfConditional(
+        result = typeOfConditional(
             *node
         );
-    }
-
-    if (
+    } else if (
         const auto* node =
             as<zplus::ast::CallExpression>(
                 &expression
             )
     ) {
-        return typeOfCall(
+        result = typeOfCall(
             *node
         );
-    }
-
-    if (
+    } else if (
         const auto* node =
             as<zplus::ast::MemberExpression>(
                 &expression
             )
     ) {
-        return typeOfMember(
+        result = typeOfMember(
             *node
         );
-    }
-
-    if (
+    } else if (
         const auto* node =
             as<zplus::ast::IndexExpression>(
                 &expression
             )
     ) {
-        return typeOfIndex(
+        result = typeOfIndex(
             *node
         );
-    }
-
-    if (
+    } else if (
         const auto* node =
             as<zplus::ast::ArrayExpression>(
                 &expression
             )
     ) {
-        return typeOfArray(
+        result = typeOfArray(
             *node
         );
+    } else {
+        error(expression, "unsupported expression");
+        result = Type::unknown();
     }
-
-    error(
-        expression,
-        "unsupported expression"
-    );
-
-    return Type::unknown();
+    expression.resolvedType = result;
+    return result;
 }
 
 // ============================================================
@@ -3498,6 +3344,20 @@ Type Analyzer::typeOfCall(
                 )
             );
         }
+    }
+
+    if (calleeIdentifier && calleeIdentifier->name == "to_string") {
+        if (argumentTypes.size() != 1) {
+            error(expression, "to_string expects exactly one argument");
+            return Type::unknown();
+        }
+        if (argumentTypes[0].kind != TypeKind::Number &&
+            argumentTypes[0].kind != TypeKind::Unknown) {
+            error(expression, "to_string expects a number, got '" +
+                typeName(argumentTypes[0]) + "'");
+            return Type::unknown();
+        }
+        return Type::string();
     }
 
     if (

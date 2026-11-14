@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../parser/AST.hpp"
+#include "../semantic/Type.hpp"
 
 #include <cstddef>
 #include <deque>
@@ -41,6 +42,7 @@ struct Value {
     bool globalSlot = false;
     double numericValue = 0.0;
     bool hasNumericValue = false;
+    zplus::semantic::Type type;
 
     Value() = default;
 
@@ -64,6 +66,7 @@ struct Instruction {
     std::string opcode;
 
     std::string result;
+    zplus::semantic::Type resultType;
 
     std::vector<Value> operands;
 
@@ -167,7 +170,7 @@ struct Parameter {
 
     std::string name;
 
-    std::string type;
+    zplus::semantic::Type type;
 
     std::string defaultFunction;
     std::size_t runtimeSlot = kInvalidRuntimeSlot;
@@ -176,7 +179,7 @@ struct Parameter {
 
     Parameter(
         std::string n,
-        std::string t = {}
+        zplus::semantic::Type t = {}
     )
         : name(std::move(n)),
           type(std::move(t)) {
@@ -212,14 +215,27 @@ struct Function {
 
     std::vector<Parameter> parameters;
 
-    std::string returnType = "void";
+    zplus::semantic::Type returnType = zplus::semantic::Type::voidType();
 
     std::deque<BasicBlock> blocks;
     std::size_t runtimeSlotCount = 0;
+    std::size_t requiredParameterCount = 0;
 
     bool external = false;
 
     bool isBuiltin = false;
+
+    zplus::semantic::Type signature() const {
+        std::vector<zplus::semantic::Type> parameterTypes;
+        parameterTypes.reserve(parameters.size());
+        for (const Parameter& parameter : parameters) {
+            parameterTypes.push_back(parameter.type);
+        }
+        zplus::semantic::Type result =
+            zplus::semantic::Type::function(parameterTypes, returnType);
+        result.requiredParameterCount = requiredParameterCount;
+        return result;
+    }
 
 
     // --------------------------------------------------------
@@ -263,7 +279,7 @@ struct Function {
 
 struct StructField {
     std::string name;
-    std::string type;
+    zplus::semantic::Type type;
     Value defaultValue;
     bool hasDefault = false;
 };

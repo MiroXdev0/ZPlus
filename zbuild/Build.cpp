@@ -1,17 +1,21 @@
 #include "Build.hpp"
 
+#include "BuildGraph.hpp"
+#include "Cache.hpp"
+#include "Dependencies.hpp"
+#include "Filesystem.hpp"
 #include "Hash.hpp"
 #include "Process.hpp"
 
 #include <algorithm>
 #include <atomic>
 #include <cctype>
-#include <cstdlib>
 #include <fstream>
 #include <future>
 #include <functional>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <regex>
 #include <set>
@@ -20,6 +24,10 @@
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
+
+#ifndef ZBUILD_VERSION
+#define ZBUILD_VERSION "development"
+#endif
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -59,10 +67,10 @@ std::string trim(std::string value) {
 
 std::string readText(const std::filesystem::path& path) {
     std::ifstream input(path, std::ios::binary);
-    if (!input) throw std::runtime_error("cannot read '" + path.string() + "'");
+    if (!input) throw std::runtime_error("cannot read '" + pathToUtf8(path) + "'");
     std::ostringstream content;
     content << input.rdbuf();
-    if (input.bad()) throw std::runtime_error("failed reading '" + path.string() + "'");
+    if (input.bad()) throw std::runtime_error("failed reading '" + pathToUtf8(path) + "'");
     return content.str();
 }
 
@@ -97,6 +105,36 @@ std::string jsonEscape(const std::string& value) {
         }
     }
     return result;
+}
+
+void writeBuildMetadata(
+    const std::filesystem::path& destination,
+    const ProjectConfig& project,
+    const TargetConfig& target,
+    const std::filesystem::path& compiler,
+    const std::string& compilerVersion,
+    const std::string& profile,
+    const std::string& backend,
+    const std::string& signature,
+    const std::filesystem::path& output
+) {
+    std::ostringstream metadata;
+    metadata << "{\n"
+             << "  \"format_version\": 1,\n"
+             << "  \"build_tool_version\": \"" << ZBUILD_VERSION << "\",\n"
+             << "  \"project\": \"" << jsonEscape(project.name) << "\",\n"
+             << "  \"target\": \"" << jsonEscape(target.name) << "\",\n"
+             << "  \"type\": \"" << jsonEscape(target.type) << "\",\n"
+             << "  \"profile\": \"" << jsonEscape(profile) << "\",\n"
+             << "  \"backend\": \"" << jsonEscape(backend) << "\",\n"
+             << "  \"compiler\": \"" << jsonEscape(pathToUtf8(compiler)) << "\",\n"
+             << "  \"compiler_version\": \"" << jsonEscape(compilerVersion) << "\",\n"
+             << "  \"signature\": \"" << signature << "\",\n"
+             << "  \"output\": ";
+    if (output.empty()) metadata << "null\n";
+    else metadata << '"' << jsonEscape(pathToUtf8(output)) << "\"\n";
+    metadata << "}\n";
+    writeFileIfChangedAtomically(destination, metadata.str());
 }
 
 std::regex globRegex(const std::string& glob) {
@@ -134,26 +172,46 @@ std::vector<std::filesystem::path> expandSources(
 ) {
     std::vector<std::filesystem::path> result;
     std::set<std::filesystem::path> unique;
-    std::vector<std::string> patterns = target.sources;
-    if (patterns.empty() && project.implicitTarget) {
-        patterns = project.sourceDirectories;
-    }
+    static const std::vector<std::string> noPatterns;
+    const std::vector<std::string>& patterns = !target.sources.empty()
+        ? target.sources
+        : project.implicitTarget ? project.sourceDirectories : noPatterns;
+    const auto excluded = [&](const std::filesystem::path& candidate) {
+        const auto relative = candidate.lexically_relative(project.root);
+        const std::string name = relative.generic_string();
+        if (relative.empty() || name.starts_with("../")) return false;
+        for (const std::string& configured : project.sourceExcludes) {
+            const std::string pattern =
+                pathFromUtf8(configured).generic_string();
+            if (hasGlob(pattern)) {
+                if (std::regex_match(name, globRegex(pattern))) return true;
+            } else if (name == pattern || name.starts_with(pattern + "/")) {
+                return true;
+            }
+        }
+        return false;
+    };
     for (const std::string& configured : patterns) {
-        const std::filesystem::path path = project.root / configured;
+        const std::filesystem::path path = project.root / pathFromUtf8(configured);
         std::error_code error;
         if (hasGlob(configured)) {
             const auto firstGlob = configured.find_first_of("*?");
-            const auto prefix = std::filesystem::path(configured.substr(0, firstGlob));
+            const auto prefix = pathFromUtf8(configured.substr(0, firstGlob));
             const auto base = prefix.has_filename() ? prefix.parent_path() : prefix;
             const auto scanRoot = project.root / base;
             if (!std::filesystem::exists(scanRoot, error) || error) {
-                throw std::runtime_error("source glob base does not exist: '" + scanRoot.string() + "'");
+                throw std::runtime_error(
+                    "source glob base does not exist: '" + pathToUtf8(scanRoot) + "'");
             }
             const std::regex matcher = globRegex(
-                std::filesystem::path(configured).generic_string());
+                pathFromUtf8(configured).generic_string());
             for (std::filesystem::recursive_directory_iterator it(scanRoot, error), end;
                  it != end; it.increment(error)) {
                 if (error) throw std::runtime_error("failed scanning source glob '" + configured + "'");
+                if (excluded(it->path())) {
+                    if (it->is_directory()) it.disable_recursion_pending();
+                    continue;
+                }
                 if (!it->is_regular_file()) continue;
                 const auto relative = std::filesystem::relative(it->path(), project.root, error);
                 if (!error && std::regex_match(relative.generic_string(), matcher) &&
@@ -164,122 +222,43 @@ std::vector<std::filesystem::path> expandSources(
         } else if (std::filesystem::is_directory(path, error) && !error) {
             for (std::filesystem::recursive_directory_iterator it(path, error), end;
                  it != end; it.increment(error)) {
-                if (error) throw std::runtime_error("failed scanning source directory '" + path.string() + "'");
+                if (error) throw std::runtime_error(
+                    "failed scanning source directory '" + pathToUtf8(path) + "'");
+                if (excluded(it->path())) {
+                    if (it->is_directory()) it.disable_recursion_pending();
+                    continue;
+                }
                 if (it->is_regular_file() &&
                     (it->path().extension() == ".zp" || it->path().extension() == ".zh")) {
                     unique.insert(std::filesystem::weakly_canonical(it->path()));
                 }
             }
         } else if (std::filesystem::is_regular_file(path, error) && !error) {
+            if (excluded(path)) continue;
             if (path.extension() == ".zp" || path.extension() == ".zh") {
                 unique.insert(std::filesystem::weakly_canonical(path));
             } else {
-                throw std::runtime_error("unsupported source extension: '" + path.string() + "'");
+                throw std::runtime_error(
+                    "unsupported source extension: '" + pathToUtf8(path) + "'");
             }
         } else {
-            throw std::runtime_error("configured source does not exist: '" + path.string() + "'");
+            throw std::runtime_error(
+                "configured source does not exist: '" + pathToUtf8(path) + "'");
         }
     }
     if (!target.entry.empty()) {
-        const auto entry = std::filesystem::weakly_canonical(project.root / target.entry);
+        const auto entry = std::filesystem::weakly_canonical(
+            project.root / pathFromUtf8(target.entry));
         if (!std::filesystem::is_regular_file(entry)) {
-            throw std::runtime_error("target '" + target.name + "' entry does not exist: '" + entry.string() + "'");
+            throw std::runtime_error("target '" + target.name +
+                "' entry does not exist: '" + pathToUtf8(entry) + "'");
         }
         unique.insert(entry);
     }
-    if (unique.empty()) throw std::runtime_error("target '" + target.name + "' has no Z+ sources");
-    return {unique.begin(), unique.end()};
-}
-
-std::vector<std::filesystem::path> importedModules(
-    const std::filesystem::path& entry
-) {
-    std::vector<std::filesystem::path> result;
-    std::unordered_set<std::string> seen;
-    const std::regex usePattern(R"(^\s*use\s+(?:\"([^\"]+)\"|([^\s;]+)))");
-    std::vector<std::filesystem::path> pending{entry};
-    while (!pending.empty()) {
-        const auto current = std::filesystem::weakly_canonical(pending.back());
-        pending.pop_back();
-        if (!seen.insert(current.string()).second) continue;
-        const std::string content = readText(current);
-        std::istringstream lines(content);
-        std::string line;
-        while (std::getline(lines, line)) {
-            std::smatch match;
-            if (!std::regex_search(line, match, usePattern)) continue;
-            std::string requested = match[1].matched ? match[1].str() : match[2].str();
-            std::replace(requested.begin(), requested.end(), '\\', '/');
-            std::filesystem::path importPath(requested);
-            if (importPath.is_absolute()) {
-                throw std::runtime_error("absolute source imports are not permitted: '" + requested + "'");
-            }
-            auto resolved = current.parent_path() / importPath;
-            const bool bareDottedModule =
-                importPath.parent_path().empty() &&
-                requested.find('.') != std::string::npos &&
-                importPath.extension() != ".zh";
-            const bool standardModuleName =
-                importPath.parent_path().empty() &&
-                (importPath.extension().empty() || bareDottedModule);
-            if (!std::filesystem::exists(resolved) && standardModuleName) {
-                std::filesystem::path standardRoot;
-#ifdef _WIN32
-                char* configured = nullptr;
-                std::size_t configuredLength = 0;
-                if (_dupenv_s(&configured, &configuredLength, "ZPLUS_STDLIB_PATH") == 0 &&
-                    configured) {
-                    standardRoot = configured;
-                    std::free(configured);
-                }
-#else
-                if (const char* configured = std::getenv("ZPLUS_STDLIB_PATH");
-                    configured && *configured) {
-                    standardRoot = configured;
-                }
-#endif
-                if (standardRoot.empty()) {
-                    const auto executableDir = executableDirectory();
-                    if (!executableDir.empty()) {
-                        const auto adjacentLibrary = executableDir / "stdlib";
-                        std::error_code directoryError;
-                        if (std::filesystem::is_directory(
-                                adjacentLibrary, directoryError) &&
-                            !directoryError) {
-                            standardRoot = adjacentLibrary;
-                        }
-                    }
-                }
-#ifdef ZBUILD_STDLIB_DIR
-                if (standardRoot.empty()) standardRoot = ZBUILD_STDLIB_DIR;
-#endif
-                if (!standardRoot.empty()) {
-                    if (bareDottedModule) {
-                        std::size_t begin = 0;
-                        std::size_t separator = requested.find('.');
-                        while (separator != std::string::npos) {
-                            standardRoot /= requested.substr(begin, separator - begin);
-                            begin = separator + 1;
-                            separator = requested.find('.', begin);
-                        }
-                        standardRoot /= requested.substr(begin) + ".zh";
-                    } else {
-                        standardRoot /= requested;
-                        standardRoot /= requested + ".zh";
-                    }
-                    resolved = std::move(standardRoot);
-                }
-            }
-            std::error_code error;
-            if (std::filesystem::is_regular_file(resolved, error) && !error) {
-                pending.push_back(std::filesystem::weakly_canonical(resolved));
-                result.push_back(std::filesystem::weakly_canonical(resolved));
-            }
-        }
+    if (unique.empty() && target.type != "custom") {
+        throw std::runtime_error("target '" + target.name + "' has no Z+ sources");
     }
-    std::sort(result.begin(), result.end());
-    result.erase(std::unique(result.begin(), result.end()), result.end());
-    return result;
+    return {unique.begin(), unique.end()};
 }
 
 std::filesystem::path checkedRelativePath(
@@ -287,7 +266,7 @@ std::filesystem::path checkedRelativePath(
     const std::string& configured,
     const char* description
 ) {
-    const std::filesystem::path relative(configured);
+    const std::filesystem::path relative = pathFromUtf8(configured);
     if (relative.empty() || relative.is_absolute()) {
         throw std::runtime_error(std::string(description) + " must be a non-empty project-relative path");
     }
@@ -295,6 +274,22 @@ std::filesystem::path checkedRelativePath(
     const auto rel = resolved.lexically_relative(project.root);
     if (rel.empty() || *rel.begin() == "..") {
         throw std::runtime_error(std::string(description) + " must stay inside the project directory");
+    }
+    auto current = project.root;
+    for (const auto& component : rel) {
+        current /= component;
+        std::error_code error;
+        const auto status = std::filesystem::symlink_status(current, error);
+        if (error && error != std::errc::no_such_file_or_directory) {
+            throw std::runtime_error(
+                "cannot inspect " + std::string(description) + " path '" +
+                pathToUtf8(current) + "': " + error.message());
+        }
+        if (!error && std::filesystem::is_symlink(status)) {
+            throw std::runtime_error(
+                std::string(description) + " cannot traverse symlink '" +
+                pathToUtf8(current) + "'");
+        }
     }
     return resolved;
 }
@@ -329,6 +324,15 @@ const TargetConfig& selectedTarget(
         }
         return *found;
     }
+    if (!testsOnly && !project.defaultTarget.empty()) {
+        const auto found = std::find_if(
+            project.targets.begin(), project.targets.end(),
+            [&](const TargetConfig& target) {
+                return target.name == project.defaultTarget &&
+                    (target.type == "executable" || target.type == "test");
+            });
+        if (found != project.targets.end()) return *found;
+    }
     const auto found = std::find_if(
         project.targets.begin(), project.targets.end(),
         [&](const TargetConfig& target) {
@@ -343,6 +347,7 @@ const TargetConfig& selectedTarget(
 }
 
 std::string defaultBuildTargetName(const ProjectConfig& project) {
+    if (!project.defaultTarget.empty()) return project.defaultTarget;
     const auto executable = std::find_if(
         project.targets.begin(), project.targets.end(),
         [](const TargetConfig& target) { return target.type == "executable"; });
@@ -462,7 +467,8 @@ std::map<std::string, std::filesystem::path> collectAssets(const ProjectConfig& 
     for (const std::string& directory : project.assetDirectories) {
         const auto sourceRoot = checkedRelativePath(project, directory, "asset directory");
         if (!std::filesystem::is_directory(sourceRoot)) {
-            throw std::runtime_error("asset directory does not exist: '" + sourceRoot.string() + "'");
+            throw std::runtime_error(
+                "asset directory does not exist: '" + pathToUtf8(sourceRoot) + "'");
         }
         const auto outputRoot =
             (project.root / project.outputDirectory).lexically_normal();
@@ -475,7 +481,9 @@ std::map<std::string, std::filesystem::path> collectAssets(const ProjectConfig& 
              it != end; ++it) {
             const auto status = it->symlink_status();
             if (std::filesystem::is_symlink(status)) {
-                throw std::runtime_error("asset symlinks are not supported: '" + it->path().string() + "'");
+                throw std::runtime_error(
+                    "asset symlinks are not supported: '" +
+                    pathToUtf8(it->path()) + "'");
             }
             if (!std::filesystem::is_regular_file(status)) continue;
             const auto relative = project.preserveAssetStructure
@@ -529,7 +537,7 @@ void syncAssets(const ProjectConfig& project, const std::filesystem::path& desti
         std::filesystem::remove(directory, error);
         if (error) {
             throw std::runtime_error(
-                "cannot remove stale asset directory '" + directory.string() +
+                "cannot remove stale asset directory '" + pathToUtf8(directory) +
                 "': " + error.message());
         }
     }
@@ -562,65 +570,59 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
 
     const auto outputRoot = checkedRelativePath(project_, project_.outputDirectory, "build.output_dir");
     const auto profileRoot = outputRoot / mode;
-    const auto cacheDirectory = outputRoot / "cache";
-    std::filesystem::create_directories(cacheDirectory);
+    const auto profile = project_.profiles.find(mode);
+    if (profile == project_.profiles.end()) {
+        throw std::runtime_error("build profile '" + mode + "' is not configured");
+    }
 
     std::unordered_map<std::string, const TargetConfig*> targets;
     for (const TargetConfig& target : project_.targets) targets.emplace(target.name, &target);
-    for (const TargetConfig& target : project_.targets) {
-        for (const std::string& dependency : target.dependencies) {
-            if (!targets.contains(dependency)) {
-                throw std::runtime_error(
-                    "target '" + target.name + "' depends on missing target '" + dependency + "'");
-            }
-        }
+    const std::vector<std::string> order =
+        targetBuildOrder(project_.targets, options.target);
+
+    if (options.dryRun && options.cleanFirst) {
+        throw std::runtime_error("--dry-run cannot be combined with --clean-first");
     }
-
-    std::vector<std::string> order;
-    std::unordered_map<std::string, int> states;
-    std::vector<std::string> stack;
-    std::function<void(const std::string&)> visit = [&](const std::string& name) {
-        if (states[name] == 2) return;
-        if (states[name] == 1) {
-            std::ostringstream chain;
-            for (const std::string& item : stack) chain << item << " -> ";
-            chain << name;
-            throw std::runtime_error("circular target dependency: " + chain.str());
-        }
-        states[name] = 1;
-        stack.push_back(name);
-        for (const std::string& dependency : targets.at(name)->dependencies) visit(dependency);
-        stack.pop_back();
-        states[name] = 2;
-        order.push_back(name);
-    };
-
-    if (options.target.empty()) {
-        for (const auto& target : project_.targets) visit(target.name);
-    } else {
-        if (!targets.contains(options.target)) {
-            throw std::runtime_error("unknown target '" + options.target + "'");
-        }
-        visit(options.target);
+    if (compiler_.empty() || !std::filesystem::is_regular_file(compiler_)) {
+        throw std::runtime_error("Z+ compiler does not exist: '" + pathToUtf8(compiler_) + "'");
     }
-
-    if (options.cleanFirst) clean(mode);
+    std::unique_ptr<ProjectBuildLock> buildLock;
+    if (!options.dryRun) {
+        std::filesystem::create_directories(outputRoot);
+        buildLock = std::make_unique<ProjectBuildLock>(outputRoot / ".zpbuild.lock");
+    }
+    if (options.cleanFirst) {
+        const auto profileOutput = checkedRelativePath(
+            project_, pathToUtf8((outputRoot / mode).lexically_relative(project_.root)),
+            "profile output directory");
+        const auto legacyCache = checkedRelativePath(
+            project_, pathToUtf8((outputRoot / "cache").lexically_relative(project_.root)),
+            "legacy cache directory");
+        std::filesystem::remove_all(profileOutput);
+        std::filesystem::remove_all(legacyCache);
+    }
+    const unsigned hardwareJobs = std::min(
+        32u, std::max(1u, std::thread::hardware_concurrency()));
     const unsigned jobs = options.jobs != 0 ? options.jobs
-        : project_.jobs != 0 ? project_.jobs
-        : std::max(1u, std::thread::hardware_concurrency());
-    std::unordered_map<std::string, std::string> compilerVersion;
+        : !options.parallel && project_.jobs != 0 ? project_.jobs
+        : hardwareJobs;
     const ProcessResult version = runProcess(
-        {compiler_.string(), "version"}, project_.root);
+        {pathToUtf8(compiler_), "version"}, project_.root);
     if (version.exitCode != 0) {
         throw std::runtime_error("cannot query compiler version:\n" + version.output);
     }
-    compilerVersion.emplace("value", version.output);
+    const std::string compilerVersion = trim(version.output);
 
     BuildResult result;
     std::unordered_set<std::string> completed;
     std::unordered_map<std::string, std::filesystem::path> outputByTarget;
+    std::unordered_map<std::string, std::string> signatureByTarget;
     std::mutex resultMutex;
     std::mutex consoleMutex;
+    CacheStatistics statisticsDelta;
+    std::atomic<std::uint64_t> temporarySequence{0};
+    std::size_t maximumReadyTargets = 0;
+    try {
     while (completed.size() < order.size()) {
         std::vector<const TargetConfig*> ready;
         for (const std::string& name : order) {
@@ -632,6 +634,15 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
             }
         }
         if (ready.empty()) throw std::runtime_error("internal build scheduler deadlock");
+        const auto customTarget = std::find_if(
+            ready.begin(), ready.end(), [](const TargetConfig* target) {
+                return target->type == "custom";
+            });
+        if (customTarget != ready.end()) {
+            const TargetConfig* serializedCustom = *customTarget;
+            ready.assign(1, serializedCustom);
+        }
+        maximumReadyTargets = std::max(maximumReadyTargets, ready.size());
         for (std::size_t begin = 0; begin < ready.size(); begin += jobs) {
             const std::size_t end = std::min<std::size_t>(ready.size(), begin + jobs);
             std::vector<std::future<std::pair<std::string, std::filesystem::path>>> tasks;
@@ -652,17 +663,96 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                     if (targetMode != "debug" && targetMode != "release") {
                         throw std::runtime_error("target '" + target->name + "' has invalid mode");
                     }
-                    const auto sources = expandSources(project_, *target);
+                    const auto targetProfile = project_.profiles.find(targetMode);
+                    if (targetProfile == project_.profiles.end()) {
+                        throw std::runtime_error(
+                            "target '" + target->name + "' selects unconfigured profile '" +
+                            targetMode + "'");
+                    }
+                    const auto invalidateStaleOutput = [&] {
+                        if (options.dryRun || target->type == "custom") return;
+#ifdef _WIN32
+                        const std::string outputExtension = ".exe";
+#else
+                        const std::string outputExtension = ".out";
+#endif
+                        const std::string configuredDirectory =
+                            target->outputDirectory.empty()
+                                ? "artifacts"
+                                : target->outputDirectory;
+                        const auto profileDirectory = outputRoot / targetMode;
+                        const auto outputDirectory = checkedRelativePath(
+                            project_, pathToUtf8((profileDirectory /
+                                pathFromUtf8(configuredDirectory))
+                                .lexically_relative(project_.root)),
+                            "target output directory");
+                        const auto output = outputDirectory /
+                            (targetComponent(target->name) +
+                                (targetBackend == "interpreter"
+                                    ? ".checked"
+                                    : outputExtension));
+                        const auto cacheRecord = profileDirectory / "metadata" / "cache" /
+                            (targetComponent(target->name) + "-" + targetMode + "-" +
+                                targetBackend + ".sha256");
+                        std::error_code error;
+                        std::filesystem::remove(output, error);
+                        if (error) {
+                            throw std::runtime_error(
+                                "cannot remove stale target output '" +
+                                pathToUtf8(output) + "': " + error.message());
+                        }
+                        std::filesystem::remove(cacheRecord, error);
+                        if (error) {
+                            throw std::runtime_error(
+                                "cannot invalidate target cache record '" +
+                                pathToUtf8(cacheRecord) + "': " + error.message());
+                        }
+                    };
+                    std::vector<std::filesystem::path> sources;
+                    std::set<std::filesystem::path> tracked;
+                    try {
+                        sources = expandSources(project_, *target);
+                        tracked.insert(sources.begin(), sources.end());
+                        if (!target->entry.empty()) {
+                            const auto modules = compilerDependencies(
+                                compiler_,
+                                project_.root / pathFromUtf8(target->entry),
+                                project_.root);
+                            tracked.insert(modules.begin(), modules.end());
+                        }
+                    } catch (...) {
+                        invalidateStaleOutput();
+                        throw;
+                    }
                     std::ostringstream signatureData;
-                    signatureData << project_.name << '\n' << project_.version << '\n'
+                    signatureData << "zbuild:" << ZBUILD_VERSION << '\n'
+                        << project_.name << '\n' << project_.version << '\n'
                         << target->name << '\n' << target->type << '\n'
+                        << target->entry << '\n' << target->outputDirectory << '\n'
                         << targetBackend << '\n' << targetMode << '\n'
-                        << project_.optimization << '\n'
+                        << targetProfile->second.optimization << '\n'
+                        << targetProfile->second.debugSymbols << '\n'
                         << (project_.windowsGui && targetBackend == "native"
                                 ? "windows-gui\n"
                                 : "console\n")
-                        << compilerVersion.at("value") << '\n'
+                        << compilerVersion << '\n'
+                        << pathToUtf8(compiler_) << '\n'
                         << sha256File(compiler_) << '\n';
+#ifdef _WIN32
+                    signatureData << "platform:windows\n";
+#elif defined(__linux__)
+                    signatureData << "platform:linux\n";
+#else
+                    signatureData << "platform:other\n";
+#endif
+                    for (const std::string& argument : target->command) {
+                        signatureData << "command:" << argument << '\n';
+                    }
+                    std::vector<std::string> targetDependencies = target->dependencies;
+                    std::sort(targetDependencies.begin(), targetDependencies.end());
+                    targetDependencies.erase(
+                        std::unique(targetDependencies.begin(), targetDependencies.end()),
+                        targetDependencies.end());
 #ifdef _WIN32
                     if (targetBackend == "native") {
                         const auto runtime = graphicsRuntime(compiler_);
@@ -671,32 +761,39 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                         else signatureData << sha256File(runtime) << '\n';
                     }
 #endif
-                    for (const std::string& dependency : target->dependencies) {
+                    for (const std::string& dependency : targetDependencies) {
                         std::filesystem::path dependencyOutput;
+                        std::string dependencySignature;
                         {
                             std::lock_guard lock(resultMutex);
-                            const auto found = outputByTarget.find(dependency);
-                            if (found == outputByTarget.end()) {
+                            const auto signature = signatureByTarget.find(dependency);
+                            if (signature == signatureByTarget.end()) {
                                 throw std::runtime_error(
-                                    "dependency output is unavailable for target '" +
+                                    "dependency result is unavailable for target '" +
                                     target->name + "'");
                             }
-                            dependencyOutput = found->second;
+                            dependencySignature = signature->second;
+                            const auto output = outputByTarget.find(dependency);
+                            if (output != outputByTarget.end()) {
+                                dependencyOutput = output->second;
+                            }
                         }
                         signatureData << "target-dependency:" << dependency << ':'
-                                      << sha256File(dependencyOutput) << '\n';
-                    }
-                    std::set<std::filesystem::path> tracked(sources.begin(), sources.end());
-                    if (!target->entry.empty()) {
-                        const auto modules = importedModules(project_.root / target->entry);
-                        tracked.insert(modules.begin(), modules.end());
+                                      << dependencySignature;
+                        if (!dependencyOutput.empty() &&
+                            std::filesystem::is_regular_file(dependencyOutput)) {
+                            signatureData << ':' << sha256File(dependencyOutput);
+                        }
+                        signatureData << '\n';
                     }
                     const bool usesAudio =
-                        targetBackend == "native" && needsAudioRuntime(tracked);
+                        target->type != "custom" && targetBackend == "native" &&
+                        needsAudioRuntime(tracked);
                     const bool usesPhysics =
-                        targetBackend == "native" && needsPhysicsRuntime(tracked);
+                        target->type != "custom" && targetBackend == "native" &&
+                        needsPhysicsRuntime(tracked);
                     const bool usesTerminalInput =
-                        targetBackend == "native" &&
+                        target->type != "custom" && targetBackend == "native" &&
                         needsTerminalInputRuntime(tracked);
                     if (usesAudio) {
                         const auto runtime = audioRuntime(compiler_);
@@ -717,24 +814,16 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                         else signatureData << sha256File(runtime) << '\n';
                     }
                     for (const auto& source : tracked) {
-                        signatureData << source.generic_string() << ':'
+                        signatureData << pathToUtf8(source) << ':'
                                       << sha256File(source) << '\n';
                     }
-                    for (const auto& [relative, asset] : collectAssets(project_)) {
-                        signatureData << "asset:" << relative << ':'
-                                      << sha256File(asset) << '\n';
-                    }
-                    for (const auto& [dependencyName, dependencyPath] : project_.localDependencies) {
-                        const auto manifest = project_.root / dependencyPath / "zproject.toml";
-                        if (!std::filesystem::is_regular_file(manifest)) {
-                            throw std::runtime_error("local dependency '" + dependencyName +
-                                "' has no project manifest: '" + manifest.string() + "'");
-                        }
-                        signatureData << "local-dependency:" << dependencyName << ':'
-                                      << sha256File(manifest) << '\n';
-                    }
                     const std::string signature = sha256(signatureData.str());
-                    const auto cacheRecord = cacheDirectory /
+                    const auto targetMetadataRoot = outputRoot / targetMode / "metadata";
+                    const auto targetCacheDirectory = targetMetadataRoot / "cache";
+                    if (!options.dryRun && !options.noCache) {
+                        std::filesystem::create_directories(targetCacheDirectory);
+                    }
+                    const auto cacheRecord = targetCacheDirectory /
                         (targetComponent(target->name) + "-" + targetMode + "-" +
                          targetBackend + ".sha256");
 #ifdef _WIN32
@@ -743,16 +832,79 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                     const std::string extension = ".out";
 #endif
                     const std::string targetOutputDirectory = target->outputDirectory.empty()
-                        ? "bin"
+                        ? "artifacts"
                         : target->outputDirectory;
                     const auto targetProfileRoot = outputRoot / targetMode;
                     const auto targetDirectory = checkedRelativePath(
-                        project_, (targetProfileRoot / targetOutputDirectory).lexically_relative(project_.root).string(),
+                        project_, pathToUtf8((targetProfileRoot /
+                            pathFromUtf8(targetOutputDirectory))
+                            .lexically_relative(project_.root)),
                         "target output directory");
-                    std::filesystem::create_directories(targetDirectory);
+                    if (!options.dryRun) std::filesystem::create_directories(targetDirectory);
+                    if (target->type == "custom") {
+                        if (options.dryRun) {
+                            std::lock_guard lock(resultMutex);
+                            result.plan.push_back({
+                                target->name, false,
+                                "custom targets have no declared outputs and always run"
+                            });
+                            signatureByTarget[target->name] = signature;
+                            return std::pair{target->name, std::filesystem::path{}};
+                        }
+                        {
+                            std::lock_guard lock(resultMutex);
+                            result.plan.push_back({
+                                target->name, false,
+                                "custom targets have no declared outputs and always run"
+                            });
+                        }
+                        std::vector<std::string> command = target->command;
+                        const std::unordered_map<std::string, std::string> substitutions{
+                            {"{project_root}", pathToUtf8(project_.root)},
+                            {"{output_dir}", pathToUtf8(targetDirectory)},
+                            {"{profile}", targetMode},
+                            {"{target}", target->name}
+                        };
+                        for (std::string& argument : command) {
+                            for (const auto& [placeholder, value] : substitutions) {
+                                std::size_t position = 0;
+                                while ((position = argument.find(placeholder, position)) !=
+                                       std::string::npos) {
+                                    argument.replace(position, placeholder.size(), value);
+                                    position += value.size();
+                                }
+                            }
+                        }
+                        {
+                            std::lock_guard lock(resultMutex);
+                            ++statisticsDelta.rebuilds;
+                        }
+                        const ProcessResult custom = runProcess(command, project_.root);
+                        if (options.verbose || custom.exitCode != 0) {
+                            std::lock_guard lock(consoleMutex);
+                            std::cout << custom.output;
+                        }
+                        if (custom.exitCode != 0) {
+                            throw std::runtime_error(
+                                "custom target '" + target->name +
+                                "' failed with exit code " +
+                                std::to_string(custom.exitCode));
+                        }
+                        writeBuildMetadata(
+                            targetMetadataRoot / (targetComponent(target->name) + ".json"),
+                            project_, *target, compiler_, compilerVersion, targetMode,
+                            targetBackend, signature, {});
+                        {
+                            std::lock_guard lock(resultMutex);
+                            result.built.push_back(target->name);
+                            signatureByTarget[target->name] = signature;
+                        }
+                        return std::pair{target->name, std::filesystem::path{}};
+                    }
                     const auto output = targetDirectory / (targetComponent(target->name) +
                         (targetBackend == "interpreter" ? ".checked" : extension));
-                    const auto temporaryOutput = output.string() + ".zbuild-tmp";
+                    const auto temporaryOutput = pathToUtf8(output) + ".zbuild-tmp-" +
+                        std::to_string(temporarySequence.fetch_add(1));
                     struct TemporaryFileCleanup {
                         std::filesystem::path path;
                         ~TemporaryFileCleanup() {
@@ -764,8 +916,10 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                         void release() { path.clear(); }
                     };
                     TemporaryFileCleanup temporaryOutputCleanup{
-                        std::filesystem::path(temporaryOutput)};
+                        pathFromUtf8(temporaryOutput)};
                     bool cacheHit = false;
+                    const bool cacheLookup = !options.noCache && !options.force;
+                    std::string rebuildReason;
                     bool runtimeMatches = true;
 #ifdef _WIN32
                     if (targetBackend == "native") {
@@ -834,36 +988,102 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                                 sha256File(runtime) == sha256File(stagedRuntime)
                             : !std::filesystem::exists(stagedRuntime));
                     }
-                    if (!options.force && std::filesystem::is_regular_file(output) &&
-                        std::filesystem::is_regular_file(cacheRecord) && runtimeMatches) {
-                        std::istringstream record(readText(cacheRecord));
-                        std::string cachedSignature;
-                        std::string cachedOutputHash;
-                        std::string trailing;
-                        const bool validRecord =
-                            static_cast<bool>(std::getline(record, cachedSignature)) &&
-                            static_cast<bool>(std::getline(record, cachedOutputHash)) &&
-                            !(record >> trailing);
-                        if (!validRecord) {
+                    const bool outputExists = std::filesystem::is_regular_file(output);
+                    if (options.noCache) {
+                        rebuildReason = "cache bypassed (--no-cache)";
+                    } else if (options.force) {
+                        rebuildReason = "forced rebuild";
+                    } else if (!outputExists) {
+                        rebuildReason = "output is missing";
+                    } else if (!std::filesystem::is_regular_file(cacheRecord)) {
+                        rebuildReason = "cache record is missing";
+                    } else {
+                        try {
+                            const CacheRecord cached = loadCacheRecord(cacheRecord);
+                            if (pathToUtf8(cached.output) != pathToUtf8(output)) {
+                                rebuildReason = "cached output path changed";
+                            } else if (cached.signature != signature) {
+                                rebuildReason = "source or build configuration changed";
+                            } else if (cached.outputHash != sha256File(output)) {
+                                rebuildReason = "output integrity check failed";
+                            } else if (!runtimeMatches) {
+                                rebuildReason = "staged runtime is missing or changed";
+                            } else {
+                                cacheHit = true;
+                            }
+                        } catch (const std::exception& error) {
+                            rebuildReason = "cache record is invalid";
                             std::lock_guard lock(consoleMutex);
                             std::cout << "[cache] invalid record for " << target->name
-                                      << "; rebuilding\n";
-                        } else {
-                            cacheHit = trim(cachedSignature) == signature &&
-                                trim(cachedOutputHash) == sha256File(output);
+                                      << ": " << error.what() << '\n';
                         }
+                    }
+                    if (!runtimeMatches && rebuildReason.empty()) {
+                        rebuildReason = "staged runtime is missing or changed";
+                    }
+                    if (rebuildReason == "source or build configuration changed") {
+                        std::lock_guard lock(resultMutex);
+                        for (const std::string& dependency : targetDependencies) {
+                            const auto plannedDependency = std::find_if(
+                                result.plan.begin(), result.plan.end(),
+                                [&](const BuildPlanEntry& item) {
+                                    return item.target == dependency && !item.upToDate;
+                                });
+                            if (plannedDependency != result.plan.end()) {
+                                rebuildReason = "dependency target '" + dependency +
+                                    "' requires rebuilding";
+                                break;
+                            }
+                        }
+                    }
+                    if (options.dryRun) {
+                        std::lock_guard lock(resultMutex);
+                        result.plan.push_back({
+                            target->name, cacheHit,
+                            cacheHit ? "all tracked inputs and outputs match the cache"
+                                     : rebuildReason
+                        });
+                        if (cacheHit) ++result.cacheHits;
+                        else if (cacheLookup) ++result.cacheMisses;
+                        signatureByTarget[target->name] = signature;
+                        outputByTarget[target->name] = output;
+                        result.outputs[target->name] = output;
+                        return std::pair{target->name, output};
+                    }
+                    {
+                        std::lock_guard lock(resultMutex);
+                        result.plan.push_back({
+                            target->name, cacheHit,
+                            cacheHit ? "all tracked inputs and outputs match the cache"
+                                     : rebuildReason
+                        });
                     }
                     if (cacheHit) {
                         std::lock_guard lock(resultMutex);
                         result.reused.push_back(target->name);
+                        ++statisticsDelta.hits;
+                        ++result.cacheHits;
                     } else {
+                        {
+                            std::lock_guard lock(resultMutex);
+                            if (cacheLookup) {
+                                ++statisticsDelta.misses;
+                                ++result.cacheMisses;
+                            }
+                            ++statisticsDelta.rebuilds;
+                        }
                         if (std::filesystem::exists(temporaryOutput)) {
                             std::filesystem::remove(temporaryOutput);
                         }
+                        {
+                            std::lock_guard lock(consoleMutex);
+                            std::cout << "[build] " << target->name << " building ("
+                                      << rebuildReason << ")\n";
+                        }
                         std::vector<std::string> command{
-                            compiler_.string(),
+                            pathToUtf8(compiler_),
                             targetBackend == "interpreter" ? "check" : "build",
-                            (project_.root / target->entry).string()
+                            pathToUtf8(project_.root / pathFromUtf8(target->entry))
                         };
                         if (targetBackend == "native") {
                             command.push_back("-o");
@@ -876,14 +1096,34 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                             std::cout << built.output;
                         }
                         if (built.exitCode != 0) {
-                            std::error_code ignored;
-                            std::filesystem::remove(temporaryOutput, ignored);
-                            std::filesystem::remove(output, ignored);
-                            throw std::runtime_error(
+                            std::string cleanupFailure;
+                            for (const auto& stale : {
+                                     pathFromUtf8(temporaryOutput), output, cacheRecord}) {
+                                std::error_code error;
+                                std::filesystem::remove(stale, error);
+                                if (error) {
+                                    if (!cleanupFailure.empty()) cleanupFailure += "; ";
+                                    cleanupFailure += "cannot remove '" + pathToUtf8(stale) +
+                                        "': " + error.message();
+                                }
+                            }
+                            std::string message =
                                 "compiler failed for target '" + target->name +
-                                "' with exit code " + std::to_string(built.exitCode));
+                                "' with exit code " + std::to_string(built.exitCode);
+                            if (!cleanupFailure.empty()) {
+                                message += "; cleanup failed: " + cleanupFailure;
+                            }
+                            throw std::runtime_error(
+                                std::move(message));
                         }
                         if (targetBackend == "native") {
+                            if (!std::filesystem::is_regular_file(
+                                    pathFromUtf8(temporaryOutput)) ||
+                                std::filesystem::file_size(pathFromUtf8(temporaryOutput)) == 0) {
+                                throw std::runtime_error(
+                                    "compiler reported success but produced no valid output for target '" +
+                                    target->name + "'");
+                            }
 #ifdef _WIN32
                             const auto runtime = graphicsRuntime(compiler_);
                             const auto stagedRuntime = targetDirectory / "zgraphics_runtime.dll";
@@ -927,7 +1167,7 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                                 if (usesAudio && audioRuntimeFile.empty()) {
                                     throw std::runtime_error(
                                         "zaudio runtime was not found beside compiler '" +
-                                        compiler_.string() + "'");
+                                        pathToUtf8(compiler_) + "'");
                                 }
                                 if (usesAudio &&
                                     (!std::filesystem::is_regular_file(stagedAudioRuntime) ||
@@ -954,7 +1194,7 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                                 if (usesPhysics && physicsRuntimeFile.empty()) {
                                     throw std::runtime_error(
                                         "zphysics runtime was not found beside compiler '" +
-                                        compiler_.string() + "'");
+                                        pathToUtf8(compiler_) + "'");
                                 }
                                 if (usesPhysics &&
                                     (!std::filesystem::is_regular_file(stagedPhysicsRuntime) ||
@@ -983,7 +1223,7 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                                 if (usesTerminalInput && inputRuntimeFile.empty()) {
                                     throw std::runtime_error(
                                         "terminal input runtime was not found beside compiler '" +
-                                        compiler_.string() + "'");
+                                        pathToUtf8(compiler_) + "'");
                                 }
                                 if (usesTerminalInput &&
                                     (!std::filesystem::is_regular_file(stagedInputRuntime) ||
@@ -997,45 +1237,31 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
                                     std::filesystem::remove(stagedInputRuntime);
                                 }
                             }
-                            std::error_code error;
-                            std::filesystem::rename(temporaryOutput, output, error);
-                            if (error) {
-                                std::filesystem::remove(output, error);
-                                error.clear();
-                                std::filesystem::rename(temporaryOutput, output, error);
-                            }
-                            if (error) throw std::runtime_error(
-                                "cannot publish target output '" + output.string() + "': " + error.message());
+                            replaceFileAtomically(
+                                pathFromUtf8(temporaryOutput), output);
                             temporaryOutputCleanup.release();
                         } else {
-                            std::ofstream marker(output, std::ios::binary | std::ios::trunc);
-                            if (!marker) throw std::runtime_error(
-                                "cannot write interpreter validation marker: '" + output.string() + "'");
-                            marker << signature << '\n';
+                            writeFileAtomically(output, signature + '\n');
                         }
-                        const auto temporaryRecord = cacheRecord.string() + ".tmp";
-                        TemporaryFileCleanup temporaryRecordCleanup{
-                            std::filesystem::path(temporaryRecord)};
-                        {
-                            std::ofstream record(temporaryRecord, std::ios::trunc);
-                            if (!record) throw std::runtime_error("cannot write build cache");
-                            record << signature << '\n' << sha256File(output) << '\n';
-                            if (!record) throw std::runtime_error("failed writing build cache");
+                        if (!std::filesystem::is_regular_file(output) ||
+                            std::filesystem::file_size(output) == 0) {
+                            throw std::runtime_error(
+                                "build output validation failed for target '" + target->name + "'");
                         }
-                        std::error_code recordError;
-                        std::filesystem::remove(cacheRecord, recordError);
-                        if (recordError) throw std::runtime_error(
-                            "cannot replace build cache record: " + recordError.message());
-                        std::filesystem::rename(temporaryRecord, cacheRecord, recordError);
-                        if (recordError) throw std::runtime_error(
-                            "cannot publish build cache record: " + recordError.message());
-                        temporaryRecordCleanup.release();
+                        if (!options.noCache) {
+                            saveCacheRecord(cacheRecord, signature, output);
+                        }
                         std::lock_guard lock(resultMutex);
                         result.built.push_back(target->name);
                     }
+                    writeBuildMetadata(
+                        targetMetadataRoot / (targetComponent(target->name) + ".json"),
+                        project_, *target, compiler_, compilerVersion, targetMode,
+                        targetBackend, signature, output);
                     {
                         std::lock_guard lock(resultMutex);
                         outputByTarget[target->name] = output;
+                        signatureByTarget[target->name] = signature;
                         result.outputs[target->name] = output;
                     }
                     return std::pair{target->name, output};
@@ -1056,6 +1282,13 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
         }
     }
 
+    } catch (...) {
+        if (!options.dryRun && !options.noCache) {
+            updateCacheStatistics(profileRoot / "metadata" / "cache", statisticsDelta);
+        }
+        throw;
+    }
+
     if (result.selectedOutput.empty() && !outputByTarget.empty()) {
         const std::string selected = options.target.empty()
             ? defaultBuildTargetName(project_)
@@ -1063,14 +1296,106 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
         const auto output = outputByTarget.find(selected);
         if (output != outputByTarget.end()) result.selectedOutput = output->second;
     }
+    const auto orderIndex = [&](const std::string& name) {
+        return std::find(order.begin(), order.end(), name) - order.begin();
+    };
+    if (options.dryRun) {
+        std::sort(result.plan.begin(), result.plan.end(), [&](const auto& left, const auto& right) {
+            return orderIndex(left.target) < orderIndex(right.target);
+        });
+        std::cout << "Build plan: " << project_.name << '\n'
+                  << "Profile: " << mode << "\nBackend: " << backend << '\n';
+        for (const auto& item : result.plan) {
+            std::cout << (item.upToDate ? "[UP-TO-DATE] " : "[REBUILD]    ")
+                      << item.target;
+            const auto target = targets.find(item.target);
+            if (target != targets.end() && !target->second->dependencies.empty()) {
+                std::cout << " [depends: ";
+                for (std::size_t i = 0; i < target->second->dependencies.size(); ++i) {
+                    if (i != 0) std::cout << ", ";
+                    std::cout << target->second->dependencies[i];
+                }
+                std::cout << ']';
+            }
+            std::cout << '\n';
+            if (!item.upToDate) std::cout << "  Reason: " << item.reason << '\n';
+        }
+        std::cout << "Plan: " << (result.plan.size() - result.cacheHits)
+                  << " targets require rebuilding; " << result.cacheHits
+                  << " cache hits; " << result.cacheMisses << " cache misses\n"
+                  << "Parallelizable ready targets: " << maximumReadyTargets
+                  << " (job limit " << jobs << ")\n";
+        return result;
+    }
+
     syncAssets(project_, profileRoot / "assets");
+    if (!options.noCache) {
+        updateCacheStatistics(profileRoot / "metadata" / "cache", statisticsDelta);
+    }
+    std::sort(result.built.begin(), result.built.end(), [&](const auto& left, const auto& right) {
+        return orderIndex(left) < orderIndex(right);
+    });
+    std::sort(result.reused.begin(), result.reused.end(), [&](const auto& left, const auto& right) {
+        return orderIndex(left) < orderIndex(right);
+    });
+    std::sort(result.plan.begin(), result.plan.end(), [&](const auto& left, const auto& right) {
+        return orderIndex(left.target) < orderIndex(right.target);
+    });
+    for (std::size_t i = 0; i < result.plan.size(); ++i) {
+        const auto& item = result.plan[i];
+        std::cout << '[' << (i + 1) << '/' << result.plan.size() << "] "
+                  << item.target << ' '
+                  << (item.upToDate ? "CACHE HIT" : "BUILT") << '\n';
+    }
     for (const std::string& target : result.built) {
         std::cout << "[build] " << target << " complete\n";
     }
     for (const std::string& target : result.reused) {
         std::cout << "[build] " << target << " up to date (content cache)\n";
     }
+    std::cout << "[build] summary: built=" << result.built.size()
+              << ", cache_hits=" << result.cacheHits
+              << ", cache_misses=" << result.cacheMisses
+              << ", failed=0\n";
     return result;
+}
+
+int BuildEngine::check(const BuildOptions& options) {
+    const std::vector<std::string> order =
+        targetBuildOrder(project_.targets, options.target);
+    if (!compiler_.empty() && !std::filesystem::is_regular_file(compiler_)) {
+        throw std::runtime_error(
+            "configured Z+ compiler does not exist: '" + pathToUtf8(compiler_) + "'");
+    }
+
+    for (const std::string& name : order) {
+        const auto target = std::find_if(
+            project_.targets.begin(), project_.targets.end(),
+            [&](const TargetConfig& item) { return item.name == name; });
+        if (target == project_.targets.end()) {
+            throw std::runtime_error("internal error: graph returned unknown target '" + name + "'");
+        }
+        if (target->type == "custom") {
+            if (name == options.target) {
+                throw std::runtime_error(
+                    "custom target '" + name + "' has no Z+ entry point to check");
+            }
+            continue;
+        }
+        const ProcessResult checked = runProcess(
+            {pathToUtf8(compiler_), "check",
+                pathToUtf8(project_.root / pathFromUtf8(target->entry))},
+            project_.root);
+        if (checked.exitCode != 0) {
+            std::cout << checked.output;
+            std::cerr << "[check] target '" << target->name
+                      << "' failed with exit code " << checked.exitCode << '\n';
+            return checked.exitCode;
+        }
+        if (options.verbose) std::cout << checked.output;
+        std::cout << "[check] " << target->name << " passed\n";
+    }
+    return 0;
 }
 
 int BuildEngine::run(
@@ -1078,20 +1403,24 @@ int BuildEngine::run(
     const std::vector<std::string>& arguments
 ) {
     const TargetConfig& target = selectedTarget(project_, options);
-    if (target.type == "test") throw std::runtime_error("cannot run a test target with 'zbuild run'");
+    if (target.type != "executable") {
+        throw std::runtime_error(
+            "cannot run target '" + target.name + "' of type '" + target.type + "'");
+    }
     const BuildResult result = build(options);
     const std::string backend = target.backend.empty()
         ? effectiveBackend(project_, options)
         : target.backend;
     std::vector<std::string> command;
     if (backend == "interpreter") {
-        command = {compiler_.string(), "run", (project_.root / target.entry).string()};
+        command = {pathToUtf8(compiler_), "run",
+            pathToUtf8(project_.root / pathFromUtf8(target.entry))};
         if (!arguments.empty()) {
             command.push_back("--");
             command.insert(command.end(), arguments.begin(), arguments.end());
         }
     } else {
-        command.push_back(result.selectedOutput.string());
+        command.push_back(pathToUtf8(result.selectedOutput));
         command.insert(command.end(), arguments.begin(), arguments.end());
     }
     const std::string mode = effectiveMode(project_, options);
@@ -1131,14 +1460,15 @@ int BuildEngine::test(const BuildOptions& options) {
             : target->backend;
         std::vector<std::string> command;
         if (backend == "interpreter") {
-            command = {compiler_.string(), "run", (project_.root / target->entry).string()};
+            command = {pathToUtf8(compiler_), "run",
+                pathToUtf8(project_.root / pathFromUtf8(target->entry))};
             if (!project_.testArguments.empty()) command.push_back("--");
         } else {
             const auto outputIt = built.outputs.find(name);
             if (outputIt == built.outputs.end()) {
                 throw std::runtime_error("test target output was not generated: '" + name + "'");
             }
-            command.push_back(outputIt->second.string());
+            command.push_back(pathToUtf8(outputIt->second));
         }
         command.insert(command.end(), project_.testArguments.begin(), project_.testArguments.end());
         const ProcessResult result = runProcess(command, project_.root);
@@ -1156,32 +1486,116 @@ int BuildEngine::test(const BuildOptions& options) {
     return firstFailure;
 }
 
+int BuildEngine::cacheCommand(const std::string& action) {
+    if (action != "info" && action != "clean" && action != "verify") {
+        throw std::runtime_error(
+            "cache command must be info, clean, or verify");
+    }
+    const auto outputRoot =
+        checkedRelativePath(project_, project_.outputDirectory, "build.output_dir");
+    if (!std::filesystem::exists(outputRoot)) {
+        std::cout << "[cache] entries=0, valid=0, invalid=0, size=0 bytes, "
+                     "hits=0, misses=0, rebuilds=0\n";
+        return 0;
+    }
+
+    auto buildLock = std::make_unique<ProjectBuildLock>(outputRoot / ".zpbuild.lock");
+    if (action == "clean") {
+        for (const std::string& profile : {"debug", "release"}) {
+            const auto directory = checkedRelativePath(
+                project_,
+                pathToUtf8((outputRoot / profile / "metadata" / "cache")
+                    .lexically_relative(project_.root)),
+                "cache directory");
+            std::filesystem::remove_all(directory);
+        }
+        std::cout << "[cache] removed ZPBuild cache data\n";
+        return 0;
+    }
+
+    std::uint64_t entries = 0;
+    std::uint64_t valid = 0;
+    std::uint64_t bytes = 0;
+    CacheStatistics totals;
+    for (const std::string& profile : {"debug", "release"}) {
+        const auto directory = checkedRelativePath(
+            project_,
+            pathToUtf8((outputRoot / profile / "metadata" / "cache")
+                .lexically_relative(project_.root)),
+            "cache directory");
+        if (!std::filesystem::is_directory(directory)) continue;
+        const CacheStatistics statistics =
+            loadCacheStatistics(directory / "stats.txt");
+        totals.hits += statistics.hits;
+        totals.misses += statistics.misses;
+        totals.rebuilds += statistics.rebuilds;
+        for (std::filesystem::directory_iterator it(directory), end; it != end; ++it) {
+            if (!it->is_regular_file()) continue;
+            bytes += it->file_size();
+            if (it->path().extension() != ".sha256") continue;
+            ++entries;
+            if (isCacheRecordValid(it->path(), project_.root)) ++valid;
+        }
+    }
+    const std::uint64_t invalid = entries - valid;
+    std::cout << "[cache] entries=" << entries << ", valid=" << valid
+              << ", invalid=" << invalid << ", size=" << bytes
+              << " bytes, hits=" << totals.hits << ", misses=" << totals.misses
+              << ", rebuilds=" << totals.rebuilds << '\n';
+    if (action == "verify") {
+        std::cout << (invalid == 0 ? "[cache] verification passed\n"
+                                  : "[cache] verification found invalid entries\n");
+        return invalid == 0 ? 0 : 1;
+    }
+    return 0;
+}
+
 void BuildEngine::clean(const std::string& requestedMode) {
     const auto outputRoot = checkedRelativePath(project_, project_.outputDirectory, "build.output_dir");
     if (!std::filesystem::exists(outputRoot)) return;
+    ProjectBuildLock buildLock(outputRoot / ".zpbuild.lock");
     if (requestedMode.empty()) {
-        std::filesystem::remove_all(outputRoot / "debug");
-        std::filesystem::remove_all(outputRoot / "release");
-        std::filesystem::remove_all(outputRoot / "cache");
+        for (const std::string& profile : {"debug", "release", "cache"}) {
+            const auto directory = checkedRelativePath(
+                project_,
+                pathToUtf8((outputRoot / profile).lexically_relative(project_.root)),
+                "build output directory");
+            std::filesystem::remove_all(directory);
+        }
     } else {
         const std::string mode = requestedMode == "debug" || requestedMode == "release"
             ? requestedMode
             : throw std::runtime_error("clean mode must be debug or release");
-        std::filesystem::remove_all(outputRoot / mode);
-        std::filesystem::remove_all(outputRoot / "cache");
+        const auto profileOutput = checkedRelativePath(
+            project_, pathToUtf8((outputRoot / mode).lexically_relative(project_.root)),
+            "profile output directory");
+        const auto legacyCache = checkedRelativePath(
+            project_, pathToUtf8((outputRoot / "cache").lexically_relative(project_.root)),
+            "legacy cache directory");
+        std::filesystem::remove_all(profileOutput);
+        std::filesystem::remove_all(legacyCache);
     }
     std::cout << "[clean] removed generated ZBuild outputs\n";
 }
 
 void BuildEngine::printTargets(bool json) const {
     if (json) {
-        std::cout << "{\"project\":\"" << jsonEscape(project_.name) << "\",\"targets\":[";
+        std::cout << "{\"project\":\"" << jsonEscape(project_.name)
+                  << "\",\"default_target\":\""
+                  << jsonEscape(project_.defaultTarget) << "\",\"targets\":[";
         for (std::size_t i = 0; i < project_.targets.size(); ++i) {
             if (i) std::cout << ',';
             const auto& target = project_.targets[i];
             std::cout << "{\"name\":\"" << jsonEscape(target.name)
                       << "\",\"type\":\"" << jsonEscape(target.type)
-                      << "\",\"entry\":\"" << jsonEscape(target.entry) << "\"}";
+                      << "\",\"entry\":\"" << jsonEscape(target.entry)
+                      << "\",\"dependencies\":[";
+            for (std::size_t dependency = 0;
+                 dependency < target.dependencies.size(); ++dependency) {
+                if (dependency) std::cout << ',';
+                std::cout << '"' << jsonEscape(target.dependencies[dependency]) << '"';
+            }
+            std::cout << "]}";
         }
         std::cout << "]}\n";
         return;
@@ -1202,22 +1616,26 @@ void BuildEngine::printTargets(bool json) const {
 }
 
 void BuildEngine::printGraph(bool dot) const {
+    const auto order = targetBuildOrder(project_.targets);
     if (dot) std::cout << "digraph zbuild {\n";
-    for (const auto& target : project_.targets) {
+    for (const std::string& name : order) {
+        const auto target = std::find_if(
+            project_.targets.begin(), project_.targets.end(),
+            [&](const TargetConfig& item) { return item.name == name; });
         if (dot) {
-            std::cout << "  \"" << target.name << "\";\n";
-            for (const auto& dependency : target.dependencies) {
-                std::cout << "  \"" << target.name << "\" -> \"" << dependency << "\";\n";
+            std::cout << "  \"" << target->name << "\";\n";
+            for (const auto& dependency : target->dependencies) {
+                std::cout << "  \"" << target->name << "\" -> \"" << dependency << "\";\n";
             }
         } else {
-            std::cout << target.name;
-            if (target.dependencies.empty()) {
+            std::cout << target->name;
+            if (target->dependencies.empty()) {
                 std::cout << " (no dependencies)\n";
             } else {
                 std::cout << " -> ";
-                for (std::size_t i = 0; i < target.dependencies.size(); ++i) {
+                for (std::size_t i = 0; i < target->dependencies.size(); ++i) {
                     if (i) std::cout << ", ";
-                    std::cout << target.dependencies[i];
+                    std::cout << target->dependencies[i];
                 }
                 std::cout << '\n';
             }
@@ -1230,22 +1648,45 @@ void BuildEngine::printInfo(bool json) const {
     if (json) {
         std::cout << "{\"name\":\"" << jsonEscape(project_.name)
                   << "\",\"version\":\"" << jsonEscape(project_.version)
-                  << "\",\"root\":\"" << jsonEscape(project_.root.string())
+                  << "\",\"root\":\"" << jsonEscape(pathToUtf8(project_.root))
                   << "\",\"backend\":\"" << jsonEscape(project_.backend)
-                  << "\",\"mode\":\"" << jsonEscape(project_.mode)
-                  << "\",\"target_count\":" << project_.targets.size() << "}\n";
+                  << "\",\"default_profile\":\"" << jsonEscape(project_.mode)
+                  << "\",\"default_target\":\"" << jsonEscape(project_.defaultTarget)
+                  << "\",\"compiler\":\"" << jsonEscape(pathToUtf8(compiler_))
+                  << "\",\"profiles\":[";
+        bool first = true;
+        for (const auto& [profile, settings] : project_.profiles) {
+            (void)settings;
+            if (!first) std::cout << ',';
+            first = false;
+            std::cout << '"' << jsonEscape(profile) << '"';
+        }
+        std::cout << "],\"target_count\":" << project_.targets.size() << "}\n";
         return;
     }
     std::cout << project_.name << " " << project_.version << '\n'
-              << "Root: " << project_.root.string() << '\n'
+              << "Root: " << pathToUtf8(project_.root) << '\n'
+              << "Compiler: " << pathToUtf8(compiler_) << '\n'
               << "Backend: " << project_.backend << '\n'
-              << "Mode: " << project_.mode << '\n'
+              << "Default profile: " << project_.mode << '\n'
+              << "Profiles: ";
+    bool first = true;
+    for (const auto& [profile, settings] : project_.profiles) {
+        (void)settings;
+        if (!first) std::cout << ", ";
+        first = false;
+        std::cout << profile;
+    }
+    std::cout << "\nDefault target: " << project_.defaultTarget << '\n'
               << "Targets: " << project_.targets.size() << '\n';
 }
 
 void BuildEngine::package(const BuildOptions& options) {
     const TargetConfig& target = selectedTarget(project_, options);
-    if (target.type == "test") throw std::runtime_error("cannot package a test target");
+    if (target.type != "executable") {
+        throw std::runtime_error(
+            "cannot package target '" + target.name + "' of type '" + target.type + "'");
+    }
     const std::string backend = target.backend.empty()
         ? effectiveBackend(project_, options)
         : target.backend;
@@ -1255,7 +1696,7 @@ void BuildEngine::package(const BuildOptions& options) {
         : target.mode;
     const auto result = build(options);
     const auto packageRoot = checkedRelativePath(
-        project_, (std::filesystem::path(project_.outputDirectory) / mode / "package")
+        project_, (pathFromUtf8(project_.outputDirectory) / mode / "package")
             .generic_string(), "package directory");
     std::filesystem::create_directories(packageRoot);
     const auto executableDestination = packageRoot / result.selectedOutput.filename();
@@ -1263,7 +1704,7 @@ void BuildEngine::package(const BuildOptions& options) {
                                     const std::filesystem::path& destination) {
         if (!std::filesystem::is_regular_file(source)) {
             throw std::runtime_error(
-                "package source file is missing: " + source.string());
+                "package source file is missing: " + pathToUtf8(source));
         }
         if (std::filesystem::is_regular_file(destination) &&
             sha256File(source) == sha256File(destination)) {
@@ -1285,9 +1726,9 @@ void BuildEngine::package(const BuildOptions& options) {
     copyIfDifferent(result.selectedOutput, executableDestination);
 #ifdef _WIN32
     const auto runtime = result.selectedOutput.parent_path() / "zgraphics_runtime.dll";
-    syncOptionalFile(runtime, runtime.filename().string());
+    syncOptionalFile(runtime, pathToUtf8(runtime.filename()));
     const auto sqlite = result.selectedOutput.parent_path() / "sqlite3.dll";
-    syncOptionalFile(sqlite, sqlite.filename().string());
+    syncOptionalFile(sqlite, pathToUtf8(sqlite.filename()));
 #endif
     const auto audioRuntimeFile =
 #ifdef _WIN32
@@ -1298,7 +1739,7 @@ void BuildEngine::package(const BuildOptions& options) {
         std::filesystem::path{};
 #endif
     if (!audioRuntimeFile.empty()) {
-        syncOptionalFile(audioRuntimeFile, audioRuntimeFile.filename().string());
+        syncOptionalFile(audioRuntimeFile, pathToUtf8(audioRuntimeFile.filename()));
     }
     const auto physicsRuntimeFile =
 #ifdef _WIN32
@@ -1309,7 +1750,7 @@ void BuildEngine::package(const BuildOptions& options) {
         std::filesystem::path{};
 #endif
     if (!physicsRuntimeFile.empty()) {
-        syncOptionalFile(physicsRuntimeFile, physicsRuntimeFile.filename().string());
+        syncOptionalFile(physicsRuntimeFile, pathToUtf8(physicsRuntimeFile.filename()));
     }
     const auto inputRuntimeFile =
 #ifdef _WIN32
@@ -1320,16 +1761,16 @@ void BuildEngine::package(const BuildOptions& options) {
         std::filesystem::path{};
 #endif
     if (!inputRuntimeFile.empty()) {
-        syncOptionalFile(inputRuntimeFile, inputRuntimeFile.filename().string());
+        syncOptionalFile(inputRuntimeFile, pathToUtf8(inputRuntimeFile.filename()));
     }
     const auto stagedAssets = checkedRelativePath(
-        project_, (std::filesystem::path(project_.outputDirectory) /
+        project_, (pathFromUtf8(project_.outputDirectory) /
             mode / "assets").generic_string(), "staged asset directory");
     if (!project_.assetDirectories.empty()) {
         const auto destinationRoot = packageRoot / "assets";
         if (!std::filesystem::is_directory(stagedAssets)) {
             throw std::runtime_error(
-                "staged asset directory is missing: " + stagedAssets.string());
+                "staged asset directory is missing: " + pathToUtf8(stagedAssets));
         }
         std::filesystem::create_directories(destinationRoot);
         std::unordered_set<std::string> expectedFiles;
@@ -1375,7 +1816,7 @@ void BuildEngine::package(const BuildOptions& options) {
             std::filesystem::remove_all(destinationRoot);
         }
     }
-    std::cout << "[package] " << packageRoot.string() << '\n';
+    std::cout << "[package] " << pathToUtf8(packageRoot) << '\n';
 }
 
 } // namespace zbuild

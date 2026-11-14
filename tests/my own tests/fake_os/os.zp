@@ -1,0 +1,28 @@
+start{
+    fn commands() {
+        say("command list :")
+        say("exit - exit the OS")
+        say("help - show this command list")
+        say("clear - clear the screen")
+        say("echo - echo a message")
+    } end fn
+
+    say("This is a OS")
+    say("not a short script writen which Z+")
+    commands()
+    say("type a command :")
+    let command = read()   
+
+    if command == "exit" {
+        say("exiting...")
+        // its not going to exit...
+    } else if command == "help" {
+        commands()
+    } else if command == "clear" {
+        // forgot how to clear the screen in Z+
+    } else if command == "echo" {
+        say("echo: " + read())
+    } else {
+        say("command not found")
+    } end if
+} stop

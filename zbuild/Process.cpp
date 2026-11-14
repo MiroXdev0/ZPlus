@@ -1,4 +1,5 @@
 #include "Process.hpp"
+#include "Filesystem.hpp"
 
 #include <array>
 #include <cstdlib>
@@ -247,28 +248,46 @@ ProcessResult runProcess(
 }
 
 std::filesystem::path findExecutable(const std::string& name) {
-    std::string paths;
 #ifdef _WIN32
-    constexpr char separator = ';';
+    const DWORD required = GetEnvironmentVariableW(L"PATH", nullptr, 0);
+    if (required == 0) return {};
+    std::wstring paths(static_cast<std::size_t>(required), L'\0');
+    const DWORD length = GetEnvironmentVariableW(
+        L"PATH", paths.data(), required);
+    if (length == 0 || length >= required) return {};
+    paths.resize(length);
+    constexpr wchar_t separator = L';';
     const std::vector<std::string> extensions{"", ".exe", ".cmd", ".bat"};
-    char* pathValue = nullptr;
-    std::size_t pathLength = 0;
-    if (_dupenv_s(&pathValue, &pathLength, "PATH") != 0 || !pathValue) return {};
-    paths.assign(pathValue);
-    std::free(pathValue);
+    std::size_t begin = 0;
+    while (begin <= paths.size()) {
+        const std::size_t end = paths.find(separator, begin);
+        const std::filesystem::path directory(paths.substr(
+            begin, end == std::wstring::npos ? std::wstring::npos : end - begin));
+        for (const std::string& extension : extensions) {
+            const auto candidate =
+                directory / pathFromUtf8(name + extension);
+            std::error_code error;
+            if (std::filesystem::is_regular_file(candidate, error) && !error) {
+                return std::filesystem::absolute(candidate);
+            }
+        }
+        if (end == std::wstring::npos) break;
+        begin = end + 1;
+    }
 #else
+    std::string paths;
     constexpr char separator = ':';
     const std::vector<std::string> extensions{""};
     const char* pathValue = std::getenv("PATH");
     if (!pathValue) return {};
     paths.assign(pathValue);
-#endif
     std::size_t begin = 0;
     while (begin <= paths.size()) {
         const std::size_t end = paths.find(separator, begin);
         const std::string directory = paths.substr(begin, end - begin);
         for (const std::string& extension : extensions) {
-            const auto candidate = std::filesystem::path(directory) / (name + extension);
+            const auto candidate = pathFromUtf8(directory) /
+                pathFromUtf8(name + extension);
             std::error_code error;
             if (std::filesystem::is_regular_file(candidate, error) && !error) {
                 return std::filesystem::absolute(candidate);
@@ -277,6 +296,7 @@ std::filesystem::path findExecutable(const std::string& name) {
         if (end == std::string::npos) break;
         begin = end + 1;
     }
+#endif
     return {};
 }
 

@@ -1,17 +1,232 @@
-use zpath as path
 use zstring as text
-use zenv as env
 
-start{
-    class Data {
-        let name: string = null
-        let email: string = null
-        let age:  = 0
+start {
+    fn greeting(name: string): string {
+        return "Hello, " + name + "!"
+    } end fn
 
-        fn store_data(){
-            
-        }
-    } end class
+    fn add(left: number, right: number): number {
+        return left + right
+    } end fn
 
-    
+    fn digit_value(ch: string): number {
+        if ch == "0" {
+            return 0
+        } else if ch == "1" {
+            return 1
+        } else if ch == "2" {
+            return 2
+        } else if ch == "3" {
+            return 3
+        } else if ch == "4" {
+            return 4
+        } else if ch == "5" {
+            return 5
+        } else if ch == "6" {
+            return 6
+        } else if ch == "7" {
+            return 7
+        } else if ch == "8" {
+            return 8
+        } else if ch == "9" {
+            return 9
+        } end if
+
+        throw "expected a decimal digit"
+    } end fn
+
+    fn parse_number(value: string): number {
+        let size: number = text.length(value)
+        if size == 0 {
+            throw "value is empty"
+        } end if
+
+        let position: number = 0
+        let sign: number = 1
+        let first: string = text.substring(value, 0, 1)
+
+        if first == "-" {
+            sign = -1
+            position = 1
+        } else if first == "+" {
+            position = 1
+        } end if
+
+        let result: number = 0
+        let digits: number = 0
+        let fraction: boolean = false
+        let fraction_scale: number = 0.1
+
+        while position < size {
+            let ch: string = text.substring(value, position, 1)
+            if ch == "e" or ch == "E" {
+                break
+            } else if ch == "." {
+                if fraction {
+                    throw "multiple decimal points"
+                } end if
+                fraction = true
+            } else {
+                let digit: number = digit_value(ch)
+                digits = digits + 1
+                if fraction {
+                    result = result + digit * fraction_scale
+                    fraction_scale = fraction_scale * 0.1
+                } else {
+                    result = result * 10 + digit
+                } end if
+            } end if
+            position = position + 1
+        } end while
+
+        if digits == 0 {
+            throw "expected numeric digits"
+        } end if
+
+        if position < size {
+            position = position + 1
+            let exponent_sign: number = 1
+            if position < size {
+                let exponent_prefix: string = text.substring(value, position, 1)
+                if exponent_prefix == "-" {
+                    exponent_sign = -1
+                    position = position + 1
+                } else if exponent_prefix == "+" {
+                    position = position + 1
+                } end if
+            } end if
+
+            let exponent: number = 0
+            let exponent_digits: number = 0
+            while position < size {
+                let digit: number = digit_value(text.substring(value, position, 1))
+                exponent = exponent * 10 + digit
+                if exponent > 308 {
+                    throw "exponent is outside the supported range"
+                } end if
+                exponent_digits = exponent_digits + 1
+                position = position + 1
+            } end while
+
+            if exponent_digits == 0 {
+                throw "expected exponent digits"
+            } end if
+
+            let scale: number = 1
+            for (let index: number = 0; index < exponent; index++) {
+                scale = scale * 10
+            } end for
+
+            if exponent_sign > 0 {
+                let maximum: number = 1.7976931348623157e308
+                if result > maximum / scale {
+                    throw "number is outside the finite range"
+                } end if
+                result = result * scale
+            } else {
+                result = result / scale
+            } end if
+        } end if
+
+        return sign * result
+    } end fn
+
+    fn factorial(value: number): number {
+        let result: number = 1
+        for (let index: number = 1; index <= value; index++) {
+            result = result * index
+        } end for
+        return result
+    } end fn
+
+    fn commands(): string[] {
+        return ["help", "exit", "echo", "greet", "add", "factorial"]
+    } end fn
+
+    say("Welcome to ZPshell!")
+    say("Type 'help' to see available commands.")
+    say("")
+
+    while true {
+        printz("@ZPshell> ")
+
+        let raw_input: string = text.trim(read())
+        if raw_input == "" {
+            continue
+        } end if
+
+        let input: string = raw_input
+        while text.contains(input, "  ") {
+            input = text.replace(input, "  ", " ")
+        } end while
+
+        let parts: string[] = text.split(input, " ")
+        let command: string = parts[0]
+
+        if command == "exit" {
+            if length(parts) == 1 {
+                say("Goodbye!")
+                break
+            } else {
+                say("Usage: exit")
+            } end if
+        } else if command == "help" {
+            if length(parts) == 1 {
+                say("Commands: " + text.join(commands(), ", "))
+                say("  help                 List commands")
+                say("  exit                 Leave ZPshell")
+                say("  echo <text>          Display text")
+                say("  greet [name]         Greet a name (defaults to friend)")
+                say("  add <number> <number> Add two numbers")
+                say("  factorial <integer>  Calculate a factorial (0 through 170)")
+            } else {
+                say("Usage: help")
+            } end if
+        } else if command == "echo" {
+            let message: string = ""
+            if text.length(raw_input) > 4 {
+                message = text.trim(text.substring(raw_input, 4, text.length(raw_input) - 4))
+            } end if
+            say(message)
+        } else if command == "greet" {
+            if length(parts) == 1 {
+                say(greeting("friend"))
+            } else if length(parts) == 2 {
+                say(greeting(parts[1]))
+            } else {
+                say("Usage: greet [name]")
+            } end if
+        } else if command == "add" {
+            if length(parts) != 3 {
+                say("Usage: add <number1> <number2>")
+            } else {
+                try {
+                    let left: number = parse_number(parts[1])
+                    let right: number = parse_number(parts[2])
+                    say("Result: " + to_string(add(left, right)))
+                } catch error {
+                    say("Invalid number: " + error.message)
+                } end try
+            } end if
+        } else if command == "factorial" {
+            if length(parts) != 2 {
+                say("Usage: factorial <integer>")
+            } else {
+                try {
+                    let value: number = parse_number(parts[1])
+                    if value % 1 != 0 {
+                        say("Invalid integer: enter a whole number.")
+                    } else if value < 0 or value > 170 {
+                        say("Number must be between 0 and 170.")
+                    } else {
+                        say("Factorial: " + to_string(factorial(value)))
+                    } end if
+                } catch error {
+                    say("Invalid integer: " + error.message)
+                } end try
+            } end if
+        } else {
+            say("Unknown command. Type 'help' for available commands.")
+        } end if
+    } end while
 } stop

@@ -28,6 +28,7 @@ The backend emits actual x86-64 machine code and executable containers. Its supp
 - Windows x64 classes: managed instances with positional construction, typed fields, literal defaults, field reads/writes, instance methods, `this`, and function arguments/returns. Inheritance and explicit constructors are not implemented.
 - Windows x64 enums: typed numeric members with equality/comparison and function argument/return support; explicit member values must be numeric literals.
 - `say(boolean)` prints `true` or `false`, matching interpreter output.
+- `to_string(number)` uses the native runtime's round-trip decimal formatter and returns a managed string.
 - String/character literals and local string values passed to `say()`, `printz()`, or the deprecated `printm()` alias. Windows native output accepts strings and numbers; `say()` adds a line feed after its final value. On Windows, string concatenation is supported for two string operands through the native runtime.
 
 Every local and IR temporary currently receives a stack slot; this is a simple reliable spill-all strategy rather than a register allocator. Numeric stack slots contain the 64-bit IEEE-754 payload. Native formatting uses round-trip decimal conversion and normalizes NaN and infinity spellings.

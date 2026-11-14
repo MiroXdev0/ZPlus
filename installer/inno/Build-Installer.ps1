@@ -178,6 +178,7 @@ try {
     $requiredFiles = @(
         'zp.exe',
         'zbuild.exe',
+        'zpbuild.exe',
         'zgraphics_runtime.dll',
         'zaudio_runtime.dll',
         'zphysics_runtime.dll',
@@ -195,8 +196,13 @@ try {
     }
 
     $zbuildVersion = (& (Join-Path $binaryDirectory 'zbuild.exe') --version 2>&1 | Out-String).Trim()
-    if ($LASTEXITCODE -ne 0 -or $zbuildVersion -notmatch '^ZBuild \S+$') {
+    if ($LASTEXITCODE -ne 0 -or $zbuildVersion -notmatch '^ZPBuild (?<version>\d+\.\d+\.\d+)$') {
         throw "The local ZBuild executable failed its version check: '$zbuildVersion'."
+    }
+    $zbuildSemanticVersion = $Matches.version
+    $zpbuildVersion = (& (Join-Path $binaryDirectory 'zpbuild.exe') --version 2>&1 | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or $zpbuildVersion -ne $zbuildVersion) {
+        throw "The local ZPBuild alias failed its version check: '$zpbuildVersion'."
     }
 
     $logoPath = Join-Path $repositoryRoot 'logo\Z+ Emblem - for ligth theme.png'
@@ -221,12 +227,16 @@ try {
     }
     $stagedZbuild = Join-Path $stagedBinaryDirectory 'zbuild.exe'
     $stagedZbuildVersion = (& $stagedZbuild --version 2>&1 | Out-String).Trim()
-    if ($LASTEXITCODE -ne 0 -or $stagedZbuildVersion -notmatch '^ZBuild \S+$') {
+    if ($LASTEXITCODE -ne 0 -or $stagedZbuildVersion -ne $zbuildVersion) {
         throw "The staged ZBuild executable failed its version check: '$stagedZbuildVersion'."
+    }
+    $stagedZpbuild = Join-Path $stagedBinaryDirectory 'zpbuild.exe'
+    $stagedZpbuildVersion = (& $stagedZpbuild --version 2>&1 | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or $stagedZpbuildVersion -ne $zbuildVersion) {
+        throw "The staged ZPBuild alias failed its version check: '$stagedZpbuildVersion'."
     }
     foreach ($relativePath in @(
         'zp.exe',
-        'zbuild.exe',
         'zgraphics_runtime.dll',
         'zaudio_runtime.dll',
         'zphysics_runtime.dll',
@@ -237,6 +247,14 @@ try {
         if ($stagedVersionInfo.FileVersion.Trim() -ne $version -or
             $stagedVersionInfo.ProductVersion.Trim() -ne $version) {
             throw "Staged '$relativePath' does not contain Z+ $version Windows version metadata."
+        }
+    }
+    foreach ($relativePath in @('zbuild.exe', 'zpbuild.exe')) {
+        $stagedPath = Join-Path $stagedBinaryDirectory $relativePath
+        $stagedVersionInfo = (Get-Item -LiteralPath $stagedPath).VersionInfo
+        if ($stagedVersionInfo.FileVersion.Trim() -ne $zbuildSemanticVersion -or
+            $stagedVersionInfo.ProductVersion.Trim() -ne $zbuildSemanticVersion) {
+            throw "Staged '$relativePath' does not contain ZPBuild $zbuildSemanticVersion version metadata."
         }
     }
     Copy-DirectoryContents -SourceDirectory (Join-Path $repositoryRoot 'docs') -DestinationDirectory (Join-Path $stageDirectory 'docs')
@@ -281,7 +299,7 @@ try {
         $installerVersionInfo.ProductVersion.Trim() -ne $version) {
         throw "The generated installer does not contain Z+ $version Windows version metadata."
     }
-    Write-Host "Built Z+ $version installer with ZBuild $zbuildVersion from '$binaryDirectory': $installerPath"
+    Write-Host "Built Z+ $version installer with ZPBuild $zbuildVersion from '$binaryDirectory': $installerPath"
 }
 catch {
     [Console]::Error.WriteLine("Installer build failed: $($_.Exception.Message)")

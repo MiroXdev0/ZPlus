@@ -1,0 +1,3 @@
+start {
+    to_string("not a number")
+} stop

@@ -7,6 +7,7 @@
 #include "backend/native/NativeCodeGenerator.hpp"
 #include "../runtime/Runtime.hpp"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -46,6 +47,20 @@ constexpr const char* EXECUTABLE_NAME = "zp";
 namespace {
 
 bool diagnosticsJson = false;
+
+std::filesystem::path pathFromUtf8(const std::string& value) {
+    std::u8string encoded;
+    encoded.reserve(value.size());
+    for (const unsigned char character : value) {
+        encoded.push_back(static_cast<char8_t>(character));
+    }
+    return std::filesystem::path(encoded);
+}
+
+std::string pathToUtf8(const std::filesystem::path& path) {
+    const auto value = path.u8string();
+    return {reinterpret_cast<const char*>(value.data()), value.size()};
+}
 
 std::string jsonEscape(const std::string& value) {
     std::string escaped;
@@ -97,7 +112,7 @@ bool readSourceLine(
     if (sourceFile.empty() || lineNumber < 1) {
         return false;
     }
-    std::ifstream source(sourceFile);
+    std::ifstream source(pathFromUtf8(sourceFile));
     if (!source) {
         return false;
     }
@@ -215,6 +230,7 @@ void usage() {
         << "  build    Compile to a native executable\n"
         << "  run      Compile and run a Z+ source file\n"
         << "  check    Check a Z+ source file\n"
+        << "  dependencies  List resolved source and module files as JSON\n"
         << "  version  Show compiler version\n"
         << "  help     Show this help message\n\n"
 
@@ -340,7 +356,7 @@ bool validateInputFile(
         return false;
     }
 
-    const std::filesystem::path path(filename);
+    const std::filesystem::path path = pathFromUtf8(filename);
 
     if (!std::filesystem::exists(path)) {
         printError(
@@ -434,7 +450,7 @@ bool compile(
 // Main
 // ============================================================
 
-int main(
+int runCli(
     int argc,
     char** argv
 ) {
@@ -500,7 +516,9 @@ int main(
     if (
         command != "build" &&
         command != "run" &&
-        command != "check"
+        command != "check" &&
+        command != "dependencies" &&
+        command != "deps"
     ) {
 
         printError(
@@ -571,7 +589,7 @@ int main(
                 printError("option '" + argument + "' requires exactly one output path");
                 return 1;
             }
-            outputPath = argv[++i];
+            outputPath = pathFromUtf8(argv[++i]);
             outputPathSet = true;
             continue;
         }
@@ -630,7 +648,9 @@ int main(
     // ========================================================
 
     zplus::ModuleLoader moduleLoader;
-    auto loaded = moduleLoader.load(filename, sourceFromStdin ? &sourceText : nullptr);
+    auto loaded = moduleLoader.load(
+        pathFromUtf8(filename),
+        sourceFromStdin ? &sourceText : nullptr);
     for (const auto& diagnostic : loaded.diagnostics) {
         printError(
             diagnostic.message,
@@ -642,6 +662,17 @@ int main(
     }
     if (!loaded.diagnostics.empty() || !loaded.program) {
         return 1;
+    }
+
+    if (command == "dependencies" || command == "deps") {
+        std::sort(loaded.sourceFiles.begin(), loaded.sourceFiles.end());
+        std::cout << '[';
+        for (std::size_t i = 0; i < loaded.sourceFiles.size(); ++i) {
+            if (i != 0) std::cout << ',';
+            std::cout << '"' << jsonEscape(pathToUtf8(loaded.sourceFiles[i])) << '"';
+        }
+        std::cout << "]\n";
+        return 0;
     }
 
 
@@ -658,15 +689,16 @@ int main(
     if (command == "build") {
         if (!outputPathSet) {
 #ifdef _WIN32
-            outputPath = std::filesystem::path(filename).replace_extension(".exe");
+            outputPath = pathFromUtf8(filename).replace_extension(".exe");
 #else
-            outputPath = std::filesystem::path(filename).replace_extension(".out");
+            outputPath = pathFromUtf8(filename).replace_extension(".out");
 #endif
         }
 
         std::error_code inputPathError;
         std::error_code outputPathError;
-        const auto absoluteInput = std::filesystem::weakly_canonical(filename, inputPathError);
+        const auto absoluteInput = std::filesystem::weakly_canonical(
+            pathFromUtf8(filename), inputPathError);
         const auto absoluteOutput = std::filesystem::weakly_canonical(outputPath, outputPathError);
         if (!inputPathError && !outputPathError && absoluteInput == absoluteOutput) {
             printError("native output path must not overwrite the source file");
@@ -682,10 +714,9 @@ int main(
             return 1;
         }
 
-        std::cout << "built: " << outputPath.string() << '\n';
+        std::cout << "built: " << pathToUtf8(outputPath) << '\n';
         return 0;
     }
-
 
     // ========================================================
     // Check
@@ -700,7 +731,6 @@ int main(
 
         return 0;
     }
-
 
     // ========================================================
     // Run
@@ -732,6 +762,38 @@ int main(
         return 0;
     }
 
-
     return 0;
 }
+
+#ifdef _WIN32
+int wmain(int argc, wchar_t** wideArguments) {
+    std::vector<std::string> converted;
+    std::vector<char*> arguments;
+    converted.reserve(static_cast<std::size_t>(argc));
+    arguments.reserve(static_cast<std::size_t>(argc));
+    for (int i = 0; i < argc; ++i) {
+        const int length = WideCharToMultiByte(
+            CP_UTF8, WC_ERR_INVALID_CHARS, wideArguments[i], -1, nullptr, 0,
+            nullptr, nullptr);
+        if (length <= 0) {
+            std::cerr << "command-line argument is not valid Unicode\n";
+            return 1;
+        }
+        std::string value(static_cast<std::size_t>(length), '\0');
+        if (WideCharToMultiByte(
+                CP_UTF8, WC_ERR_INVALID_CHARS, wideArguments[i], -1,
+                value.data(), length, nullptr, nullptr) <= 0) {
+            std::cerr << "failed converting a command-line argument\n";
+            return 1;
+        }
+        value.resize(static_cast<std::size_t>(length - 1));
+        converted.push_back(std::move(value));
+    }
+    for (std::string& value : converted) arguments.push_back(value.data());
+    return runCli(argc, arguments.data());
+}
+#else
+int main(int argc, char** argv) {
+    return runCli(argc, argv);
+}
+#endif
