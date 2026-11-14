@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../parser/AST.hpp"
+#include "../semantic/BuiltinRegistry.hpp"
 #include "../semantic/Type.hpp"
 
 #include <cstddef>
@@ -75,6 +76,7 @@ struct Instruction {
     zplus::ast::Location location;
     std::size_t resultSlot = kInvalidRuntimeSlot;
     std::size_t calleeFunctionIndex = kInvalidFunctionIndex;
+    std::vector<zplus::semantic::Type> genericTypeArguments;
     std::string scopeId;
     std::string siteId;
     std::size_t scopeDepth = 0;
@@ -214,6 +216,7 @@ struct Function {
     zplus::ast::Location location;
 
     std::vector<Parameter> parameters;
+    std::vector<zplus::semantic::GenericTypeParameter> genericParameters;
 
     zplus::semantic::Type returnType = zplus::semantic::Type::voidType();
 
@@ -232,7 +235,8 @@ struct Function {
             parameterTypes.push_back(parameter.type);
         }
         zplus::semantic::Type result =
-            zplus::semantic::Type::function(parameterTypes, returnType);
+            zplus::semantic::Type::function(
+                parameterTypes, returnType, genericParameters);
         result.requiredParameterCount = requiredParameterCount;
         return result;
     }
@@ -286,6 +290,7 @@ struct StructField {
 
 struct StructType {
     std::string name;
+    std::vector<zplus::semantic::GenericTypeParameter> genericParameters;
     std::vector<StructField> fields;
 };
 
@@ -304,6 +309,7 @@ struct StructType {
 struct Module {
 
     std::string name;
+    zplus::semantic::BuiltinRegistry builtinRegistry;
 
     std::vector<Instruction> globals;
 
@@ -468,6 +474,11 @@ public:
 
     Module build(
         const zplus::ast::Program& program
+    ) const;
+
+    Module build(
+        const zplus::ast::Program& program,
+        const zplus::semantic::BuiltinRegistry& builtinRegistry
     ) const;
 
 

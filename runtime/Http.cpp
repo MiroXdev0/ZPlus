@@ -1,5 +1,6 @@
 #include "Http.hpp"
 
+#include "Base64.hpp"
 #include "Json.hpp"
 
 #include <algorithm>
@@ -50,8 +51,12 @@ namespace zplus::http {
 namespace {
 
 constexpr std::size_t maximumHeaderBytes = 16 * 1024;
+constexpr std::size_t maximumHeaderCount = 100;
+constexpr std::size_t maximumChunkCount = 65536;
+constexpr std::size_t maximumChunkMetadataBytes = 16 * 1024 * 1024;
 constexpr std::size_t maximumBodyBytes = 1024 * 1024;
 constexpr std::size_t maximumConfigurableBodyBytes = 16 * 1024 * 1024;
+constexpr std::size_t maximumServerResponseBytes = 16 * 1024 * 1024;
 constexpr std::size_t maximumClientResponseBytes = 4 * 1024 * 1024;
 constexpr std::size_t maximumQueuedClients = 64;
 constexpr std::int64_t defaultTimeoutMilliseconds = 30000;
@@ -113,10 +118,50 @@ std::string trim(std::string_view value) {
     return std::string(value.substr(first, last - first + 1));
 }
 
+bool containsToken(std::string_view values, std::string_view wanted) {
+    std::size_t start = 0;
+    while (start <= values.size()) {
+        const auto separator = values.find(',', start);
+        const auto item = trim(values.substr(start,
+            separator == std::string_view::npos
+                ? values.size() - start : separator - start));
+        if (lower(item) == lower(std::string(wanted))) return true;
+        if (separator == std::string_view::npos) break;
+        start = separator + 1;
+    }
+    return false;
+}
+
+bool validCorsOrigin(std::string_view origin) {
+    if (origin.empty() || origin == "*") return true;
+    if (std::any_of(origin.begin(), origin.end(), [](unsigned char ch) {
+            return ch <= 0x20 || ch >= 0x7f || ch == ',' || ch == '\\';
+        })) return false;
+    const auto separator = origin.find("://");
+    if (separator == std::string_view::npos) return false;
+    const std::string scheme = lower(std::string(origin.substr(0, separator)));
+    if (scheme != "http" && scheme != "https") return false;
+    const auto authorityStart = separator + 3;
+    return authorityStart < origin.size() &&
+        origin.find_first_of("/?#", authorityStart) == std::string_view::npos &&
+        origin.find('@', authorityStart) == std::string_view::npos;
+}
+
+void addVaryToken(std::map<std::string, std::string>& headers, std::string_view token) {
+    auto vary = headers.find("vary");
+    if (vary == headers.end()) {
+        headers.emplace("vary", std::string(token));
+    } else if (!containsToken(vary->second, token)) {
+        vary->second += ", " + std::string(token);
+    }
+}
+
 bool validHeaderName(std::string_view name) {
     if (name.empty()) return false;
     for (const unsigned char ch : name) {
-        if (!(std::isalnum(ch) || ch == '!' || ch == '#' || ch == '$' ||
+        const bool alphaNumeric = (ch >= 'a' && ch <= 'z') ||
+            (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9');
+        if (!(alphaNumeric || ch == '!' || ch == '#' || ch == '$' ||
               ch == '%' || ch == '&' || ch == '\'' || ch == '*' || ch == '+' ||
               ch == '-' || ch == '.' || ch == '^' || ch == '_' || ch == '`' ||
               ch == '|' || ch == '~')) {
@@ -195,6 +240,7 @@ std::string reasonPhrase(std::int64_t status) {
         case 405: return "Method Not Allowed";
         case 408: return "Request Timeout";
         case 413: return "Payload Too Large";
+        case 431: return "Request Header Fields Too Large";
         case 415: return "Unsupported Media Type";
         case 417: return "Expectation Failed";
         case 429: return "Too Many Requests";
@@ -229,7 +275,19 @@ struct Request {
         fields.emplace_back("query", json::Value{query});
         fields.emplace_back("version", json::Value{version});
         fields.emplace_back("headers", json::Value{std::move(headerValues)});
-        fields.emplace_back("body", json::Value{body});
+        bool textBody = true;
+        try {
+            (void)json::quote(body);
+        } catch (const std::invalid_argument&) {
+            textBody = false;
+        }
+        fields.emplace_back("bodyEncoding", json::Value{textBody ? "utf8" : "base64"});
+        if (textBody) {
+            fields.emplace_back("body", json::Value{body});
+        } else {
+            fields.emplace_back("body", json::Value{""});
+            fields.emplace_back("bodyBase64", json::Value{encoding::base64Encode(body)});
+        }
         return json::serialize(json::Value{std::move(fields)});
     }
 };
@@ -249,12 +307,22 @@ struct PendingRequest {
 };
 
 bool sendAll(NativeSocket socket, std::string_view bytes) {
+#ifdef SO_NOSIGPIPE
+    int noSignal = 1;
+    setsockopt(socket, SOL_SOCKET, SO_NOSIGPIPE,
+        reinterpret_cast<const char*>(&noSignal), sizeof(noSignal));
+#endif
     while (!bytes.empty()) {
+#ifdef MSG_NOSIGNAL
+        constexpr int sendFlags = MSG_NOSIGNAL;
+#else
+        constexpr int sendFlags = 0;
+#endif
 #ifdef _WIN32
         const int sent = send(socket, bytes.data(),
-            static_cast<int>(std::min<std::size_t>(bytes.size(), INT_MAX)), 0);
+            static_cast<int>(std::min<std::size_t>(bytes.size(), INT_MAX)), sendFlags);
 #else
-        const auto sent = send(socket, bytes.data(), bytes.size(), 0);
+        const auto sent = send(socket, bytes.data(), bytes.size(), sendFlags);
 #endif
         if (sent <= 0) return false;
         bytes.remove_prefix(static_cast<std::size_t>(sent));
@@ -285,13 +353,13 @@ bool readRequest(
     std::size_t headerEnd = std::string::npos;
     while ((headerEnd = buffer.find("\r\n\r\n")) == std::string::npos) {
         if (buffer.size() > maximumHeaderBytes) {
-            errorStatus = 413;
+            errorStatus = 431;
             return false;
         }
         if (!receiveMore(socket, buffer)) return false;
     }
     if (headerEnd > maximumHeaderBytes) {
-        errorStatus = 413;
+        errorStatus = 431;
         return false;
     }
 
@@ -308,6 +376,10 @@ bool readRequest(
         errorStatus = 400;
         return false;
     }
+    if (!validHeaderName(requestLine.substr(0, firstSpace))) {
+        errorStatus = 400;
+        return false;
+    }
     request.method = std::string(requestLine.substr(0, firstSpace));
     request.target = std::string(requestLine.substr(
         firstSpace + 1, secondSpace - firstSpace - 1));
@@ -317,7 +389,10 @@ bool readRequest(
         return false;
     }
     if (request.target.empty() || request.target.front() != '/' ||
-        request.target.find('#') != std::string::npos) {
+        request.target.find('#') != std::string::npos ||
+        std::any_of(request.target.begin(), request.target.end(), [](unsigned char ch) {
+            return ch < 0x21 || ch == 0x7f || ch == '\\';
+        })) {
         errorStatus = 400;
         return false;
     }
@@ -328,9 +403,14 @@ bool readRequest(
     }
 
     std::optional<std::size_t> contentLength;
+    std::size_t headerCount = 0;
     std::size_t lineStart = firstLineEnd == std::string_view::npos
         ? headerBlock.size() : firstLineEnd + 2;
     while (lineStart < headerBlock.size()) {
+        if (++headerCount > maximumHeaderCount) {
+            errorStatus = 431;
+            return false;
+        }
         const auto lineEnd = headerBlock.find("\r\n", lineStart);
         const auto line = headerBlock.substr(
             lineStart, lineEnd == std::string_view::npos
@@ -347,14 +427,14 @@ bool readRequest(
             return false;
         }
         if (name == "content-length") {
+            if (contentLength) {
+                errorStatus = 400;
+                return false;
+            }
             std::size_t length = 0;
             const auto [end, error] = std::from_chars(
                 value.data(), value.data() + value.size(), length);
             if (error != std::errc{} || end != value.data() + value.size()) {
-                errorStatus = 400;
-                return false;
-            }
-            if (contentLength && *contentLength != length) {
                 errorStatus = 400;
                 return false;
             }
@@ -375,7 +455,8 @@ bool readRequest(
         if (lineEnd == std::string_view::npos) break;
         lineStart = lineEnd + 2;
     }
-    if (request.version == "HTTP/1.1" && !request.headers.contains("host")) {
+    if (request.version == "HTTP/1.1" &&
+        (!request.headers.contains("host") || request.headers.at("host").empty())) {
         errorStatus = 400;
         return false;
     }
@@ -392,10 +473,6 @@ bool readRequest(
     while (buffer.size() - consumed < bodyLength) {
         if (!receiveMore(socket, buffer)) {
             errorStatus = 400;
-            return false;
-        }
-        if (buffer.size() - consumed > maximumBodyBytes) {
-            errorStatus = 413;
             return false;
         }
     }
@@ -416,7 +493,9 @@ bool sendResponse(
     for (const auto& [name, value] : response.headers) {
         wire += name + ": " + value + "\r\n";
     }
-    wire += "Content-Length: " + std::to_string(response.body.size()) + "\r\n";
+    if (response.status != 204 && response.status != 304) {
+        wire += "Content-Length: " + std::to_string(response.body.size()) + "\r\n";
+    }
     wire += keepAlive ? "Connection: keep-alive\r\n\r\n" : "Connection: close\r\n\r\n";
     if (!headRequest) wire += response.body;
     return sendAll(socket, wire);
@@ -451,7 +530,9 @@ std::map<std::string, std::string> parseHeaderObject(
             throw std::invalid_argument(
                 "content-length and connection headers are managed by zhttp");
         }
-        headers.emplace(name, *headerValue);
+        if (!headers.emplace(name, *headerValue).second) {
+            throw std::invalid_argument("duplicate HTTP response header");
+        }
     }
     return headers;
 }
@@ -546,11 +627,27 @@ std::string decodeChunkedResponse(
     std::string& buffer
 ) {
     std::string body;
+    std::size_t trailerBytes = 0;
+    std::size_t trailerCount = 0;
+    std::size_t chunkCount = 0;
+    std::size_t chunkMetadataBytes = 0;
     for (;;) {
         const std::string line = readLineFromSocket(socket, buffer, maximumHeaderBytes);
+        chunkMetadataBytes += line.size() + 2;
+        if (chunkMetadataBytes > maximumChunkMetadataBytes) {
+            throw std::runtime_error("HTTP chunk framing exceeds the configured limit");
+        }
         const auto extension = line.find(';');
         const std::string_view sizeText(line.data(),
             extension == std::string::npos ? line.size() : extension);
+        if (sizeText.empty() ||
+            (extension != std::string::npos &&
+                std::any_of(line.begin() + static_cast<std::ptrdiff_t>(extension + 1),
+                    line.end(), [](unsigned char ch) {
+                        return ch < 0x20 || ch == 0x7f;
+                    }))) {
+            throw std::runtime_error("malformed chunked HTTP response");
+        }
         std::size_t chunkSize = 0;
         const auto [end, error] = std::from_chars(
             sizeText.data(), sizeText.data() + sizeText.size(), chunkSize, 16);
@@ -559,8 +656,31 @@ std::string decodeChunkedResponse(
         }
         if (chunkSize == 0) {
             for (;;) {
-                if (readLineFromSocket(socket, buffer, maximumHeaderBytes).empty()) {
-                    return body;
+                const std::string trailer =
+                    readLineFromSocket(socket, buffer, maximumHeaderBytes);
+                trailerBytes += trailer.size() + 2;
+                if (trailerBytes > maximumHeaderBytes) {
+                    throw std::runtime_error("HTTP response trailers exceed the configured limit");
+                }
+                if (++chunkCount > maximumChunkCount) {
+                    throw std::runtime_error("HTTP response contains too many chunks");
+                }
+                if (trailer.empty()) return body;
+                if (++trailerCount > maximumHeaderCount) {
+                    throw std::runtime_error("HTTP response contains too many trailers");
+                }
+                const auto colon = trailer.find(':');
+                const std::string_view trailerValue = colon == std::string::npos
+                    ? std::string_view{} : std::string_view(trailer).substr(colon + 1);
+                if (colon == std::string::npos ||
+                    !validHeaderName(std::string_view(trailer).substr(0, colon)) ||
+                    !validHeaderValue(trim(trailerValue))) {
+                    throw std::runtime_error("malformed HTTP response trailer");
+                }
+                const std::string name = lower(trailer.substr(0, colon));
+                if (name == "content-length" || name == "transfer-encoding" ||
+                    name == "trailer" || name == "host") {
+                    throw std::runtime_error("forbidden HTTP response trailer field");
                 }
             }
         }
@@ -574,6 +694,10 @@ std::string decodeChunkedResponse(
         }
         if (buffer.compare(chunkSize, 2, "\r\n") != 0) {
             throw std::runtime_error("malformed chunk terminator in HTTP response");
+        }
+        chunkMetadataBytes += 2;
+        if (chunkMetadataBytes > maximumChunkMetadataBytes) {
+            throw std::runtime_error("HTTP chunk framing exceeds the configured limit");
         }
         body.append(buffer.data(), chunkSize);
         buffer.erase(0, chunkSize + 2);
@@ -736,16 +860,20 @@ std::string performClientRequest(
     const auto statusLineEnd = headerBlock.find("\r\n");
     const std::string_view statusLine = statusLineEnd == std::string_view::npos
         ? headerBlock : headerBlock.substr(0, statusLineEnd);
-    const auto firstSpace = statusLine.find(' ');
-    if (firstSpace == std::string_view::npos || statusLine.size() < firstSpace + 4) {
+    if (statusLine.size() < 12 ||
+        (statusLine.substr(0, 8) != "HTTP/1.0" &&
+            statusLine.substr(0, 8) != "HTTP/1.1") ||
+        statusLine[8] != ' ' ||
+        (statusLine.size() > 12 && statusLine[12] != ' ') ||
+        std::any_of(statusLine.begin() + 12, statusLine.end(),
+            [](unsigned char ch) { return ch < 0x20 || ch == 0x7f; })) {
         closeSocket(connection);
         throw std::runtime_error("malformed HTTP response status line");
     }
     std::int64_t status = 0;
     const auto [statusEnd, statusError] = std::from_chars(
-        statusLine.data() + firstSpace + 1,
-        statusLine.data() + firstSpace + 4, status);
-    if (statusError != std::errc{} || statusEnd != statusLine.data() + firstSpace + 4 ||
+        statusLine.data() + 9, statusLine.data() + 12, status);
+    if (statusError != std::errc{} || statusEnd != statusLine.data() + 12 ||
         status < 100 || status > 599) {
         closeSocket(connection);
         throw std::runtime_error("invalid HTTP response status");
@@ -754,7 +882,12 @@ std::string performClientRequest(
     std::optional<std::size_t> contentLength;
     std::size_t lineStart = statusLineEnd == std::string_view::npos
         ? headerBlock.size() : statusLineEnd + 2;
+    std::size_t responseHeaderCount = 0;
     while (lineStart < headerBlock.size()) {
+        if (++responseHeaderCount > maximumHeaderCount) {
+            closeSocket(connection);
+            throw std::runtime_error("HTTP response contains too many headers");
+        }
         const auto lineEnd = headerBlock.find("\r\n", lineStart);
         const auto line = headerBlock.substr(lineStart,
             lineEnd == std::string_view::npos
@@ -766,7 +899,15 @@ std::string performClientRequest(
         }
         const std::string name = lower(std::string(line.substr(0, colon)));
         const std::string value = trim(line.substr(colon + 1));
+        if (!validHeaderValue(value)) {
+            closeSocket(connection);
+            throw std::runtime_error("invalid HTTP response header value");
+        }
         if (name == "content-length") {
+            if (contentLength) {
+                closeSocket(connection);
+                throw std::runtime_error("duplicate HTTP response Content-Length");
+            }
             std::size_t length = 0;
             const auto [end, error] = std::from_chars(
                 value.data(), value.data() + value.size(), length);
@@ -776,6 +917,10 @@ std::string performClientRequest(
             }
             contentLength = length;
         }
+        if (name == "transfer-encoding" && responseHeaders.contains(name)) {
+            closeSocket(connection);
+            throw std::runtime_error("duplicate HTTP response Transfer-Encoding");
+        }
         responseHeaders[name] = responseHeaders.contains(name)
             ? responseHeaders[name] + ", " + value : value;
         if (lineEnd == std::string_view::npos) break;
@@ -784,11 +929,19 @@ std::string performClientRequest(
     buffer.erase(0, headerEnd + 4);
     std::string responseBody;
     const auto transferEncoding = responseHeaders.find("transfer-encoding");
+    if (transferEncoding != responseHeaders.end() && contentLength) {
+        closeSocket(connection);
+        throw std::runtime_error(
+            "HTTP response contains both Transfer-Encoding and Content-Length");
+    }
     if (status == 204 || status == 304 || method == "HEAD") {
         responseBody.clear();
     } else if (transferEncoding != responseHeaders.end() &&
-        lower(transferEncoding->second).find("chunked") != std::string::npos) {
+        lower(trim(transferEncoding->second)) == "chunked") {
         responseBody = decodeChunkedResponse(connection, buffer);
+    } else if (transferEncoding != responseHeaders.end()) {
+        closeSocket(connection);
+        throw std::runtime_error("unsupported HTTP response Transfer-Encoding");
     } else if (contentLength) {
         if (*contentLength > maximumClientResponseBytes) {
             closeSocket(connection);
@@ -824,7 +977,19 @@ std::string performClientRequest(
     json::Value::Object result;
     result.emplace_back("status", json::Value{static_cast<double>(status)});
     result.emplace_back("headers", json::Value{std::move(responseHeaderValues)});
-    result.emplace_back("body", json::Value{std::move(responseBody)});
+    bool textBody = true;
+    try {
+        (void)json::quote(responseBody);
+    } catch (const std::invalid_argument&) {
+        textBody = false;
+    }
+    result.emplace_back("bodyEncoding", json::Value{textBody ? "utf8" : "base64"});
+    if (textBody) {
+        result.emplace_back("body", json::Value{std::move(responseBody)});
+    } else {
+        result.emplace_back("body", json::Value{""});
+        result.emplace_back("bodyBase64", json::Value{encoding::base64Encode(responseBody)});
+    }
     return json::serialize(json::Value{std::move(result)});
 }
 
@@ -842,6 +1007,7 @@ public:
 
     bool start() {
         std::lock_guard lifecycleLock(lifecycleMutex_);
+        if (stopped_) return false;
         if (running_) return true;
         (void)socketRuntime();
         NativeSocket listener = bindListener();
@@ -898,6 +1064,25 @@ public:
                 throw std::invalid_argument("CORS values must not contain line breaks");
             }
         }
+        if (!validCorsOrigin(origin)) {
+            throw std::invalid_argument("CORS origin must be an HTTP(S) origin or '*'");
+        }
+        const auto validateList = [](std::string_view values) {
+            std::size_t start = 0;
+            while (start <= values.size()) {
+                const auto separator = values.find(',', start);
+                const auto item = trim(values.substr(start,
+                    separator == std::string_view::npos
+                        ? values.size() - start : separator - start));
+                if (!validHeaderName(item)) {
+                    throw std::invalid_argument("CORS method or header list is invalid");
+                }
+                if (separator == std::string_view::npos) break;
+                start = separator + 1;
+            }
+        };
+        if (!methods.empty()) validateList(methods);
+        if (!headers.empty()) validateList(headers);
         std::lock_guard lock(corsMutex_);
         corsOrigin_ = std::move(origin);
         corsMethods_ = std::move(methods);
@@ -905,22 +1090,32 @@ public:
     }
 
     std::string next(std::int64_t timeoutMilliseconds) {
-        if (timeoutMilliseconds < 0) {
-            throw std::invalid_argument("HTTP request timeout must not be negative");
+        if (timeoutMilliseconds < 0 || timeoutMilliseconds > 300000) {
+            throw std::invalid_argument(
+                "HTTP request timeout must be between 0 and 300000 milliseconds");
         }
-        std::shared_ptr<PendingRequest> pending;
-        {
-            std::unique_lock lock(requestsMutex_);
-            if (!requestsReady_.wait_for(lock,
-                    std::chrono::milliseconds(timeoutMilliseconds),
-                    [this] { return !requests_.empty() || !running_; }) ||
-                requests_.empty()) {
-                return {};
+        const auto deadline = std::chrono::steady_clock::now() +
+            std::chrono::milliseconds(timeoutMilliseconds);
+        std::unique_lock lock(requestsMutex_);
+        for (;;) {
+            if (requests_.empty()) {
+                if (!requestsReady_.wait_until(lock, deadline,
+                        [this] { return !requests_.empty() || !running_; }) ||
+                    requests_.empty()) {
+                    return {};
+                }
             }
-            pending = std::move(requests_.front());
+            auto pending = std::move(requests_.front());
             requests_.pop_front();
+            lock.unlock();
+            bool cancelled = false;
+            {
+                std::lock_guard pendingLock(pending->mutex);
+                cancelled = pending->cancelled;
+            }
+            if (!cancelled) return pending->request.asJson();
+            lock.lock();
         }
-        return pending->request.asJson();
     }
 
     bool respond(
@@ -929,26 +1124,19 @@ public:
         const std::string& headersJson,
         std::string body
     ) {
-        if (status < 100 || status > 599) {
-            throw std::invalid_argument("HTTP status must be between 100 and 599");
+        if (status < 200 || status > 599) {
+            throw std::invalid_argument("HTTP status must be between 200 and 599");
+        }
+        if ((status == 204 || status == 304) && !body.empty()) {
+            throw std::invalid_argument("204 and 304 HTTP responses cannot include a body");
+        }
+        if (body.size() > maximumServerResponseBytes) {
+            throw std::length_error("HTTP response body exceeds the 16 MiB limit");
         }
         auto response = std::make_shared<Response>();
         response->status = status;
         response->headers = parseHeaderObject(headersJson, true);
         response->body = std::move(body);
-        {
-            std::lock_guard lock(corsMutex_);
-            if (!corsOrigin_.empty()) {
-                response->headers.try_emplace("access-control-allow-origin", corsOrigin_);
-                response->headers.try_emplace("vary", "Origin");
-            }
-            if (!corsMethods_.empty()) {
-                response->headers.try_emplace("access-control-allow-methods", corsMethods_);
-            }
-            if (!corsHeaders_.empty()) {
-                response->headers.try_emplace("access-control-allow-headers", corsHeaders_);
-            }
-        }
         std::shared_ptr<PendingRequest> pending;
         {
             std::lock_guard lock(requestsMutex_);
@@ -956,6 +1144,7 @@ public:
             if (found == pending_.end()) return false;
             pending = found->second;
         }
+        applyCors(pending->request, *response);
         {
             std::lock_guard lock(pending->mutex);
             if (pending->cancelled || pending->response) return false;
@@ -967,6 +1156,7 @@ public:
 
     void stop() noexcept {
         std::lock_guard lifecycleLock(lifecycleMutex_);
+        stopped_ = true;
         if (!running_.exchange(false)) return;
         closeSocket(listener_.exchange(invalidSocket));
         clientsReady_.notify_all();
@@ -1000,6 +1190,74 @@ public:
     }
 
 private:
+    bool originAllowed(std::string_view origin) const {
+        return !corsOrigin_.empty() &&
+            (corsOrigin_ == "*" || origin == corsOrigin_);
+    }
+
+    void applyCors(const Request& request, Response& response) {
+        std::lock_guard lock(corsMutex_);
+        if (corsOrigin_.empty()) return;
+        addVaryToken(response.headers, "Origin");
+        const auto origin = request.headers.find("origin");
+        if (origin == request.headers.end() || !originAllowed(origin->second)) return;
+        response.headers.try_emplace("access-control-allow-origin", corsOrigin_);
+        if (!corsMethods_.empty()) {
+            response.headers.try_emplace("access-control-allow-methods", corsMethods_);
+        }
+        if (!corsHeaders_.empty()) {
+            response.headers.try_emplace("access-control-allow-headers", corsHeaders_);
+        }
+    }
+
+    std::optional<Response> preflightResponse(const Request& request) {
+        if (request.method != "OPTIONS") return std::nullopt;
+        const auto origin = request.headers.find("origin");
+        const auto requestedMethod =
+            request.headers.find("access-control-request-method");
+        if (origin == request.headers.end() ||
+            requestedMethod == request.headers.end()) return std::nullopt;
+
+        std::lock_guard lock(corsMutex_);
+        if (corsOrigin_.empty()) return std::nullopt;
+        Response response;
+        const bool allowedOrigin = originAllowed(origin->second);
+        const std::string method = trim(requestedMethod->second);
+        const bool allowedMethod = method.find(',') == std::string::npos &&
+            validHeaderName(method) && containsToken(corsMethods_, method);
+        bool allowedHeaders = true;
+        const auto requestedHeaders =
+            request.headers.find("access-control-request-headers");
+        if (requestedHeaders != request.headers.end()) {
+            std::size_t start = 0;
+            while (start <= requestedHeaders->second.size()) {
+                const auto separator = requestedHeaders->second.find(',', start);
+                const auto name = trim(std::string_view(requestedHeaders->second).substr(
+                    start, separator == std::string::npos
+                        ? requestedHeaders->second.size() - start
+                        : separator - start));
+                if (!validHeaderName(name) || !containsToken(corsHeaders_, name)) {
+                    allowedHeaders = false;
+                    break;
+                }
+                if (separator == std::string::npos) break;
+                start = separator + 1;
+            }
+        }
+        response.status = allowedOrigin && allowedMethod && allowedHeaders ? 204 : 403;
+        addVaryToken(response.headers, "Origin");
+        addVaryToken(response.headers, "Access-Control-Request-Method");
+        addVaryToken(response.headers, "Access-Control-Request-Headers");
+        if (response.status == 204) {
+            response.headers.emplace("access-control-allow-origin", corsOrigin_);
+            response.headers.emplace("access-control-allow-methods", corsMethods_);
+            if (!corsHeaders_.empty()) {
+                response.headers.emplace("access-control-allow-headers", corsHeaders_);
+            }
+        }
+        return response;
+    }
+
     NativeSocket bindListener() {
         addrinfo hints{};
         hints.ai_family = AF_UNSPEC;
@@ -1122,6 +1380,10 @@ private:
                 if (!buffer.empty()) sendResponse(client, errorResponse(errorStatus), false);
                 break;
             }
+            if (const auto preflight = preflightResponse(request)) {
+                if (!sendResponse(client, *preflight, false)) break;
+                break;
+            }
             const auto method = request.method;
             if (method != "GET" && method != "POST" && method != "PUT" &&
                 method != "PATCH" && method != "DELETE" && method != "OPTIONS" &&
@@ -1132,9 +1394,10 @@ private:
             const auto connection = request.headers.find("connection");
             const bool keepAlive = request.version == "HTTP/1.1"
                 ? connection == request.headers.end() ||
-                    lower(connection->second) != "close"
+                    !containsToken(connection->second, "close")
                 : connection != request.headers.end() &&
-                    lower(connection->second) == "keep-alive";
+                    containsToken(connection->second, "keep-alive") &&
+                    !containsToken(connection->second, "close");
             auto pending = std::make_shared<PendingRequest>();
             pending->request = std::move(request);
             {
@@ -1156,6 +1419,7 @@ private:
                     })) {
                     response = std::move(pending->response);
                 }
+                if (!response) pending->cancelled = true;
             }
             {
                 std::lock_guard lock(requestsMutex_);
@@ -1179,6 +1443,7 @@ private:
     std::atomic<NativeSocket> listener_{invalidSocket};
     std::atomic<std::int64_t> nextRequestId_{1};
     std::mutex lifecycleMutex_;
+    bool stopped_ = false;
     std::mutex clientsMutex_;
     std::condition_variable clientsReady_;
     std::deque<NativeSocket> clients_;
@@ -1196,16 +1461,16 @@ private:
 };
 
 std::mutex serversMutex;
-std::unordered_map<std::int64_t, std::unique_ptr<Server>> servers;
+std::unordered_map<std::int64_t, std::shared_ptr<Server>> servers;
 std::atomic<std::int64_t> nextServerHandle{1};
 
-Server& getServer(std::int64_t handle) {
+std::shared_ptr<Server> getServer(std::int64_t handle) {
     std::lock_guard lock(serversMutex);
     const auto found = servers.find(handle);
     if (found == servers.end()) {
         throw std::invalid_argument("invalid HTTP server handle");
     }
-    return *found->second;
+    return found->second;
 }
 
 } // namespace
@@ -1213,26 +1478,26 @@ Server& getServer(std::int64_t handle) {
 std::int64_t createServer(std::string address, std::int64_t port) {
     const std::int64_t handle = nextServerHandle.fetch_add(1);
     if (handle <= 0) throw std::overflow_error("HTTP server handle space exhausted");
-    auto server = std::make_unique<Server>(std::move(address), port);
+    auto server = std::make_shared<Server>(std::move(address), port);
     std::lock_guard lock(serversMutex);
     servers.emplace(handle, std::move(server));
     return handle;
 }
 
 bool startServer(std::int64_t handle) {
-    return getServer(handle).start();
+    return getServer(handle)->start();
 }
 
 bool serverRunning(std::int64_t handle) {
-    return getServer(handle).running();
+    return getServer(handle)->running();
 }
 
 std::int64_t serverPort(std::int64_t handle) {
-    return getServer(handle).port();
+    return getServer(handle)->port();
 }
 
 std::string nextRequest(std::int64_t handle, std::int64_t timeoutMilliseconds) {
-    return getServer(handle).next(timeoutMilliseconds);
+    return getServer(handle)->next(timeoutMilliseconds);
 }
 
 bool respond(
@@ -1242,11 +1507,27 @@ bool respond(
     const std::string& headersJson,
     std::string body
 ) {
-    return getServer(handle).respond(requestId, status, headersJson, std::move(body));
+    return getServer(handle)->respond(requestId, status, headersJson, std::move(body));
+}
+
+bool respondBinary(
+    std::int64_t handle,
+    std::int64_t requestId,
+    std::int64_t status,
+    const std::string& headersJson,
+    const std::string& bodyBase64
+) {
+    const auto maximumEncodedBytes =
+        ((maximumServerResponseBytes + 2) / 3) * 4;
+    if (bodyBase64.size() > maximumEncodedBytes) {
+        throw std::length_error("HTTP response body exceeds the 16 MiB limit");
+    }
+    return respond(handle, requestId, status, headersJson,
+        encoding::base64Decode(bodyBase64));
 }
 
 void stopServer(std::int64_t handle) {
-    std::unique_ptr<Server> server;
+    std::shared_ptr<Server> server;
     {
         std::lock_guard lock(serversMutex);
         const auto found = servers.find(handle);
@@ -1259,7 +1540,7 @@ void stopServer(std::int64_t handle) {
 
 void shutdownServers() noexcept {
     for (;;) {
-        std::unique_ptr<Server> server;
+        std::shared_ptr<Server> server;
         {
             std::lock_guard lock(serversMutex);
             if (servers.empty()) return;
@@ -1276,7 +1557,7 @@ void configureServer(
     std::int64_t maximumRequestBodyBytes,
     std::int64_t timeoutMilliseconds
 ) {
-    getServer(handle).configure(maximumRequestBodyBytes, timeoutMilliseconds);
+    getServer(handle)->configure(maximumRequestBodyBytes, timeoutMilliseconds);
 }
 
 void configureCors(
@@ -1285,7 +1566,7 @@ void configureCors(
     std::string methods,
     std::string headers
 ) {
-    getServer(handle).configureCors(
+    getServer(handle)->configureCors(
         std::move(origin), std::move(methods), std::move(headers));
 }
 
@@ -1373,6 +1654,17 @@ std::string clientRequest(
     return performClientRequest(
         std::move(method), std::move(url), headersJson,
         std::move(body), timeoutMilliseconds);
+}
+
+std::string clientRequestBinary(
+    std::string method,
+    std::string url,
+    const std::string& headersJson,
+    const std::string& bodyBase64,
+    std::int64_t timeoutMilliseconds
+) {
+    return clientRequest(std::move(method), std::move(url), headersJson,
+        encoding::base64Decode(bodyBase64), timeoutMilliseconds);
 }
 
 } // namespace zplus::http

@@ -1,12 +1,162 @@
 #include "Type.hpp"
 
+#include <algorithm>
+#include <unordered_set>
 #include <utility>
 
 namespace zplus::semantic {
+namespace {
 
-Type Type::typeParameter(std::string parameterName) {
+bool containsTypeParameter(const Type& type, const std::string& name) {
+    if (type.kind == TypeKind::TypeParameter && type.name == name) {
+        return true;
+    }
+    if (type.elementType && containsTypeParameter(*type.elementType, name)) {
+        return true;
+    }
+    for (const Type& argument : type.arguments) {
+        if (containsTypeParameter(argument, name)) return true;
+    }
+    for (const Type& parameter : type.parameters) {
+        if (containsTypeParameter(parameter, name)) return true;
+    }
+    return type.returnType && containsTypeParameter(*type.returnType, name);
+}
+
+Type substituteImpl(
+    const Type& type,
+    const TypeSubstitution& substitutions,
+    std::unordered_set<std::string>& expanding
+) {
+    if (type.kind == TypeKind::TypeParameter) {
+        const auto found = substitutions.find(type.name);
+        if (found == substitutions.end()) return type;
+        if (!expanding.insert(type.name).second) return Type::unknown();
+        Type result = substituteImpl(found->second, substitutions, expanding);
+        expanding.erase(type.name);
+        return result;
+    }
+
+    Type result = type;
+    if (type.elementType) {
+        result.elementType =
+            std::make_shared<Type>(
+                substituteImpl(*type.elementType, substitutions, expanding));
+    }
+    for (Type& argument : result.arguments) {
+        argument = substituteImpl(argument, substitutions, expanding);
+    }
+    for (Type& parameter : result.parameters) {
+        parameter = substituteImpl(parameter, substitutions, expanding);
+    }
+    if (type.returnType) {
+        result.returnType =
+            std::make_shared<Type>(
+                substituteImpl(*type.returnType, substitutions, expanding));
+    }
+    return result;
+}
+
+bool satisfiesConstraint(const Type& type, TypeConstraint constraint) {
+    if (type.kind == TypeKind::TypeParameter) {
+        return std::find(type.constraints.begin(), type.constraints.end(),
+                         constraint) != type.constraints.end();
+    }
+    if (constraint == TypeConstraint::Numeric) {
+        return type.kind == TypeKind::Number;
+    }
+    return type.kind == TypeKind::Number ||
+        type.kind == TypeKind::String ||
+        type.kind == TypeKind::Character ||
+        type.kind == TypeKind::Boolean ||
+        type.kind == TypeKind::Null ||
+        type.kind == TypeKind::Custom ||
+        type.kind == TypeKind::Array ||
+        type.kind == TypeKind::Pointer;
+}
+
+bool unifyImpl(
+    const Type& pattern,
+    const Type& actual,
+    TypeSubstitution& substitutions,
+    std::unordered_set<std::string>& resolving
+) {
+    if (pattern.kind == TypeKind::Unknown || actual.kind == TypeKind::Unknown) {
+        return true;
+    }
+    if (pattern.kind == TypeKind::TypeParameter) {
+        for (const TypeConstraint constraint : pattern.constraints) {
+            if (!satisfiesConstraint(actual, constraint)) return false;
+        }
+        if (actual.kind == TypeKind::TypeParameter &&
+            actual.name == pattern.name) {
+            return true;
+        }
+        const auto found = substitutions.find(pattern.name);
+        if (found != substitutions.end()) {
+            if (!resolving.insert(pattern.name).second) return false;
+            const bool compatible =
+                unifyImpl(found->second, actual, substitutions, resolving);
+            resolving.erase(pattern.name);
+            return compatible;
+        }
+        if (containsTypeParameter(actual, pattern.name)) {
+            return false;
+        }
+        substitutions.emplace(pattern.name, actual);
+        return true;
+    }
+    if (pattern.kind != actual.kind) return false;
+
+    if (pattern.kind == TypeKind::Array || pattern.kind == TypeKind::Pointer) {
+        return !pattern.elementType || !actual.elementType ||
+            unifyImpl(*pattern.elementType, *actual.elementType,
+                      substitutions, resolving);
+    }
+    if (pattern.kind == TypeKind::Custom) {
+        if (pattern.name != actual.name ||
+            pattern.arguments.size() != actual.arguments.size()) {
+            return false;
+        }
+        for (std::size_t i = 0; i < pattern.arguments.size(); ++i) {
+            if (!unifyImpl(pattern.arguments[i], actual.arguments[i],
+                           substitutions, resolving)) {
+                return false;
+            }
+        }
+        return true;
+    }
+    if (pattern.kind == TypeKind::Function) {
+        if (pattern.parameters.size() != actual.parameters.size() ||
+            pattern.requiredParameterCount != actual.requiredParameterCount ||
+            !pattern.returnType || !actual.returnType) {
+            return false;
+        }
+        for (std::size_t i = 0; i < pattern.parameters.size(); ++i) {
+            if (!unifyImpl(pattern.parameters[i], actual.parameters[i],
+                           substitutions, resolving)) {
+                return false;
+            }
+        }
+        return unifyImpl(*pattern.returnType, *actual.returnType,
+                         substitutions, resolving);
+    }
+    return true;
+}
+
+} // namespace
+
+Type Type::typeParameter(
+    std::string parameterName,
+    std::string parameterDisplayName,
+    std::vector<TypeConstraint> parameterConstraints
+) {
     Type type(TypeKind::TypeParameter);
     type.name = std::move(parameterName);
+    type.displayName = parameterDisplayName.empty()
+        ? type.name
+        : std::move(parameterDisplayName);
+    type.constraints = std::move(parameterConstraints);
     return type;
 }
 
@@ -41,17 +191,27 @@ Type Type::pointer(Type&& element) {
     return type;
 }
 
-Type Type::function(std::vector<Type> functionParameters, const Type& result) {
+Type Type::function(
+    std::vector<Type> functionParameters,
+    const Type& result,
+    std::vector<GenericTypeParameter> typeParameters
+) {
     Type type(TypeKind::Function);
     type.parameters = std::move(functionParameters);
+    type.genericParameters = std::move(typeParameters);
     type.requiredParameterCount = type.parameters.size();
     type.returnType = std::make_shared<Type>(result);
     return type;
 }
 
-Type Type::function(std::vector<Type> functionParameters, Type&& result) {
+Type Type::function(
+    std::vector<Type> functionParameters,
+    Type&& result,
+    std::vector<GenericTypeParameter> typeParameters
+) {
     Type type(TypeKind::Function);
     type.parameters = std::move(functionParameters);
+    type.genericParameters = std::move(typeParameters);
     type.requiredParameterCount = type.parameters.size();
     type.returnType = std::make_shared<Type>(std::move(result));
     return type;
@@ -78,7 +238,8 @@ std::string typeName(const Type& type) {
             }
             return result;
         }
-        case TypeKind::TypeParameter: return type.name;
+        case TypeKind::TypeParameter:
+            return type.displayName.empty() ? type.name : type.displayName;
         case TypeKind::Array:
             return (type.elementType ? typeName(*type.elementType) : "unknown") + "[]";
         case TypeKind::Pointer:
@@ -110,11 +271,18 @@ bool typesEqual(const Type& left, const Type& right) {
     }
     if (left.kind == TypeKind::Function) {
         if (left.parameters.size() != right.parameters.size() ||
-            left.requiredParameterCount != right.requiredParameterCount) {
+            left.requiredParameterCount != right.requiredParameterCount ||
+            left.genericParameters.size() != right.genericParameters.size()) {
             return false;
         }
         for (std::size_t i = 0; i < left.parameters.size(); ++i) {
             if (!typesEqual(left.parameters[i], right.parameters[i])) return false;
+        }
+        for (std::size_t i = 0; i < left.genericParameters.size(); ++i) {
+            if (left.genericParameters[i].constraints !=
+                right.genericParameters[i].constraints) {
+                return false;
+            }
         }
         return !left.returnType || !right.returnType ||
             typesEqual(*left.returnType, *right.returnType);
@@ -130,68 +298,15 @@ bool isAssignable(const Type& target, const Type& value) {
 }
 
 Type substitute(const Type& type, const TypeSubstitution& substitutions) {
-    if (type.kind == TypeKind::TypeParameter) {
-        const auto found = substitutions.find(type.name);
-        return found == substitutions.end() ? type : found->second;
-    }
-
-    Type result = type;
-    if (type.elementType) {
-        result.elementType =
-            std::make_shared<Type>(substitute(*type.elementType, substitutions));
-    }
-    for (Type& argument : result.arguments) {
-        argument = substitute(argument, substitutions);
-    }
-    for (Type& parameter : result.parameters) {
-        parameter = substitute(parameter, substitutions);
-    }
-    if (type.returnType) {
-        result.returnType =
-            std::make_shared<Type>(substitute(*type.returnType, substitutions));
-    }
-    return result;
+    std::unordered_set<std::string> expanding;
+    return substituteImpl(type, substitutions, expanding);
 }
 
 bool unify(const Type& pattern, const Type& actual, TypeSubstitution& substitutions) {
-    if (pattern.kind == TypeKind::Unknown || actual.kind == TypeKind::Unknown) {
-        return true;
-    }
-    if (pattern.kind == TypeKind::TypeParameter) {
-        const auto [found, inserted] =
-            substitutions.emplace(pattern.name, actual);
-        return inserted || typesEqual(found->second, actual);
-    }
-    if (pattern.kind != actual.kind) return false;
-
-    if (pattern.kind == TypeKind::Array || pattern.kind == TypeKind::Pointer) {
-        return !pattern.elementType || !actual.elementType ||
-            unify(*pattern.elementType, *actual.elementType, substitutions);
-    }
-    if (pattern.kind == TypeKind::Custom) {
-        if (pattern.name != actual.name ||
-            pattern.arguments.size() != actual.arguments.size()) {
-            return false;
-        }
-        for (std::size_t i = 0; i < pattern.arguments.size(); ++i) {
-            if (!unify(pattern.arguments[i], actual.arguments[i], substitutions)) {
-                return false;
-            }
-        }
-        return true;
-    }
-    if (pattern.kind == TypeKind::Function) {
-        if (pattern.parameters.size() != actual.parameters.size() ||
-            !pattern.returnType || !actual.returnType) {
-            return false;
-        }
-        for (std::size_t i = 0; i < pattern.parameters.size(); ++i) {
-            if (!unify(pattern.parameters[i], actual.parameters[i], substitutions)) {
-                return false;
-            }
-        }
-        return unify(*pattern.returnType, *actual.returnType, substitutions);
-    }
+    std::unordered_set<std::string> resolving;
+    TypeSubstitution candidate = substitutions;
+    if (!unifyImpl(pattern, actual, candidate, resolving)) return false;
+    substitutions = std::move(candidate);
     return true;
 }
 

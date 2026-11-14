@@ -10,6 +10,7 @@
 namespace zplus::semantic {
 
 enum class NativeAvailability {
+    InterpreterOnly,
     BackendDependent,
     WindowsX64,
     LinuxX64,

@@ -1,6 +1,7 @@
 #include "X64CodeGenerator.hpp"
 
 #include "MachineCode.hpp"
+#include "../../ir/IRVerifier.hpp"
 #include "../../NumericLiteral.hpp"
 
 #include <algorithm>
@@ -66,6 +67,7 @@ public:
         if (module_.functions.empty()) {
             throw std::runtime_error("native code generation requires an IR function");
         }
+        validateBuiltinAvailability();
         if (!module_.globals.empty()) {
             throw std::runtime_error("native backend does not support module-level global instructions");
         }
@@ -107,6 +109,49 @@ public:
     }
 
 private:
+    void validateBuiltinAvailability() const {
+        for (const Function& function : module_.functions) {
+            for (const BasicBlock& block : function.blocks) {
+                for (const Instruction& instruction : block.instructions) {
+                    if ((instruction.opcode != "call" &&
+                         instruction.opcode != "defer_push") ||
+                        instruction.operands.empty()) {
+                        continue;
+                    }
+                    const std::string& callee = instruction.operands.front().name;
+                    if (module_.findFunction(callee)) continue;
+                    const auto* builtin = module_.builtinRegistry.find(callee);
+                    if (!builtin) continue;
+
+                    switch (builtin->nativeAvailability) {
+                        case zplus::semantic::NativeAvailability::InterpreterOnly:
+                            throw std::runtime_error(
+                                "native backend: builtin '" + callee +
+                                "' is available only in the interpreter");
+                        case zplus::semantic::NativeAvailability::WindowsX64:
+                            if (!windowsAbi_) {
+                                throw std::runtime_error(
+                                    "native backend: builtin '" + callee +
+                                    "' requires the Windows x64 runtime");
+                            }
+                            break;
+                        case zplus::semantic::NativeAvailability::LinuxX64:
+                            if (windowsAbi_) {
+                                throw std::runtime_error(
+                                    "native backend: builtin '" + callee +
+                                    "' requires the Linux x64 runtime");
+                            }
+                            break;
+                        case zplus::semantic::NativeAvailability::WindowsAndLinuxX64:
+                        case zplus::semantic::NativeAvailability::PlatformSpecific:
+                        case zplus::semantic::NativeAvailability::BackendDependent:
+                            break;
+                    }
+                }
+            }
+        }
+    }
+
     struct DeferredSite {
         std::string id;
         std::string scopeId;
@@ -653,89 +698,6 @@ private:
         return {};
     }
 
-    std::string standardLibraryReturnType(const std::string& callee) const {
-        const std::string prefix = "__zstdlib_";
-        if (callee.rfind(prefix, 0) != 0) return {};
-        const std::string operation = callee.substr(prefix.size());
-
-        if (operation.rfind("math_", 0) == 0) return "number";
-        if (operation.rfind("string_", 0) == 0) {
-            const std::string name = operation.substr(7);
-            if (name == "contains" || name == "startsWith" || name == "endsWith") {
-                return "bool";
-            }
-            if (name == "length") return "number";
-            if (name == "split") return "string[]";
-            return "string";
-        }
-        if (operation.rfind("collections_", 0) == 0) {
-            const std::string name = operation.substr(12);
-            if (name == "reverse" || name == "sort" || name == "unique") {
-                return "number[]";
-            }
-            if (name == "contains" || name == "isEmpty") return "bool";
-            return "number";
-        }
-        if (operation.rfind("random_", 0) == 0) {
-            const std::string name = operation.substr(7);
-            if (name == "boolean") return "bool";
-            if (name == "shuffle") return "number[]";
-            if (name == "seed") return "void";
-            return "number";
-        }
-        if (operation.rfind("path_", 0) == 0) {
-            return operation == "path_isAbsolute" ? "bool" : "string";
-        }
-        if (operation.rfind("file_", 0) == 0) {
-            const std::string name = operation.substr(5);
-            if (name == "read") return "string";
-            if (name == "readLines") return "string[]";
-            if (name == "listDirectory") return "string[]";
-            if (name == "size") return "number";
-            if (name == "write" || name == "writeLines" || name == "append") {
-                return "void";
-            }
-            return "bool";
-        }
-        if (operation.rfind("crypto_", 0) == 0 ||
-            operation == "process_run" ||
-            operation == "registry_read" ||
-            operation == "registry_valueKind" ||
-            operation == "system_platform" ||
-            operation == "system_architecture" ||
-            operation == "system_osVersion" ||
-            operation == "system_executablePath" ||
-            operation == "system_selectFolder" ||
-            operation == "system_shortcutTarget" ||
-            operation == "system_shortcutArguments") {
-            return "string";
-        }
-        if (operation == "system_availableSpace" ||
-            operation == "system_messageBox") return "number";
-        if (operation.rfind("system_", 0) == 0 ||
-            operation.rfind("registry_", 0) == 0) return "bool";
-        if (operation.rfind("env_", 0) == 0) {
-            const std::string name = operation.substr(4);
-            if (name == "get" || name == "homeDirectory" ||
-                name == "currentDirectory") return "string";
-            if (name == "set") return "void";
-            return "bool";
-        }
-        if (operation.rfind("time_", 0) == 0) {
-            if (operation == "time_format") return "string";
-            if (operation == "time_sleep") return "void";
-            return "number";
-        }
-        if (operation.rfind("args_", 0) == 0) {
-            if (operation == "args_get") return "string";
-            if (operation == "args_all") return "string[]";
-            if (operation == "args_has") return "bool";
-            return "number";
-        }
-        if (operation.rfind("log_", 0) == 0) return "void";
-        return {};
-    }
-
     static std::string arrayElementType(const std::string& type) {
         if (type.size() > 2 && type.ends_with("[]")) {
             return type.substr(0, type.size() - 2);
@@ -1030,6 +992,22 @@ private:
             usesManagedMemory_ = true;
             usesZGraphicsRuntime_ = true;
             storeResult(instruction);
+            return;
+        }
+        if (callee.rfind("__zweb_", 0) == 0) {
+            if (!windowsAbi_) {
+                throw std::runtime_error(
+                    "native ZWeb runtime is currently supported only on Windows x64"
+                );
+            }
+            emitNativeCallArguments(instruction);
+            emitImportCall(
+                "zpg_web_" + callee.substr(std::string("__zweb_").size()),
+                "zgraphics_runtime.dll");
+            usesManagedMemory_ = true;
+            usesZGraphicsRuntime_ = true;
+            storeResult(instruction);
+            emitExceptionDispatch(functionName);
             return;
         }
         if (callee.rfind("__zsqlite_", 0) == 0) {
@@ -2264,29 +2242,20 @@ private:
                             inferred |= setInferredType(
                                 instruction.result,
                                 zplus::semantic::typeName(target->returnType));
-                        } else if (instruction.operands[0].name == "length") {
-                            inferred |= setInferredType(instruction.result, "number");
-                        } else if (instruction.operands[0].name == "read") {
-                            inferred |= setInferredType(instruction.result, "string");
-                        } else if (instruction.operands[0].name == "read_number" ||
-                                   instruction.operands[0].name == "read_integer") {
-                            inferred |= setInferredType(instruction.result, "number");
-                        } else if (instruction.operands[0].name == "read_boolean") {
-                            inferred |= setInferredType(instruction.result, "bool");
-                        } else if (instruction.operands[0].name == "to_string") {
-                            inferred |= setInferredType(instruction.result, "string");
-                        } else if ((instruction.operands[0].name == "pop" &&
-                                    instruction.operands.size() == 2) ||
-                                   (instruction.operands[0].name == "remove" &&
-                                    instruction.operands.size() == 3)) {
+                        } else if (instruction.resultType.kind !=
+                                   zplus::semantic::TypeKind::Unknown) {
                             inferred |= setInferredType(
                                 instruction.result,
-                                arrayElementType(inferredType(instruction.operands[1])));
-                        } else if (const std::string type =
-                                       standardLibraryReturnType(
-                                           instruction.operands[0].name);
-                                   !type.empty()) {
-                            inferred |= setInferredType(instruction.result, type);
+                                zplus::semantic::typeName(instruction.resultType));
+                        } else if (const auto* builtin = module_.builtinRegistry.find(
+                                       instruction.operands[0].name);
+                                   builtin && builtin->signature.returnType &&
+                                   builtin->signature.returnType->kind !=
+                                       zplus::semantic::TypeKind::TypeParameter) {
+                            inferred |= setInferredType(
+                                instruction.result,
+                                zplus::semantic::typeName(
+                                    *builtin->signature.returnType));
                         }
                     }
                 }
@@ -2390,6 +2359,7 @@ private:
                             callee.rfind("__zstdlib_", 0) == 0 ||
                             callee.rfind("__zjson_", 0) == 0 ||
                             callee.rfind("__zhttp_", 0) == 0 ||
+                            callee.rfind("__zweb_", 0) == 0 ||
                             callee.rfind("__zsqlite_", 0) == 0 ||
                             callee == "__zplus_stringConcat" ||
                             callee == "push" || callee == "pop" ||
@@ -2818,6 +2788,13 @@ private:
 } // namespace
 
 NativeImage generateX64(const zplus::ir::Module& module, bool windowsAbi) {
+    const auto diagnostics = zplus::ir::verifyModule(module);
+    if (!diagnostics.empty()) {
+        const auto& diagnostic = diagnostics.front();
+        throw std::runtime_error(
+            "native backend: invalid IR (" + diagnostic.code + "): " +
+            diagnostic.message);
+    }
     return CodeGenerator(module, windowsAbi).generate();
 }
 

@@ -1,0 +1,12 @@
+start {
+    struct Box<T> {
+        value: T
+    } end struct
+
+    fn grow<T>(value: T) -> number {
+        let next = Box(value)
+        return grow<Box<T>>(next)
+    } end fn
+
+    let result = grow<number>(1)
+} stop

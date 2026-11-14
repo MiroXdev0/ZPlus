@@ -1,0 +1,35 @@
+use zweb as web
+
+start {
+    let routes = web.routeAddConfigured("[]", "GET", "/users/{id}", "showUser", "user.show", "{\"authenticated\":true}")
+    routes = web.routeGroup("/v1", routes)
+    let matched = web.routeMatch(routes, "GET", "/v1/users/42")
+    say(web.jsonGetString(matched, "/name"))
+    say(web.routeUrl(routes, "user.show", "{\"id\":\"a b\"}"))
+
+    let values = web.parseForm("name=Ada&age=37&tag=one&tag=two")
+    let result = web.validateForm(values, "[{\"name\":\"name\",\"required\":true,\"minLength\":2},{\"name\":\"age\",\"numeric\":true}]")
+    say(web.jsonGetBoolean(result, "/valid"))
+    say(web.formNumber(values, "age"))
+    say(web.formValue(values, "tag"))
+
+    let sessionStore = web.sessionStoreCreate()
+    let sessionId = web.sessionCreate(sessionStore, 3600)
+    web.sessionSet(sessionStore, sessionId, "user", "Ada")
+    say(web.sessionGet(sessionStore, sessionId, "user"))
+    say(web.sessionCookie("sid", sessionId, 3600, true, "Lax"))
+    web.sessionInvalidate(sessionStore, sessionId)
+    web.sessionStoreClose(sessionStore)
+
+    let htmlTemplate = web.loadTemplate("examples/zweb/templates", "welcome.html", 65536)
+    say(web.renderTemplate(htmlTemplate, "{\"name\":\"<Ada>\"}"))
+    say(web.staticFile("examples/zweb/public", "index.html", 65536))
+
+    let pipeline = web.middlewareUse("[]", "requireHeader", "{\"header\":\"x-api-key\",\"equals\":\"secret\"}")
+    pipeline = web.middlewareUse(pipeline, "securityHeaders", "{}")
+    let request = "{\"method\":\"GET\",\"path\":\"/private\",\"headers\":{\"x-api-key\":\"secret\"},\"body\":\"\"}"
+    let checked = web.middlewareBefore(pipeline, request)
+    say(web.jsonGetBoolean(checked, "/proceed"))
+    let response = web.jsonResponse(200, "{}", "{\"ready\":true}")
+    say(web.responseBody(web.middlewareAfter(pipeline, web.jsonGet(checked, "/request"), response)))
+} stop

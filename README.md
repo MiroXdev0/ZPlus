@@ -6,7 +6,7 @@
 
 Z+ is a small compiled language with a lexer, parser, semantic analyzer, shared intermediate representation, interpreter, and an x86-64 native backend.
 
-The current compiler release is **1.1.6 Stable**. The Windows x64 per-user
+The current compiler release is **1.2.0 Stable**. The Windows x64 per-user
 installer and release build instructions are documented in
 [installer/inno/README.md](./installer/inno/README.md).
 
@@ -47,6 +47,13 @@ The generic `length(array)` and numeric `to_string(number)` built-ins are
 available without imports. The interpreter supports them directly; Windows
 x64 native programs support both through the packaged runtime. See the
 [built-in function reference](./SYNTAX.md#10-built-in-functions).
+
+Z+ 1.2.0 supports generic functions, structs, and classes with inferred or
+explicit type arguments. Concrete specializations are generated for both the
+interpreter IR and Windows x64 native backend. The `zcollections` module
+provides generic `List`, `Stack`, `Queue`, `Set`, `Map`, and `Optional` types;
+see [the syntax reference](./SYNTAX.md#generic-declarations-and-types) and
+[standard-library documentation](./stdlib/README.md#zcollections-as-collections).
 
 ## Modules
 

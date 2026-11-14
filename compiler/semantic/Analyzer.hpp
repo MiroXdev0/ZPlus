@@ -1,10 +1,13 @@
 #pragma once
 
+#include "../Diagnostic.hpp"
 #include "../parser/AST.hpp"
+#include "BuiltinRegistry.hpp"
 #include "Type.hpp"
 
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -43,25 +46,7 @@ struct Symbol {
 // Semantic error
 // ============================================================
 
-struct SemanticError {
-
-    std::string message;
-    std::string sourceFile;
-    std::size_t line = 0;
-    std::size_t column = 0;
-
-    SemanticError(
-        const std::string& message,
-        const std::string& sourceFile,
-        std::size_t line,
-        std::size_t column
-    )
-        : message(message),
-          sourceFile(sourceFile),
-          line(line),
-          column(column) {
-    }
-};
+using SemanticError = zplus::Diagnostic;
 
 // ============================================================
 // Analyzer
@@ -103,6 +88,10 @@ public:
         return !errors_.empty();
     }
 
+    const BuiltinRegistry& builtinRegistry() const noexcept {
+        return builtinRegistry_;
+    }
+
 
 private:
 
@@ -142,12 +131,14 @@ private:
 
     void error(
         const zplus::ast::Node& node,
-        const std::string& message
+        const std::string& message,
+        zplus::DiagnosticCategory category = zplus::DiagnosticCategory::Semantic
     );
 
     void error(
         const zplus::ast::Location& location,
-        const std::string& message
+        const std::string& message,
+        zplus::DiagnosticCategory category = zplus::DiagnosticCategory::Semantic
     );
 
     void warning(
@@ -194,6 +185,17 @@ private:
     Type resolveType(
         const zplus::ast::Type& type
     );
+
+    void pushGenericTypeParameters(
+        const std::vector<zplus::ast::GenericParameter>& parameters,
+        const std::string& owner
+    );
+
+    void popGenericTypeParameters();
+
+    std::vector<GenericTypeParameter> activeGenericTypeParameters() const;
+
+    const Type* findGenericTypeParameter(const std::string& name) const;
 
 
     // ========================================================
@@ -402,6 +404,8 @@ private:
         >;
 
     std::vector<Scope> scopes_;
+    std::vector<std::unordered_map<std::string, Type>> genericTypeScopes_;
+    std::vector<std::vector<GenericTypeParameter>> genericParameterScopes_;
 
 
     // ========================================================
@@ -434,6 +438,7 @@ private:
 
     std::vector<SemanticError> errors_;
     std::vector<SemanticError> warnings_;
+    BuiltinRegistry builtinRegistry_;
 
 
     // ========================================================
@@ -457,6 +462,7 @@ private:
     std::size_t nextBindingId_ = 0;
 
     std::string currentModuleName_;
+    std::optional<Type> expectedExpressionType_;
 };
 
 } // namespace zplus::semantic

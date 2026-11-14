@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This reference describes the language accepted by the Z+ 1.1.6 command-line compiler in this repository. It follows the lexer, parser, semantic analyzer, IR builder, and interpreter—not proposed or aspirational features.
+This reference describes the language accepted by the Z+ 1.2.0 command-line compiler in this repository. It follows the lexer, parser, semantic analyzer, IR builder, and interpreter—not proposed or aspirational features.
 
 The status labels used below mean:
 
@@ -296,6 +296,48 @@ start {
 
 Default expressions are type-checked and evaluated only when their trailing argument is omitted. They are evaluated in parameter order and may refer to earlier parameters. Parameters without defaults cannot follow parameters with defaults. The interpreter and native backend receive the completed argument list, so both execution paths use the same defaults. **Default arguments: implemented.**
 
+### Generic declarations and types
+
+Functions, structs, and classes may declare type parameters. A parameter can
+appear in nested parameter, return, and field types. Type arguments are
+inferred from function arguments and record constructor arguments where
+possible, or supplied explicitly with `<...>`:
+
+```zp
+start {
+    fn identity<T>(value: T) -> T {
+        return value
+    } end fn
+
+    struct Box<T> {
+        value: T
+    } end struct
+
+    fn unbox<T>(box: Box<T>) -> T {
+        return box.value
+    } end fn
+
+    let text = identity("inferred")
+    let number = identity<number>(42)
+    let box = Box<number>(number)
+    say(text)
+    say(unbox(box))
+} stop
+```
+
+Generic parameter constraints currently support `number` and `equatable`,
+written as `T: number` or `T: equatable`. Arguments and nested generic types
+are checked structurally; unresolved or conflicting type parameters are
+diagnosed. Generic class methods may use class and method type parameters.
+Each concrete use is specialized before IR verification, interpreter
+execution, or native code generation. Expanding recursive specialization is
+rejected instead of generating an unbounded set of implementations.
+
+The interpreter and Windows x64 native backend support these specializations.
+Generic inheritance, user-defined constraints/traits, and generic type
+inference across arbitrary function-value contexts are not implemented.
+**Generic functions, structs, and classes: implemented.**
+
 ## 7. Control Flow
 
 Conditions for `if`, `while`, and C-style `for` must be boolean (or have `unknown` type). Parentheses around a condition are optional. Braces and explicit terminators are the official block form:
@@ -587,6 +629,11 @@ start {
 ```
 
 `printm` behaves exactly like `printz` and produces a compiler deprecation warning recommending `printz`. `printz` does not produce a warning. Array programs also have `length(array)`, `push(array, value)`, `pop(array)`, `clear(array)`, `insert(array, index, value)`, `remove(array, index)`, and `contains(array, value)` as described above.
+
+The compiler represents generic array element types internally for built-in
+signatures such as `length(array)`. This does not add user-declared generic
+functions or generic type syntax. `to_string(value)` accepts `number` and
+returns a `string`; other argument types are rejected during semantic analysis.
 
 ## 11. Comments and Formatting
 

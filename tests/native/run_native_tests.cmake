@@ -355,6 +355,10 @@ run_check_failure(
     dynamic_array_invalid_index_type
     "insert index must be a number"
 )
+run_native_build_error(
+    interpreter_only_builtin
+    "available only in the interpreter"
+)
 
 if(HOST_WINDOWS)
     if(NOT DEFINED GRAPHICS_RUNTIME OR NOT EXISTS "${GRAPHICS_RUNTIME}")

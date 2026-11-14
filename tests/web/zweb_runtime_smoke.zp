@@ -1,0 +1,39 @@
+use zweb as web
+
+start {
+    let encoded = web.urlEncode("a b/c")
+    if encoded != "a%20b%2Fc" {
+        say("url-encode-failed")
+    } end if
+    say(web.urlDecode(encoded))
+
+    let parsed = web.parseUrl("https://example.test:8443/users?q=one#top")
+    say(web.jsonGetString(parsed, "/host"))
+    say(web.jsonGetString(parsed, "/path"))
+    say(web.jsonGetString(parsed, "/query"))
+    say(web.buildUrl("https", "example.test", "443", "/users", "q=one", ""))
+
+    let form = web.parseForm("name=Jane+Doe&tag=one&tag=two&first%2Fname=yes")
+    say(web.formValue(form, "name"))
+    say(web.formValue(form, "first/name"))
+    say(web.jsonArrayLength(form, "/tag"))
+
+    let cookies = web.parseCookies("session=a%20b; theme=dark")
+    say(web.cookieValue(cookies, "session"))
+    say(web.cookieHeader("session", "a b", 3600, "/", "", true, true, "Lax"))
+
+    let routes = web.routeAdd("[]", "GET", "/users/{id}", "showUser")
+    let grouped = web.routeGroup("/v1", routes)
+    let match = web.routeMatch(grouped, "GET", "/v1/users/42")
+    say(web.jsonGetString(match, "/handler"))
+    say(web.jsonGetString(match, "/params/id"))
+    let wrongMethod = web.routeMatch(grouped, "POST", "/v1/users/42")
+    say(web.jsonGetNumber(wrongMethod, "/status"))
+    let missing = web.routeMatch(grouped, "GET", "/missing")
+    say(web.jsonGetNumber(missing, "/status"))
+
+    let secured = web.securityHeaders("{\"content-type\":\"text/plain\"}")
+    say(web.jsonGetString(secured, "/x-content-type-options"))
+    say(web.mimeType("site.css"))
+    say(web.jsonGetString("{\"status\":201,\"body\":\"created\"}", "/body"))
+} stop

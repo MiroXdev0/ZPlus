@@ -1,0 +1,35 @@
+use zcollections as collections
+
+start {
+    let list = List<number>([])
+    list.add(3)
+    list.add(8)
+    say(list.size())
+    say(list.get(1))
+
+    let stack = Stack<string>([])
+    stack.push("first")
+    stack.push("last")
+    say(stack.pop())
+
+    let queue = Queue<number>([])
+    queue.enqueue(4)
+    queue.enqueue(6)
+    say(queue.dequeue())
+
+    let set = Set<string>([])
+    set.add("one")
+    set.add("one")
+    say(set.size())
+    say(set.contains("one"))
+    say(set.remove("one"))
+
+    let map = Map<string, number>([], [])
+    map.set("answer", 42)
+    let present = map.get("answer")
+    say(present.isSome())
+    say(present.unwrap())
+    say(map.get("missing").unwrapOr(7))
+    say(map.remove("answer").unwrap())
+    say(map.size())
+} stop

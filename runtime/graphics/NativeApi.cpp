@@ -9,6 +9,7 @@
 #include "../StandardLibrary.hpp"
 #include "../Json.hpp"
 #include "../Http.hpp"
+#include "../Web.hpp"
 #include "../SQLite.hpp"
 #include "../NumericFormat.hpp"
 #include "../installer/Platform.hpp"
@@ -1119,6 +1120,479 @@ ZPLUS_GRAPHICS_API const char* zpg_http_clientRequest(
             checkedText(body, "body"),
             checkedNativeInteger(
                 decodeNativeNumber(timeoutMilliseconds), "HTTP timeout")));
+    });
+}
+
+ZPLUS_GRAPHICS_API std::int64_t zpg_http_serverRespondBinary(
+    std::int64_t handle,
+    std::int64_t requestId,
+    std::int64_t status,
+    const char* headersJson,
+    const char* bodyBase64
+) noexcept {
+    return guard<std::int64_t>([&] {
+        return zplus::http::respondBinary(
+            handle,
+            checkedNativeInteger(decodeNativeNumber(requestId), "HTTP request ID"),
+            checkedNativeInteger(decodeNativeNumber(status), "HTTP response status"),
+            checkedText(headersJson, "headers"),
+            checkedText(bodyBase64, "base64 response body")) ? 1 : 0;
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_http_clientRequestBinary(
+    const char* method,
+    const char* url,
+    const char* headersJson,
+    const char* bodyBase64,
+    std::int64_t timeoutMilliseconds
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::http::clientRequestBinary(
+            checkedText(method, "method"),
+            checkedText(url, "url"),
+            checkedText(headersJson, "headers"),
+            checkedText(bodyBase64, "base64 request body"),
+            checkedNativeInteger(
+                decodeNativeNumber(timeoutMilliseconds), "HTTP timeout")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_urlEncode(const char* value) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::urlEncode(checkedText(value, "value")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_urlDecode(const char* value) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::urlDecode(checkedText(value, "value")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_parseUrl(const char* value) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::parseUrl(checkedText(value, "URL")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_buildUrl(
+    const char* scheme, const char* host, const char* port,
+    const char* path, const char* query, const char* fragment
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::buildUrl(
+            checkedText(scheme, "scheme"), checkedText(host, "host"),
+            checkedText(port, "port"), checkedText(path, "path"),
+            checkedText(query, "query"), checkedText(fragment, "fragment")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_parseForm(const char* value) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::parseForm(checkedText(value, "form")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_parseCookies(const char* value) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::parseCookies(
+            checkedText(value, "Cookie header")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_cookieHeader(
+    const char* name, const char* value, std::int64_t maxAge,
+    const char* path, const char* domain, std::int64_t secure,
+    std::int64_t httpOnly, const char* sameSite
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::cookieHeader(
+            checkedText(name, "cookie name"), checkedText(value, "cookie value"),
+            checkedNativeInteger(decodeNativeNumber(maxAge), "cookie Max-Age"),
+            checkedText(path, "cookie path"), checkedText(domain, "cookie domain"),
+            secure != 0, httpOnly != 0, checkedText(sameSite, "SameSite")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_securityHeaders(const char* value) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::securityHeaders(
+            checkedText(value, "headers")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_routeAdd(
+    const char* routes, const char* method, const char* pattern, const char* handler
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::routeAdd(
+            checkedText(routes, "routes"), checkedText(method, "method"),
+            checkedText(pattern, "pattern"), checkedText(handler, "handler")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_routeGroup(
+    const char* prefix, const char* routes
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::routeGroup(
+            checkedText(prefix, "prefix"), checkedText(routes, "routes")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_routeMatch(
+    const char* routes, const char* method, const char* path
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::routeMatch(
+            checkedText(routes, "routes"), checkedText(method, "method"),
+            checkedText(path, "path")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_mimeType(const char* path) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::mimeType(checkedText(path, "path")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_staticFile(
+    const char* root, const char* path, std::int64_t maximumBytes
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::staticFile(
+            checkedText(root, "root"), checkedText(path, "path"),
+            checkedNativeInteger(decodeNativeNumber(maximumBytes), "static file size limit")));
+    });
+}
+
+ZPLUS_GRAPHICS_API std::int64_t zpg_web_respondFile(
+    std::int64_t serverHandle,
+    std::int64_t requestId,
+    std::int64_t status,
+    const char* headersJson,
+    const char* root,
+    const char* path,
+    std::int64_t maximumBytes
+) noexcept {
+    return guard<std::int64_t>([&] {
+        return zplus::web::respondFile(
+            serverHandle,
+            checkedNativeInteger(decodeNativeNumber(requestId), "HTTP request ID"),
+            checkedNativeInteger(decodeNativeNumber(status), "HTTP response status"),
+            checkedText(headersJson, "headers"),
+            checkedText(root, "root"),
+            checkedText(path, "path"),
+            checkedNativeInteger(decodeNativeNumber(maximumBytes), "static file size limit"));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_cookieHeaderExpires(
+    const char* name, const char* value, std::int64_t maxAge,
+    const char* expires, const char* path, const char* domain,
+    std::int64_t secure, std::int64_t httpOnly, const char* sameSite
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::cookieHeaderExpires(
+            checkedText(name, "cookie name"), checkedText(value, "cookie value"),
+            checkedNativeInteger(decodeNativeNumber(maxAge), "cookie Max-Age"),
+            checkedText(expires, "cookie expiration"), checkedText(path, "cookie path"),
+            checkedText(domain, "cookie domain"), secure != 0, httpOnly != 0,
+            checkedText(sameSite, "SameSite")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_routeAddConfigured(
+    const char* routes, const char* method, const char* pattern,
+    const char* handler, const char* name, const char* configuration
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::routeAddConfigured(
+            checkedText(routes, "routes"), checkedText(method, "method"),
+            checkedText(pattern, "pattern"), checkedText(handler, "handler"),
+            checkedText(name, "route name"), checkedText(configuration, "route configuration")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_routeUrl(
+    const char* routes, const char* name, const char* parameters
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::routeUrl(
+            checkedText(routes, "routes"), checkedText(name, "route name"),
+            checkedText(parameters, "route parameters")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_response(
+    std::int64_t status, const char* headers, const char* body
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::response(
+            checkedNativeInteger(decodeNativeNumber(status), "HTTP status"),
+            checkedText(headers, "headers"), checkedText(body, "response body")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_jsonResponse(
+    std::int64_t status, const char* headers, const char* bodyJson
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::jsonResponse(
+            checkedNativeInteger(decodeNativeNumber(status), "HTTP status"),
+            checkedText(headers, "headers"), checkedText(bodyJson, "JSON response body")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_parseJsonBody(const char* request) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::parseJsonBody(
+            checkedText(request, "request")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_notFoundResponse(const char* body) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::notFoundResponse(
+            checkedText(body, "not-found response body")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_methodNotAllowedResponse(
+    const char* allow, const char* body
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::methodNotAllowedResponse(
+            checkedText(allow, "Allow header"), checkedText(body, "response body")));
+    });
+}
+
+ZPLUS_GRAPHICS_API std::int64_t zpg_web_respondStatic(
+    std::int64_t serverHandle,
+    std::int64_t requestId,
+    std::int64_t status,
+    const char* headers,
+    const char* root,
+    const char* path,
+    const char* indexFile,
+    std::int64_t maximumBytes,
+    const char* cacheControl
+) noexcept {
+    return guard<std::int64_t>([&] {
+        return zplus::web::respondStatic(
+            serverHandle,
+            checkedNativeInteger(decodeNativeNumber(requestId), "HTTP request ID"),
+            checkedNativeInteger(decodeNativeNumber(status), "HTTP response status"),
+            checkedText(headers, "headers"), checkedText(root, "document root"),
+            checkedText(path, "static path"), checkedText(indexFile, "index file"),
+            checkedNativeInteger(decodeNativeNumber(maximumBytes), "static file size limit"),
+            checkedText(cacheControl, "Cache-Control")) ? 1 : 0;
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_parseMultipart(
+    const char* request, std::int64_t maximumBytes
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::parseMultipart(
+            checkedText(request, "request"),
+            checkedNativeInteger(decodeNativeNumber(maximumBytes), "multipart size limit")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_saveUpload(
+    const char* multipart, std::int64_t index,
+    const char* root, const char* destination, std::int64_t maximumBytes
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::saveUpload(
+            checkedText(multipart, "multipart data"),
+            checkedNativeInteger(decodeNativeNumber(index), "upload index"),
+            checkedText(root, "upload root"), checkedText(destination, "upload destination"),
+            checkedNativeInteger(decodeNativeNumber(maximumBytes), "upload size limit")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_validateForm(
+    const char* form, const char* rules
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::validateForm(
+            checkedText(form, "form"), checkedText(rules, "validation rules")));
+    });
+}
+
+ZPLUS_GRAPHICS_API std::int64_t zpg_web_formHas(
+    const char* form, const char* name
+) noexcept {
+    return guard<std::int64_t>([&] {
+        return zplus::web::formHas(
+            checkedText(form, "form"), checkedText(name, "field name")) ? 1 : 0;
+    });
+}
+
+ZPLUS_GRAPHICS_API std::int64_t zpg_web_formNumber(
+    const char* form, const char* name
+) noexcept {
+    return guard<std::int64_t>([&] {
+        return encodeNativeNumber(zplus::web::formNumber(
+            checkedText(form, "form"), checkedText(name, "field name")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_loadTemplate(
+    const char* root, const char* path, std::int64_t maximumBytes
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::loadTemplate(
+            checkedText(root, "template root"), checkedText(path, "template path"),
+            checkedNativeInteger(decodeNativeNumber(maximumBytes), "template size limit")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_renderTemplate(
+    const char* source, const char* context
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::renderTemplate(
+            checkedText(source, "template source"), checkedText(context, "template context")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_middlewareUse(
+    const char* pipeline, const char* name, const char* options
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::middlewareUse(
+            checkedText(pipeline, "middleware pipeline"),
+            checkedText(name, "middleware name"), checkedText(options, "middleware options")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_middlewareBefore(
+    const char* pipeline, const char* request
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::middlewareBefore(
+            checkedText(pipeline, "middleware pipeline"), checkedText(request, "request")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_middlewareAfter(
+    const char* pipeline, const char* request, const char* response
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::middlewareAfter(
+            checkedText(pipeline, "middleware pipeline"), checkedText(request, "request"),
+            checkedText(response, "response")));
+    });
+}
+
+ZPLUS_GRAPHICS_API std::int64_t zpg_web_sessionStoreCreate() noexcept {
+    return guard<std::int64_t>([&] {
+        return encodeNativeNumber(static_cast<double>(zplus::web::sessionStoreCreate()));
+    });
+}
+
+ZPLUS_GRAPHICS_API std::int64_t zpg_web_sessionStoreClose(std::int64_t handle) noexcept {
+    return guardVoid([&] {
+        zplus::web::sessionStoreClose(
+            checkedNativeInteger(decodeNativeNumber(handle), "session store handle"));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_sessionCreate(
+    std::int64_t handle, std::int64_t lifetimeSeconds
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::sessionCreate(
+            checkedNativeInteger(decodeNativeNumber(handle), "session store handle"),
+            checkedNativeInteger(decodeNativeNumber(lifetimeSeconds), "session lifetime")));
+    });
+}
+
+ZPLUS_GRAPHICS_API std::int64_t zpg_web_sessionSet(
+    std::int64_t handle, const char* id, const char* key, const char* value
+) noexcept {
+    return guard<std::int64_t>([&] {
+        return zplus::web::sessionSet(
+            checkedNativeInteger(decodeNativeNumber(handle), "session store handle"),
+            checkedText(id, "session ID"), checkedText(key, "session key"),
+            checkedText(value, "session value")) ? 1 : 0;
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_sessionGet(
+    std::int64_t handle, const char* id, const char* key
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::sessionGet(
+            checkedNativeInteger(decodeNativeNumber(handle), "session store handle"),
+            checkedText(id, "session ID"), checkedText(key, "session key")));
+    });
+}
+
+ZPLUS_GRAPHICS_API std::int64_t zpg_web_sessionHas(
+    std::int64_t handle, const char* id, const char* key
+) noexcept {
+    return guard<std::int64_t>([&] {
+        return zplus::web::sessionHas(
+            checkedNativeInteger(decodeNativeNumber(handle), "session store handle"),
+            checkedText(id, "session ID"), checkedText(key, "session key")) ? 1 : 0;
+    });
+}
+
+ZPLUS_GRAPHICS_API std::int64_t zpg_web_sessionInvalidate(
+    std::int64_t handle, const char* id
+) noexcept {
+    return guard<std::int64_t>([&] {
+        return zplus::web::sessionInvalidate(
+            checkedNativeInteger(decodeNativeNumber(handle), "session store handle"),
+            checkedText(id, "session ID")) ? 1 : 0;
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_sessionRotate(
+    std::int64_t handle, const char* id, std::int64_t lifetimeSeconds
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::sessionRotate(
+            checkedNativeInteger(decodeNativeNumber(handle), "session store handle"),
+            checkedText(id, "session ID"),
+            checkedNativeInteger(decodeNativeNumber(lifetimeSeconds), "session lifetime")));
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_sessionCsrfToken(
+    std::int64_t handle, const char* id
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::sessionCsrfToken(
+            checkedNativeInteger(decodeNativeNumber(handle), "session store handle"),
+            checkedText(id, "session ID")));
+    });
+}
+
+ZPLUS_GRAPHICS_API std::int64_t zpg_web_sessionValidateCsrf(
+    std::int64_t handle, const char* id, const char* token
+) noexcept {
+    return guard<std::int64_t>([&] {
+        return zplus::web::sessionValidateCsrf(
+            checkedNativeInteger(decodeNativeNumber(handle), "session store handle"),
+            checkedText(id, "session ID"), checkedText(token, "CSRF token")) ? 1 : 0;
+    });
+}
+
+ZPLUS_GRAPHICS_API const char* zpg_web_sessionCookie(
+    const char* name, const char* id, std::int64_t lifetimeSeconds,
+    std::int64_t secure, const char* sameSite
+) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(zplus::web::sessionCookie(
+            checkedText(name, "cookie name"), checkedText(id, "session ID"),
+            checkedNativeInteger(decodeNativeNumber(lifetimeSeconds), "session lifetime"),
+            secure != 0, checkedText(sameSite, "SameSite")));
     });
 }
 

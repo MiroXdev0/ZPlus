@@ -1,0 +1,22 @@
+start {
+    struct Box<T> {
+        value: T
+    } end struct
+
+    fn same<T>(left: T, right: T) -> T {
+        return left
+    } end fn
+
+    fn numeric<T: number>(left: T, right: T) -> T {
+        return left + right
+    } end fn
+
+    fn unresolved<T>() -> number {
+        return 1
+    } end fn
+
+    let conflict = same(1, "wrong")
+    let constraint = numeric<string>("wrong", "types")
+    let missing = unresolved()
+    let badConstructor = Box<number>("wrong")
+} stop

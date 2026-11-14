@@ -1,0 +1,76 @@
+start {
+    fn identity<T>(value: T) -> T {
+        return value
+    } end fn
+
+    fn keep<A, B>(first: A, second: B) -> A {
+        return identity(first)
+    } end fn
+
+    fn second<A, B>(first: A, value: B) -> B {
+        return value
+    } end fn
+
+    fn withDefault<T>(value: T, ignored: number = 1) -> T {
+        return value
+    } end fn
+
+    fn add<T: number>(left: T, right: T) -> T {
+        return left + right
+    } end fn
+
+    struct Box<T> {
+        value: T
+    } end struct
+
+    fn unbox<T>(box: Box<T>) -> T {
+        return box.value
+    } end fn
+
+    fn deepest<T>(box: Box<Box<T>>) -> T {
+        return box.value.value
+    } end fn
+
+    fn wrap<T>(value: T) -> Box<T> {
+        return Box(value)
+    } end fn
+
+    fn popOne<T>(items: T[]) -> T {
+        return pop(items)
+    } end fn
+
+    class Cell<T> {
+        value: T
+
+        fn get() -> T {
+            return this.value
+        } end fn
+
+        fn passthrough<U>(other: U) -> U {
+            return other
+        } end fn
+    } end class
+
+    let explicit = identity<number>(42)
+    let inferred = keep("ready", 7)
+    let different = second("ignored", true)
+    let defaulted = withDefault("default")
+    let total = add(10, 11)
+    let box = Box<number>(explicit)
+    let inferredBox = Box(51)
+    let wrapped = wrap(62)
+    let popped = popOne([14])
+    let nested = Box<Box<number>>(Box<number>(box.value))
+    let cell = Cell<string>("class")
+    say(inferred)
+    say(different)
+    say(defaulted)
+    say(total)
+    say(popped)
+    say(nested.value.value)
+    say(deepest(nested))
+    say(unbox(inferredBox))
+    say(wrapped.value)
+    say(cell.get())
+    say(cell.passthrough<number>(9))
+} stop

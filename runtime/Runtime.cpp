@@ -2,6 +2,7 @@
 
 #include "../compiler/NumericLiteral.hpp"
 #include "../compiler/ir/IR.hpp"
+#include "../compiler/ir/IRVerifier.hpp"
 #include "Input.hpp"
 #include "NumericFormat.hpp"
 #include "../ZGraphics/ZGraphics.hpp"
@@ -10,6 +11,7 @@
 #include "StandardLibrary.hpp"
 #include "Json.hpp"
 #include "Http.hpp"
+#include "Web.hpp"
 #include "SQLite.hpp"
 #include "installer/Platform.hpp"
 
@@ -1473,6 +1475,11 @@ static RuntimeValue executeStandardLibraryBuiltin(
             return zplus::http::respond(
                 integer(0), integer(1), integer(2), text(3), text(4));
         }
+        if (name == "serverRespondBinary") {
+            if (count != 5) failArity();
+            return zplus::http::respondBinary(
+                integer(0), integer(1), integer(2), text(3), text(4));
+        }
         if (name == "serverConfigure") {
             if (count != 3) failArity();
             zplus::http::configureServer(integer(0), integer(1), integer(2));
@@ -1504,7 +1511,214 @@ static RuntimeValue executeStandardLibraryBuiltin(
             return managedHeap().makeString(zplus::http::clientRequest(
                 text(0), text(1), text(2), text(3), integer(4)));
         }
+        if (name == "clientRequestBinary") {
+            if (count != 5) failArity();
+            return managedHeap().makeString(zplus::http::clientRequestBinary(
+                text(0), text(1), text(2), text(3), integer(4)));
+        }
         throw std::invalid_argument("unknown HTTP operation '" + name + "'");
+    }
+    const std::string webPrefix = "__zweb_";
+    if (callee.rfind(webPrefix, 0) == 0) {
+        const std::string name = callee.substr(webPrefix.size());
+        if (name == "urlEncode" || name == "urlDecode" || name == "parseUrl" ||
+            name == "parseForm" || name == "parseCookies" || name == "securityHeaders" ||
+            name == "mimeType") {
+            if (count != 1) failArity();
+            if (name == "urlEncode") return managedHeap().makeString(
+                zplus::web::urlEncode(text(0)));
+            if (name == "urlDecode") return managedHeap().makeString(
+                zplus::web::urlDecode(text(0)));
+            if (name == "parseUrl") return managedHeap().makeString(
+                zplus::web::parseUrl(text(0)));
+            if (name == "parseForm") return managedHeap().makeString(
+                zplus::web::parseForm(text(0)));
+            if (name == "parseCookies") return managedHeap().makeString(
+                zplus::web::parseCookies(text(0)));
+            if (name == "securityHeaders") return managedHeap().makeString(
+                zplus::web::securityHeaders(text(0)));
+            return managedHeap().makeString(zplus::web::mimeType(text(0)));
+        }
+        if (name == "buildUrl") {
+            if (count != 6) failArity();
+            return managedHeap().makeString(zplus::web::buildUrl(
+                text(0), text(1), text(2), text(3), text(4), text(5)));
+        }
+        if (name == "cookieHeader") {
+            if (count != 8) failArity();
+            return managedHeap().makeString(zplus::web::cookieHeader(
+                text(0), text(1), integer(2), text(3), text(4),
+                toBool(value(5)), toBool(value(6)), text(7)));
+        }
+        if (name == "cookieHeaderExpires") {
+            if (count != 9) failArity();
+            return managedHeap().makeString(zplus::web::cookieHeaderExpires(
+                text(0), text(1), integer(2), text(3), text(4), text(5),
+                toBool(value(6)), toBool(value(7)), text(8)));
+        }
+        if (name == "routeAdd") {
+            if (count != 4) failArity();
+            return managedHeap().makeString(zplus::web::routeAdd(
+                text(0), text(1), text(2), text(3)));
+        }
+        if (name == "routeGroup") {
+            if (count != 2) failArity();
+            return managedHeap().makeString(zplus::web::routeGroup(
+                text(0), text(1)));
+        }
+        if (name == "routeMatch") {
+            if (count != 3) failArity();
+            return managedHeap().makeString(zplus::web::routeMatch(
+                text(0), text(1), text(2)));
+        }
+        if (name == "routeAddConfigured") {
+            if (count != 6) failArity();
+            return managedHeap().makeString(zplus::web::routeAddConfigured(
+                text(0), text(1), text(2), text(3), text(4), text(5)));
+        }
+        if (name == "routeUrl") {
+            if (count != 3) failArity();
+            return managedHeap().makeString(zplus::web::routeUrl(
+                text(0), text(1), text(2)));
+        }
+        if (name == "response" || name == "jsonResponse") {
+            if (count != 3) failArity();
+            return managedHeap().makeString(name == "response"
+                ? zplus::web::response(integer(0), text(1), text(2))
+                : zplus::web::jsonResponse(integer(0), text(1), text(2)));
+        }
+        if (name == "parseJsonBody") {
+            if (count != 1) failArity();
+            return managedHeap().makeString(zplus::web::parseJsonBody(text(0)));
+        }
+        if (name == "notFoundResponse") {
+            if (count != 1) failArity();
+            return managedHeap().makeString(zplus::web::notFoundResponse(text(0)));
+        }
+        if (name == "methodNotAllowedResponse") {
+            if (count != 2) failArity();
+            return managedHeap().makeString(zplus::web::methodNotAllowedResponse(
+                text(0), text(1)));
+        }
+        if (name == "staticFile") {
+            if (count != 3) failArity();
+            return managedHeap().makeString(zplus::web::staticFile(
+                text(0), text(1), integer(2)));
+        }
+        if (name == "respondFile") {
+            if (count != 7) failArity();
+            return zplus::web::respondFile(
+                integer(0), integer(1), integer(2), text(3),
+                text(4), text(5), integer(6));
+        }
+        if (name == "respondStatic") {
+            if (count != 9) failArity();
+            return zplus::web::respondStatic(
+                integer(0), integer(1), integer(2), text(3), text(4),
+                text(5), text(6), integer(7), text(8));
+        }
+        if (name == "parseMultipart") {
+            if (count != 2) failArity();
+            return managedHeap().makeString(zplus::web::parseMultipart(
+                text(0), integer(1)));
+        }
+        if (name == "saveUpload") {
+            if (count != 5) failArity();
+            return managedHeap().makeString(zplus::web::saveUpload(
+                text(0), integer(1), text(2), text(3), integer(4)));
+        }
+        if (name == "validateForm") {
+            if (count != 2) failArity();
+            return managedHeap().makeString(zplus::web::validateForm(
+                text(0), text(1)));
+        }
+        if (name == "formHas") {
+            if (count != 2) failArity();
+            return zplus::web::formHas(text(0), text(1));
+        }
+        if (name == "formNumber") {
+            if (count != 2) failArity();
+            return zplus::web::formNumber(text(0), text(1));
+        }
+        if (name == "loadTemplate") {
+            if (count != 3) failArity();
+            return managedHeap().makeString(zplus::web::loadTemplate(
+                text(0), text(1), integer(2)));
+        }
+        if (name == "renderTemplate") {
+            if (count != 2) failArity();
+            return managedHeap().makeString(zplus::web::renderTemplate(
+                text(0), text(1)));
+        }
+        if (name == "middlewareUse") {
+            if (count != 3) failArity();
+            return managedHeap().makeString(zplus::web::middlewareUse(
+                text(0), text(1), text(2)));
+        }
+        if (name == "middlewareBefore") {
+            if (count != 2) failArity();
+            return managedHeap().makeString(zplus::web::middlewareBefore(
+                text(0), text(1)));
+        }
+        if (name == "middlewareAfter") {
+            if (count != 3) failArity();
+            return managedHeap().makeString(zplus::web::middlewareAfter(
+                text(0), text(1), text(2)));
+        }
+        if (name == "sessionStoreCreate") {
+            if (count != 0) failArity();
+            return static_cast<double>(zplus::web::sessionStoreCreate());
+        }
+        if (name == "sessionStoreClose") {
+            if (count != 1) failArity();
+            zplus::web::sessionStoreClose(integer(0));
+            return 0.0;
+        }
+        if (name == "sessionCreate") {
+            if (count != 2) failArity();
+            return managedHeap().makeString(zplus::web::sessionCreate(
+                integer(0), integer(1)));
+        }
+        if (name == "sessionSet") {
+            if (count != 4) failArity();
+            return zplus::web::sessionSet(
+                integer(0), text(1), text(2), text(3));
+        }
+        if (name == "sessionGet") {
+            if (count != 3) failArity();
+            return managedHeap().makeString(zplus::web::sessionGet(
+                integer(0), text(1), text(2)));
+        }
+        if (name == "sessionHas") {
+            if (count != 3) failArity();
+            return zplus::web::sessionHas(
+                integer(0), text(1), text(2));
+        }
+        if (name == "sessionInvalidate") {
+            if (count != 2) failArity();
+            return zplus::web::sessionInvalidate(integer(0), text(1));
+        }
+        if (name == "sessionRotate") {
+            if (count != 3) failArity();
+            return managedHeap().makeString(zplus::web::sessionRotate(
+                integer(0), text(1), integer(2)));
+        }
+        if (name == "sessionCsrfToken") {
+            if (count != 2) failArity();
+            return managedHeap().makeString(zplus::web::sessionCsrfToken(
+                integer(0), text(1)));
+        }
+        if (name == "sessionValidateCsrf") {
+            if (count != 3) failArity();
+            return zplus::web::sessionValidateCsrf(
+                integer(0), text(1), text(2));
+        }
+        if (name == "sessionCookie") {
+            if (count != 5) failArity();
+            return managedHeap().makeString(zplus::web::sessionCookie(
+                text(0), text(1), integer(2), toBool(value(3)), text(4)));
+        }
+        throw std::invalid_argument("unknown ZWeb operation '" + name + "'");
     }
     const std::string sqlitePrefix = "__zsqlite_";
     if (callee.rfind(sqlitePrefix, 0) == 0) {
@@ -2268,6 +2482,23 @@ static RuntimeValue executeCall(
         callee = &dynamicCallee;
     }
 
+    if (!function) {
+        if (const auto* builtin = module.builtinRegistry.find(*callee)) {
+            if (!builtin->interpreterAvailable) {
+                throw std::runtime_error(
+                    "builtin '" + *callee + "' is unavailable in the interpreter");
+            }
+            const std::size_t argumentCount = instruction.operands.size() - 1;
+            const std::size_t parameterCount =
+                builtin->signature.parameters.size();
+            if (argumentCount < builtin->minimumArgumentCount() ||
+                (!builtin->variadic && argumentCount > parameterCount)) {
+                throw std::runtime_error(
+                    "invalid IR call to builtin '" + *callee + "'");
+            }
+        }
+    }
+
     if (!function && callee->rfind("__zgraphics_", 0) == 0) {
         return executeGraphicsBuiltin(*callee, instruction, environment);
     }
@@ -2287,6 +2518,9 @@ static RuntimeValue executeCall(
         return executeStandardLibraryBuiltin(*callee, instruction, environment);
     }
     if (!function && callee->rfind("__zhttp_", 0) == 0) {
+        return executeStandardLibraryBuiltin(*callee, instruction, environment);
+    }
+    if (!function && callee->rfind("__zweb_", 0) == 0) {
         return executeStandardLibraryBuiltin(*callee, instruction, environment);
     }
     if (!function && callee->rfind("__zsqlite_", 0) == 0) {
@@ -4352,6 +4586,12 @@ int Runtime::execute(
     const zplus::ir::Module& module,
     const std::vector<std::string>& arguments
 ) {
+    const auto diagnostics = zplus::ir::verifyModule(module);
+    if (!diagnostics.empty()) {
+        const auto& diagnostic = diagnostics.front();
+        throw std::runtime_error(
+            "invalid IR (" + diagnostic.code + "): " + diagnostic.message);
+    }
 
     RuntimeContextScope context;
     runtimeFrames.clear();

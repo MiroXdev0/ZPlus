@@ -1,0 +1,116 @@
+use zweb as web
+
+start {
+    let routes = "[]"
+    routes = web.routeAdd(routes, "GET", "/health", "health")
+    routes = web.routeAdd(routes, "GET", "/users/{id}", "user")
+    routes = web.routeAdd(routes, "POST", "/echo", "echo")
+    routes = web.routeAdd(routes, "POST", "/form", "form")
+    routes = web.routeAdd(routes, "POST", "/login", "login")
+    routes = web.routeAdd(routes, "POST", "/upload", "upload")
+    routes = web.routeAdd(routes, "GET", "/static", "static")
+    routes = web.routeAdd(routes, "GET", "/template", "template")
+    routes = web.routeAdd(routes, "POST", "/__stop", "stop")
+    routes = web.routeGroup("/v1", routes)
+
+    let middleware = "[]"
+    middleware = web.middlewareUse(middleware, "maxBodyBytes", "{\"bytes\":8388608}")
+    middleware = web.middlewareUse(middleware, "jsonBody", "{}")
+    middleware = web.middlewareUse(middleware, "securityHeaders", "{}")
+    middleware = web.middlewareUse(middleware, "requestTiming", "{}")
+    middleware = web.middlewareUse(middleware, "cors", "{\"origin\":\"http://localhost:3000\",\"methods\":\"GET, POST, OPTIONS\",\"headers\":\"Content-Type\"}")
+    middleware = web.middlewareUse(middleware, "requestLog", "{}")
+    middleware = web.middlewareUse(middleware, "errorResponse", "{}")
+
+    let sessions = web.sessionStoreCreate()
+    let server = web.serverCreate("127.0.0.1", 8080)
+    web.serverConfigure(server, 8388608, 30000)
+    web.configureCors(server, "http://localhost:3000", "GET, POST, OPTIONS", "Content-Type")
+    web.serverStart(server)
+
+    let serving = true
+    while serving {
+        let incoming = web.serverNext(server, 250)
+        if incoming != "" {
+            let requestId = web.requestNumber(incoming)
+            let before = web.middlewareBefore(middleware, incoming)
+            let request = web.jsonGet(before, "/request")
+            let response = ""
+            let sent = false
+            if web.jsonGetBoolean(before, "/proceed") == false {
+                response = web.jsonGet(before, "/response")
+            } else {
+                let matched = web.routeMatch(routes, web.requestMethod(request), web.requestPath(request))
+                let status = web.jsonGetNumber(matched, "/status")
+                if status == 404 {
+                    response = web.notFoundResponse("{\"error\":\"not found\"}")
+                } else {
+                    if status == 405 {
+                        response = web.methodNotAllowedResponse(web.jsonGetString(matched, "/allow"), "{\"error\":\"method not allowed\"}")
+                    } else {
+                        let handler = web.jsonGetString(matched, "/handler")
+                        if handler == "health" {
+                            response = web.jsonResponse(200, "{}", "{\"status\":\"ok\"}")
+                        } else {
+                            if handler == "user" {
+                                let id = web.jsonGetString(web.jsonGet(matched, "/params"), "/id")
+                                response = web.jsonResponse(200, "{}", "{\"id\":" + web.jsonQuote(id) + "}")
+                            } else {
+                                if handler == "echo" {
+                                    response = web.jsonResponse(200, "{}", web.parseJsonBody(request))
+                                } else {
+                                    if handler == "form" {
+                                        let form = web.parseForm(web.requestBody(request))
+                                        let validation = web.validateForm(form, "[{\"name\":\"name\",\"required\":true,\"minLength\":1}]")
+                                        if web.jsonGetBoolean(validation, "/valid") {
+                                            response = web.jsonResponse(200, "{}", "{\"name\":" + web.jsonQuote(web.formValue(form, "name")) + "}")
+                                        } else {
+                                            response = web.jsonResponse(400, "{}", validation)
+                                        } end if
+                                    } else {
+                                        if handler == "login" {
+                                            let sessionId = web.sessionCreate(sessions, 3600)
+                                            web.sessionSet(sessions, sessionId, "user", "demo")
+                                            let cookie = web.sessionCookie("sid", sessionId, 3600, true, "Lax")
+                                            let headers = "{\"set-cookie\":" + web.jsonQuote(cookie) + "}"
+                                            response = web.jsonResponse(200, headers, "{\"authenticated\":true}")
+                                        } else {
+                                            if handler == "upload" {
+                                                let multipart = web.parseMultipart(request, 8388608)
+                                                let savedPath = web.saveUpload(multipart, 0, "examples/zweb/uploads", "latest.bin", 4194304)
+                                                response = web.jsonResponse(201, "{}", "{\"path\":" + web.jsonQuote(savedPath) + "}")
+                                            } else {
+                                                if handler == "static" {
+                                                    sent = web.serverRespondStatic(server, requestId, 200, web.securityHeaders("{}"), "examples/zweb/public", "/", "index.html", 1048576, "public, max-age=300")
+                                                } else {
+                                                    if handler == "template" {
+                                                        let source = web.loadTemplate("examples/zweb/templates", "welcome.html", 65536)
+                                                        let html = web.renderTemplate(source, "{\"name\":\"Z+\"}")
+                                                        response = web.response(200, "{\"content-type\":\"text/html; charset=utf-8\"}", html)
+                                                    } else {
+                                                        if handler == "stop" {
+                                                            serving = false
+                                                            response = web.jsonResponse(200, "{}", "{\"status\":\"stopping\"}")
+                                                        } end if
+                                                    } end if
+                                                } end if
+                                            } end if
+                                        } end if
+                                    } end if
+                                } end if
+                            } end if
+                        } end if
+                    } end if
+                } end if
+            } end if
+
+            if sent == false {
+                response = web.middlewareAfter(middleware, request, response)
+                web.serverRespond(server, requestId, web.jsonGetNumber(response, "/status"), web.jsonGet(response, "/headers"), web.jsonGetString(response, "/body"))
+            } end if
+        } end if
+    } end while
+
+    web.serverStop(server)
+    web.sessionStoreClose(sessions)
+} stop

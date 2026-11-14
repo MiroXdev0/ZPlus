@@ -4,6 +4,7 @@
 #include "ModuleLoader.hpp"
 #include "semantic/Analyzer.hpp"
 #include "ir/IR.hpp"
+#include "ir/IRVerifier.hpp"
 #include "backend/native/NativeCodeGenerator.hpp"
 #include "../runtime/Runtime.hpp"
 
@@ -128,46 +129,30 @@ bool readSourceLine(
 }
 
 std::string diagnosticCategory(
-    const std::string& code,
-    const std::string& message
+    zplus::DiagnosticCategory category
 ) {
-    if (code == "E1000") return "Lexical error";
-    if (code == "E1001") return "Syntax error";
-    if (code == "E3001") return "Module/import error";
-    if (code != "E2001") return "Compiler error";
+    switch (category) {
+        case zplus::DiagnosticCategory::Lexical: return "Lexical error";
+        case zplus::DiagnosticCategory::Syntax: return "Syntax error";
+        case zplus::DiagnosticCategory::Module: return "Module/import error";
+        case zplus::DiagnosticCategory::Type: return "Type error";
+        case zplus::DiagnosticCategory::Semantic: return "Semantic error";
+        case zplus::DiagnosticCategory::IR: return "IR error";
+        case zplus::DiagnosticCategory::Backend: return "Backend error";
+        case zplus::DiagnosticCategory::Runtime: return "Runtime error";
+        case zplus::DiagnosticCategory::General: return "Compiler error";
+    }
+    return "Compiler error";
+}
 
-    if (message.find("undefined function") != std::string::npos) {
-        return "Undefined function";
-    }
-    if (message.find("undefined variable") != std::string::npos ||
-        message.find("undefined identifier") != std::string::npos) {
-        return "Undefined name";
-    }
-    if (message.find("__zstdlib_") != std::string::npos ||
-        message.find("standard-library") != std::string::npos ||
-        message.find("builtin") != std::string::npos) {
-        return "Standard-library call error";
-    }
-    if (message.find("member") != std::string::npos ||
-        message.find("field") != std::string::npos ||
-        message.find("class") != std::string::npos ||
-        message.find("method") != std::string::npos) {
-        return "Member access error";
-    }
-    if (message.find("argument") != std::string::npos ||
-        message.find("expects") != std::string::npos ||
-        message.find("too many") != std::string::npos ||
-        message.find("not enough") != std::string::npos) {
-        return "Function argument error";
-    }
-    if (message.find("type") != std::string::npos ||
-        message.find("returns") != std::string::npos ||
-        message.find("assign") != std::string::npos ||
-        message.find("must be a number") != std::string::npos ||
-        message.find("expects an array") != std::string::npos) {
-        return "Type error";
-    }
-    return "Semantic error";
+zplus::DiagnosticCategory diagnosticCategoryForCode(const std::string& code) {
+    if (code == "E1000") return zplus::DiagnosticCategory::Lexical;
+    if (code == "E1001") return zplus::DiagnosticCategory::Syntax;
+    if (code == "E2001") return zplus::DiagnosticCategory::Semantic;
+    if (code == "E3001") return zplus::DiagnosticCategory::Module;
+    if (code == "E4001") return zplus::DiagnosticCategory::IR;
+    if (code == "E5001") return zplus::DiagnosticCategory::Backend;
+    return zplus::DiagnosticCategory::General;
 }
 
 std::string diagnosticSuggestion(
@@ -257,10 +242,15 @@ void printError(
     int line = 0,
     int column = 0,
     const std::string& sourceFile = {},
-    const std::string& code = "E0001"
+    const std::string& code = "E0001",
+    zplus::DiagnosticCategory diagnosticKind = zplus::DiagnosticCategory::General,
+    const std::vector<zplus::RelatedDiagnosticInformation>& relatedInformation = {}
 ) {
 
-    const std::string category = diagnosticCategory(code, message);
+    if (diagnosticKind == zplus::DiagnosticCategory::General) {
+        diagnosticKind = diagnosticCategoryForCode(code);
+    }
+    const std::string category = diagnosticCategory(diagnosticKind);
     const std::string suggestion = diagnosticSuggestion(code, message);
     std::string sourceLine;
     if (!sourceFile.empty() && line > 0) {
@@ -275,7 +265,16 @@ void printError(
                   << jsonEscape(sourceFile) << "\",\"line\":" << line
                   << ",\"column\":" << column << ",\"sourceLine\":\""
                   << jsonEscape(sourceLine) << "\",\"suggestion\":\""
-                  << jsonEscape(suggestion) << "\"}\n";
+                  << jsonEscape(suggestion) << "\",\"relatedInformation\":[";
+        for (std::size_t index = 0; index < relatedInformation.size(); ++index) {
+            if (index != 0) std::cerr << ',';
+            const auto& related = relatedInformation[index];
+            std::cerr << "{\"message\":\"" << jsonEscape(related.message)
+                      << "\",\"file\":\"" << jsonEscape(related.sourceFile)
+                      << "\",\"line\":" << related.line
+                      << ",\"column\":" << related.column << '}';
+        }
+        std::cerr << "]}\n";
         return;
     }
 
@@ -410,7 +409,9 @@ bool compile(
                 static_cast<int>(error.line),
                 static_cast<int>(error.column),
                 error.sourceFile,
-                "E2001"
+                error.code,
+                error.category,
+                error.relatedInformation
             );
         }
 
@@ -426,7 +427,7 @@ bool compile(
 
         zplus::ir::IRBuilder builder;
 
-        module = builder.build(program);
+        module = builder.build(program, analyzer.builtinRegistry());
 
     }
     catch (const std::exception& error) {
@@ -436,6 +437,22 @@ bool compile(
             error.what()
         );
 
+        return false;
+    }
+
+    const auto irDiagnostics = zplus::ir::verifyModule(module);
+    if (!irDiagnostics.empty()) {
+        for (const auto& diagnostic : irDiagnostics) {
+            printError(
+                diagnostic.message,
+                static_cast<int>(diagnostic.line),
+                static_cast<int>(diagnostic.column),
+                diagnostic.sourceFile,
+                diagnostic.code,
+                diagnostic.category,
+                diagnostic.relatedInformation
+            );
+        }
         return false;
     }
 

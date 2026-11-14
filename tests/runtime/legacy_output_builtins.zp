@@ -1,0 +1,7 @@
+start {
+    print("print")
+    println("line")
+    say(time() >= 0)
+    print()
+    println()
+} stop

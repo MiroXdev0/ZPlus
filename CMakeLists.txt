@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(ZPlus
-    VERSION 1.1.6
+    VERSION 1.2.0
     LANGUAGES CXX
 )
 
@@ -119,14 +119,20 @@ add_executable(zp
     compiler/parser/AST.cpp
 
     compiler/semantic/Analyzer.cpp
-    compiler/semantic/Type.cpp
 
     compiler/ir/IR.cpp
     compiler/ir/IRBuilder.cpp
 
     runtime/Runtime.cpp
+    runtime/Base64.cpp
     runtime/Json.cpp
     runtime/Http.cpp
+    runtime/WebMultipart.cpp
+    runtime/WebSessions.cpp
+    runtime/WebTemplate.cpp
+    runtime/WebValidation.cpp
+    runtime/WebMiddleware.cpp
+    runtime/Web.cpp
     runtime/SQLite.cpp
     runtime/StandardLibrary.cpp
     runtime/installer/Platform.cpp
@@ -305,6 +311,9 @@ add_library(zp_native_backend STATIC
     compiler/backend/native/NativeCodeGenerator.cpp
     compiler/backend/native/PEWriter.cpp
     compiler/backend/native/ELFWriter.cpp
+    compiler/semantic/BuiltinRegistry.cpp
+    compiler/semantic/Type.cpp
+    compiler/ir/IRVerifier.cpp
 )
 target_include_directories(zp_native_backend PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -316,8 +325,15 @@ if(WIN32)
     set(ZPLUS_SQLITE_RUNTIME_ARGUMENT)
     add_library(zplus_graphics_runtime SHARED
         runtime/graphics/NativeApi.cpp
+        runtime/Base64.cpp
         runtime/Json.cpp
         runtime/Http.cpp
+        runtime/WebMultipart.cpp
+        runtime/WebSessions.cpp
+        runtime/WebTemplate.cpp
+        runtime/WebValidation.cpp
+        runtime/WebMiddleware.cpp
+        runtime/Web.cpp
         runtime/SQLite.cpp
         runtime/StandardLibrary.cpp
         runtime/installer/Platform.cpp
@@ -441,6 +457,29 @@ else()
 endif()
 
 if(BUILD_TESTING)
+    add_executable(zp_ir_verifier_tests
+        tests/compiler/ir_verifier.cpp
+        compiler/semantic/Analyzer.cpp
+        compiler/parser/AST.cpp
+        compiler/ir/IRVerifier.cpp
+        compiler/semantic/BuiltinRegistry.cpp
+        compiler/semantic/Type.cpp
+    )
+    target_include_directories(zp_ir_verifier_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        compiler
+    )
+    add_test(NAME typed_ir_verifier COMMAND zp_ir_verifier_tests)
+    add_test(
+        NAME generic_language
+        COMMAND ${CMAKE_COMMAND}
+            "-DZP=$<TARGET_FILE:zp>"
+            "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/generic-test-output"
+            "-DHOST_WINDOWS=$<BOOL:${WIN32}>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/compiler/run_generic_tests.cmake"
+    )
+
     add_test(NAME zpbuild_version COMMAND zpbuild --version)
     set_tests_properties(zpbuild_version PROPERTIES
         PASS_REGULAR_EXPRESSION "ZPBuild 0\\.3\\.0"
@@ -608,6 +647,7 @@ if(BUILD_TESTING)
     )
     add_executable(zp_http_server_tests
         tests/http/http_server_tests.cpp
+        runtime/Base64.cpp
         runtime/Http.cpp
         runtime/Json.cpp
     )
@@ -645,6 +685,33 @@ if(BUILD_TESTING)
             "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/json-test-output"
             "-DHOST_WINDOWS=$<BOOL:${WIN32}>"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/stdlib/run_json_tests.cmake"
+    )
+    add_executable(zp_web_runtime_tests
+        tests/web/web_runtime_tests.cpp
+        runtime/Base64.cpp
+        runtime/Web.cpp
+        runtime/WebMultipart.cpp
+        runtime/WebSessions.cpp
+        runtime/WebTemplate.cpp
+        runtime/WebValidation.cpp
+        runtime/WebMiddleware.cpp
+        runtime/Http.cpp
+        runtime/Json.cpp
+    )
+    target_include_directories(zp_web_runtime_tests PRIVATE runtime)
+    target_link_libraries(zp_web_runtime_tests PRIVATE Threads::Threads)
+    if(WIN32)
+        target_link_libraries(zp_web_runtime_tests PRIVATE ws2_32 bcrypt)
+    endif()
+    add_test(NAME web_runtime_utilities COMMAND zp_web_runtime_tests)
+    add_test(
+        NAME zweb_interpreter_integration
+        COMMAND ${CMAKE_COMMAND}
+            "-DZP=$<TARGET_FILE:zp>"
+            "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/zweb-test-output"
+            "-DHOST_WINDOWS=$<BOOL:${WIN32}>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/web/run_zweb_tests.cmake"
     )
 
     add_executable(zp_native_ir_tests

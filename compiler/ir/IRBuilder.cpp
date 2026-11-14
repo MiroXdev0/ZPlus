@@ -52,7 +52,16 @@ zplus::semantic::Type irType(const zplus::ast::Type* type) {
         case zplus::ast::Type::Kind::Character: return Type::character();
         case zplus::ast::Type::Kind::Boolean: return Type::boolean();
         case zplus::ast::Type::Kind::Void: return Type::voidType();
-        case zplus::ast::Type::Kind::Custom: return Type::custom(type->name);
+        case zplus::ast::Type::Kind::Custom: {
+            std::vector<Type> arguments;
+            arguments.reserve(type->arguments.size());
+            for (const auto& argument : type->arguments) {
+                arguments.push_back(argument
+                    ? argument->resolvedType.value_or(irType(argument.get()))
+                    : Type::unknown());
+            }
+            return Type::custom(type->name, std::move(arguments));
+        }
         case zplus::ast::Type::Kind::Array:
             return Type::array(irType(type->elementType.get()));
         case zplus::ast::Type::Kind::Pointer:
@@ -66,6 +75,264 @@ zplus::semantic::Type resolvedType(
     const zplus::ast::Type* syntax = nullptr
 ) {
     return node.resolvedType.value_or(irType(syntax));
+}
+
+bool containsTypeParameter(const zplus::semantic::Type& type) {
+    using zplus::semantic::TypeKind;
+    if (type.kind == TypeKind::TypeParameter) return true;
+    if (type.elementType && containsTypeParameter(*type.elementType)) return true;
+    if (type.returnType && containsTypeParameter(*type.returnType)) return true;
+    for (const auto& argument : type.arguments) {
+        if (containsTypeParameter(argument)) return true;
+    }
+    for (const auto& parameter : type.parameters) {
+        if (containsTypeParameter(parameter)) return true;
+    }
+    return false;
+}
+
+std::string specializationKey(
+    const std::string& baseName,
+    const std::vector<zplus::semantic::Type>& arguments
+) {
+    std::string key = baseName;
+    for (const auto& argument : arguments) {
+        key += "|" + zplus::semantic::typeName(argument);
+    }
+    return key;
+}
+
+std::string specializationName(
+    const std::string& baseName,
+    const std::vector<zplus::semantic::Type>& arguments
+) {
+    static constexpr char hex[] = "0123456789abcdef";
+    std::string name = baseName + "$generic";
+    for (const auto& argument : arguments) {
+        const std::string encoded = zplus::semantic::typeName(argument);
+        name += "$" + std::to_string(encoded.size()) + "_";
+        for (const unsigned char character : encoded) {
+            name.push_back(hex[character >> 4]);
+            name.push_back(hex[character & 0x0f]);
+        }
+    }
+    return name;
+}
+
+void specializeGenericModule(Module& module) {
+    using zplus::semantic::Type;
+    using zplus::semantic::TypeKind;
+    using zplus::semantic::TypeSubstitution;
+
+    struct ActiveSpecialization {
+        std::string templateName;
+        std::vector<Type> arguments;
+    };
+
+    std::unordered_map<std::string, std::string> functionSpecializations;
+    std::unordered_map<std::string, std::string> structSpecializations;
+    std::unordered_map<std::string, std::vector<ActiveSpecialization>> ancestry;
+
+    const auto ensureSpecialization =
+        [&](const Function& target, const std::vector<Type>& arguments,
+            const std::vector<ActiveSpecialization>& parentAncestry) -> std::string {
+        if (arguments.size() != target.genericParameters.size()) {
+            throw std::runtime_error(
+                "generic call to '" + target.name + "' has " +
+                std::to_string(arguments.size()) + " type argument(s), expected " +
+                std::to_string(target.genericParameters.size()));
+        }
+        for (const Type& argument : arguments) {
+            if (argument.kind == TypeKind::Unknown ||
+                containsTypeParameter(argument)) {
+                throw std::runtime_error(
+                    "generic call to '" + target.name +
+                    "' has an unresolved type argument");
+            }
+        }
+
+        const std::string key = specializationKey(target.name, arguments);
+        if (const auto existing = functionSpecializations.find(key);
+            existing != functionSpecializations.end()) {
+            return existing->second;
+        }
+
+        for (const auto& active : parentAncestry) {
+            bool sameArguments = active.arguments.size() == arguments.size();
+            for (std::size_t index = 0;
+                 sameArguments && index < arguments.size(); ++index) {
+                sameArguments = zplus::semantic::typesEqual(
+                    active.arguments[index], arguments[index]);
+            }
+            if (active.templateName == target.name && !sameArguments) {
+                throw std::runtime_error(
+                    "recursive generic specialization of '" + target.name +
+                    "' expands its type arguments");
+            }
+        }
+
+        const std::string generatedName =
+            specializationName(target.name, arguments);
+        functionSpecializations.emplace(key, generatedName);
+
+        TypeSubstitution substitutions;
+        for (std::size_t index = 0; index < arguments.size(); ++index) {
+            substitutions.emplace(
+                target.genericParameters[index].id, arguments[index]);
+        }
+
+        Function specialized = target;
+        specialized.name = generatedName;
+        specialized.genericParameters.clear();
+        specialized.returnType =
+            zplus::semantic::substitute(specialized.returnType, substitutions);
+        for (auto& parameter : specialized.parameters) {
+            parameter.type =
+                zplus::semantic::substitute(parameter.type, substitutions);
+        }
+        for (auto& block : specialized.blocks) {
+            for (auto& instruction : block.instructions) {
+                instruction.resultType =
+                    zplus::semantic::substitute(instruction.resultType, substitutions);
+                for (Type& type : instruction.genericTypeArguments) {
+                    type = zplus::semantic::substitute(type, substitutions);
+                }
+                for (auto& operand : instruction.operands) {
+                    operand.type =
+                        zplus::semantic::substitute(operand.type, substitutions);
+                }
+            }
+        }
+
+        auto specializedAncestry = parentAncestry;
+        specializedAncestry.push_back({target.name, arguments});
+        ancestry.emplace(generatedName, std::move(specializedAncestry));
+        Function& appended = module.createFunction(generatedName);
+        appended = std::move(specialized);
+
+        return generatedName;
+    };
+
+    for (std::size_t functionIndex = 0;
+         functionIndex < module.functions.size(); ++functionIndex) {
+        Function& function = module.functions[functionIndex];
+        if (!function.genericParameters.empty()) continue;
+        const auto active = ancestry.find(function.name);
+        const std::vector<ActiveSpecialization> emptyAncestry;
+        const auto& activeAncestry = active == ancestry.end()
+            ? emptyAncestry
+            : active->second;
+
+        for (auto& block : function.blocks) {
+            for (auto& instruction : block.instructions) {
+                if (instruction.opcode == "struct_new" &&
+                    !instruction.operands.empty()) {
+                    const std::string baseName = instruction.operands.front().name;
+                    const StructType* target = module.findStructType(baseName);
+                    if (target && !target->genericParameters.empty()) {
+                        const auto arguments = instruction.genericTypeArguments;
+                        if (arguments.size() != target->genericParameters.size()) {
+                            throw std::runtime_error(
+                                "generic construction of '" + baseName +
+                                "' has an invalid number of type arguments");
+                        }
+                        for (const Type& argument : arguments) {
+                            if (argument.kind == TypeKind::Unknown ||
+                                containsTypeParameter(argument)) {
+                                throw std::runtime_error(
+                                    "generic construction of '" + baseName +
+                                    "' has an unresolved type argument");
+                            }
+                        }
+
+                        const std::string key =
+                            specializationKey(baseName, arguments);
+                        auto specialization = structSpecializations.find(key);
+                        if (specialization == structSpecializations.end()) {
+                            const std::string generatedName =
+                                zplus::semantic::typeName(
+                                    Type::custom(baseName, arguments));
+                            TypeSubstitution substitutions;
+                            for (std::size_t index = 0;
+                                 index < arguments.size(); ++index) {
+                                substitutions.emplace(
+                                    target->genericParameters[index].id,
+                                    arguments[index]);
+                            }
+                            StructType concrete = *target;
+                            concrete.name = generatedName;
+                            concrete.genericParameters.clear();
+                            for (auto& field : concrete.fields) {
+                                field.type = zplus::semantic::substitute(
+                                    field.type, substitutions);
+                            }
+                            module.structTypes.push_back(std::move(concrete));
+                            specialization = structSpecializations.emplace(
+                                key, generatedName).first;
+                        }
+                        instruction.operands.front().name = specialization->second;
+                        instruction.operands.front().type =
+                            instruction.resultType;
+                        instruction.genericTypeArguments.clear();
+                    }
+                }
+
+                if (instruction.opcode != "call" ||
+                    instruction.operands.empty() ||
+                    instruction.operands.front().kind != Value::Kind::Identifier) {
+                    continue;
+                }
+
+                const std::string calleeName =
+                    instruction.operands.front().name;
+                const Function* target = module.findFunction(calleeName);
+                if (!target || target->genericParameters.empty()) continue;
+
+                std::vector<Type> arguments = instruction.genericTypeArguments;
+                const std::string generatedName = ensureSpecialization(
+                    *target, arguments, activeAncestry);
+                instruction.operands.front().name = generatedName;
+                instruction.genericTypeArguments.clear();
+            }
+        }
+    }
+
+    for (auto iterator = module.functions.begin();
+         iterator != module.functions.end();) {
+        if (!iterator->genericParameters.empty()) {
+            iterator = module.functions.erase(iterator);
+        } else {
+            ++iterator;
+        }
+    }
+    module.structTypes.erase(
+        std::remove_if(module.structTypes.begin(), module.structTypes.end(),
+                       [](const StructType& type) {
+                           return !type.genericParameters.empty();
+                       }),
+        module.structTypes.end());
+
+    std::unordered_map<const Function*, std::size_t> functionIndices;
+    for (std::size_t index = 0; index < module.functions.size(); ++index) {
+        functionIndices.emplace(&module.functions[index], index);
+    }
+    for (auto& function : module.functions) {
+        for (auto& block : function.blocks) {
+            for (auto& instruction : block.instructions) {
+                instruction.calleeFunctionIndex = kInvalidFunctionIndex;
+                if (instruction.opcode != "call" ||
+                    instruction.operands.empty()) {
+                    continue;
+                }
+                const Function* target =
+                    module.findFunction(instruction.operands.front().name);
+                if (target &&
+                    !module.builtinRegistry.find(target->name)) {
+                    instruction.calleeFunctionIndex = functionIndices.at(target);
+                }
+            }
+        }
+    }
 }
 
 // ============================================================
@@ -269,20 +536,7 @@ void assignRuntimeSlots(Module& module) {
 
                 const Function* target = module.findFunction(callee.name);
                 if (target &&
-                    target->name != "say" &&
-                    target->name != "println" &&
-                    target->name != "printz" &&
-                    target->name != "printm" &&
-                    target->name != "print" &&
-                    target->name != "time" &&
-                    target->name != "length" &&
-                    target->name != "push" &&
-                    target->name != "pop" &&
-                    target->name != "clear" &&
-                    target->name != "insert" &&
-                    target->name != "remove" &&
-                    target->name != "contains" &&
-                    target->name.rfind("__zgraphics_", 0) != 0) {
+                    !module.builtinRegistry.find(target->name)) {
                     instruction.calleeFunctionIndex = functionIndices.at(target);
                 }
             }
@@ -300,6 +554,13 @@ void assignRuntimeSlots(Module& module) {
 Module IRBuilder::build(
     const zplus::ast::Program& program
 ) const {
+    return build(program, zplus::semantic::BuiltinRegistry{});
+}
+
+Module IRBuilder::build(
+    const zplus::ast::Program& program,
+    const zplus::semantic::BuiltinRegistry& builtinRegistry
+) const {
 
     temporaryCounter_ = 0;
     labelCounter_ = 0;
@@ -314,11 +575,13 @@ Module IRBuilder::build(
 
     Module module;
     module.name = "main";
+    module.builtinRegistry = builtinRegistry;
 
     buildProgram(
         program,
         module
     );
+    specializeGenericModule(module);
     assignRuntimeSlots(module);
 
     return module;
@@ -334,13 +597,8 @@ void IRBuilder::buildProgram(
     Module& module
 ) const {
 
-    const auto isSourceBuiltin = [](const std::string& name) {
-        return name == "length" || name == "push" || name == "pop" ||
-            name == "clear" || name == "insert" || name == "remove" ||
-            name == "contains" || name == "read" ||
-            name == "read_number" || name == "read_integer" ||
-            name == "read_boolean" || name == "say" ||
-            name == "printz" || name == "printm";
+    const auto isSourceBuiltin = [&module](const std::string& name) {
+        return module.builtinRegistry.find(name) != nullptr;
     };
     std::vector<const zplus::ast::VariableDeclaration*> moduleVariables;
     std::unordered_map<std::string, std::size_t> functionNameCounts;
@@ -1601,15 +1859,9 @@ void IRBuilder::buildRepeat(
     const std::string counter =
         nextTemporary();
 
-    currentBlock->emit(
-        Instruction{
-            "mov",
-            counter,
-            {
-                count
-            }
-        }
-    );
+    Instruction counterMove{"mov", counter, {count}};
+    counterMove.resultType = zplus::semantic::Type::number();
+    currentBlock->emit(std::move(counterMove));
 
 
     // --------------------------------------------------------
@@ -1653,16 +1905,14 @@ void IRBuilder::buildRepeat(
     const std::string comparison =
         nextTemporary();
 
-    conditionBlock.emit(
-        Instruction{
-            "cmp_gt",
-            comparison,
-            {
-                Value{counter},
-                Value{"0"}
-            }
-        }
-    );
+    Value counterValue{counter};
+    counterValue.type = zplus::semantic::Type::number();
+    Value zero{"0", Value::Kind::Number};
+    zero.type = zplus::semantic::Type::number();
+    Instruction comparisonInstruction{
+        "cmp_gt", comparison, {counterValue, zero}};
+    comparisonInstruction.resultType = zplus::semantic::Type::boolean();
+    conditionBlock.emit(std::move(comparisonInstruction));
 
     conditionBlock.emit(
         Instruction{
@@ -2190,9 +2440,21 @@ void IRBuilder::prepareFunction(
         : (statement.returnType
                ? irType(statement.returnType.get())
                : zplus::semantic::Type::voidType());
+    function.genericParameters = signature.genericParameters;
     if (!statement.ownerClass.empty()) {
+        std::vector<zplus::semantic::Type> receiverArguments;
+        const std::string classParameterPrefix =
+            statement.ownerClass + "$type$";
+        for (const auto& parameter : signature.genericParameters) {
+            if (parameter.id.starts_with(classParameterPrefix)) {
+                receiverArguments.push_back(
+                    zplus::semantic::Type::typeParameter(
+                        parameter.id, parameter.name, parameter.constraints));
+            }
+        }
         function.parameters.emplace_back(
-            "this", zplus::semantic::Type::custom(statement.ownerClass));
+            "this", zplus::semantic::Type::custom(
+                        statement.ownerClass, std::move(receiverArguments)));
     }
     function.requiredParameterCount =
         statement.ownerClass.empty() ? 0 : 1;
@@ -2226,6 +2488,7 @@ void IRBuilder::prepareFunction(
         Function& helper = module.createFunction(helperName);
         helper.location = parameter->location;
         helper.returnType = resolvedType(*parameter, parameter->type.get());
+        helper.genericParameters = signature.genericParameters;
         if (!statement.ownerClass.empty()) {
             helper.parameters.emplace_back(
                 "this", zplus::semantic::Type::custom(statement.ownerClass));
@@ -2482,6 +2745,13 @@ void IRBuilder::buildStruct(
 
     StructType type;
     type.name = canonicalName;
+    const zplus::semantic::Type declarationType = resolvedType(statement);
+    for (const auto& argument : declarationType.arguments) {
+        if (argument.kind == zplus::semantic::TypeKind::TypeParameter) {
+            type.genericParameters.push_back({
+                argument.name, argument.displayName, argument.constraints});
+        }
+    }
     for (const auto& field : statement.fields) {
         if (!field) continue;
         StructField irField;
@@ -2532,6 +2802,13 @@ void IRBuilder::buildClass(
     if (!module.findStructType(canonicalName)) {
         StructType type;
         type.name = canonicalName;
+        const zplus::semantic::Type declarationType = resolvedType(statement);
+        for (const auto& argument : declarationType.arguments) {
+            if (argument.kind == zplus::semantic::TypeKind::TypeParameter) {
+                type.genericParameters.push_back({
+                    argument.name, argument.displayName, argument.constraints});
+            }
+        }
         for (const auto& field : statement.fields) {
             if (!field) continue;
             StructField irField;
@@ -3201,11 +3478,10 @@ Value IRBuilder::buildAssignment(
             );
         } else {
             const std::string currentValueName = nextTemporary();
-            currentBlock->emit(Instruction{
-                "index",
-                currentValueName,
-                {object, index}
-            });
+            Instruction load{"index", currentValueName, {object, index}};
+            load.resultType = indexTarget->resolvedType.value_or(
+                zplus::semantic::Type::unknown());
+            currentBlock->emit(std::move(load));
 
             const Value right = buildExpression(
                 *expression.value,
@@ -3229,11 +3505,10 @@ Value IRBuilder::buildAssignment(
                     throw std::runtime_error("unsupported indexed assignment operator");
             }
             const std::string resultName = nextTemporary();
-            currentBlock->emit(Instruction{
-                opcode,
-                resultName,
-                {Value{currentValueName}, right}
-            });
+            Instruction operation{
+                opcode, resultName, {Value{currentValueName}, right}};
+            operation.resultType = resolvedType(expression);
+            currentBlock->emit(std::move(operation));
             assignedValue = Value{resultName};
         }
         if (!currentBlock) {
@@ -3287,9 +3562,11 @@ Value IRBuilder::buildAssignment(
         }
         if (expression.operatorType != zplus::TokenType::Equal) {
             const std::string currentValue = nextTemporary();
-            currentBlock->emit(Instruction{
-                "member", currentValue, {object, Value{memberTarget->member}}
-            });
+            Instruction load{
+                "member", currentValue, {object, Value{memberTarget->member}}};
+            load.resultType = memberTarget->resolvedType.value_or(
+                zplus::semantic::Type::unknown());
+            currentBlock->emit(std::move(load));
             std::string opcode;
             switch (expression.operatorType) {
                 case zplus::TokenType::PlusEqual: opcode = "add"; break;
@@ -3302,9 +3579,10 @@ Value IRBuilder::buildAssignment(
                         "unsupported compound member assignment operator");
             }
             const std::string result = nextTemporary();
-            currentBlock->emit(Instruction{
-                opcode, result, {Value{currentValue}, assignedValue}
-            });
+            Instruction operation{
+                opcode, result, {Value{currentValue}, assignedValue}};
+            operation.resultType = resolvedType(expression);
+            currentBlock->emit(std::move(operation));
             assignedValue = Value{result};
         }
         currentBlock->emit(Instruction{
@@ -3516,7 +3794,11 @@ Value IRBuilder::buildCall(
         const StructType* structure = module.findStructType(callee.name);
         if (structure) {
             Instruction instruction{"struct_new", result};
-            instruction.operands.push_back(Value{structure->name});
+            instruction.genericTypeArguments = expression.resolvedTypeArguments;
+            instruction.resultType = resolvedType(expression);
+            Value structType{structure->name};
+            structType.type = instruction.resultType;
+            instruction.operands.push_back(std::move(structType));
             std::size_t argumentIndex = 0;
             for (const auto& field : structure->fields) {
                 if (argumentIndex < expression.arguments.size() &&
@@ -3543,6 +3825,7 @@ Value IRBuilder::buildCall(
         result
     };
     instruction.location = expression.location;
+    instruction.genericTypeArguments = expression.resolvedTypeArguments;
 
     instruction.operands.push_back(
         callee
@@ -3593,6 +3876,8 @@ Value IRBuilder::buildCall(
 
             const std::string defaultResult = nextTemporary();
             Instruction defaultCall{"call", defaultResult};
+            defaultCall.resultType = target->parameters[i].type;
+            defaultCall.genericTypeArguments = expression.resolvedTypeArguments;
             defaultCall.operands.push_back(
                 Value{helperName, Value::Kind::Identifier}
             );
@@ -3600,8 +3885,14 @@ Value IRBuilder::buildCall(
                 defaultCall.operands.push_back(arguments[preceding]);
             }
             currentBlock->emit(std::move(defaultCall));
-            arguments.emplace_back(defaultResult);
+            Value defaultArgument{defaultResult};
+            defaultArgument.type = target->parameters[i].type;
+            arguments.push_back(std::move(defaultArgument));
         }
+    }
+
+    if (const Function* target = module.findFunction(callee.name)) {
+        instruction.resultType = target->returnType;
     }
 
     instruction.operands.insert(

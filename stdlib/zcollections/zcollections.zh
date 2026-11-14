@@ -35,4 +35,196 @@ pub fn last(values: number[]): number {
 pub fn isEmpty(values: number[]): boolean {
     return __zstdlib_collections_isEmpty(values)
 } end fn
+
+pub class List<T> {
+    items: T[]
+
+    fn size() -> number {
+        return length(this.items)
+    } end fn
+
+    fn add(value: T) {
+        push(this.items, value)
+    } end fn
+
+    fn get(index: number) -> T {
+        return this.items[index]
+    } end fn
+
+    fn removeAt(index: number) -> T {
+        return remove(this.items, index)
+    } end fn
+
+    fn clear() {
+        clear(this.items)
+    } end fn
+} end class
+
+pub class Stack<T> {
+    items: T[]
+
+    fn size() -> number {
+        return length(this.items)
+    } end fn
+
+    fn push(value: T) {
+        push(this.items, value)
+    } end fn
+
+    fn pop() -> T {
+        return pop(this.items)
+    } end fn
+} end class
+
+pub class Queue<T> {
+    items: T[]
+
+    fn size() -> number {
+        return length(this.items)
+    } end fn
+
+    fn enqueue(value: T) {
+        push(this.items, value)
+    } end fn
+
+    fn dequeue() -> T {
+        return remove(this.items, 0)
+    } end fn
+} end class
+
+pub class Set<T: equatable> {
+    items: T[]
+
+    fn validate() {
+        for left in 0..length(this.items) {
+            for right in left + 1..length(this.items) {
+                if this.items[left] == this.items[right] {
+                    throw "Set cannot contain duplicate initial values"
+                } end if
+            } end for
+        } end for
+    } end fn
+
+    fn size() -> number {
+        this.validate()
+        return length(this.items)
+    } end fn
+
+    fn contains(value: T) -> boolean {
+        this.validate()
+        for index in 0..length(this.items) {
+            if this.items[index] == value {
+                return true
+            } end if
+        } end for
+        return false
+    } end fn
+
+    fn add(value: T) {
+        this.validate()
+        if this.contains(value) == false {
+            push(this.items, value)
+        } end if
+    } end fn
+
+    fn remove(value: T) -> boolean {
+        this.validate()
+        for index in 0..length(this.items) {
+            if this.items[index] == value {
+                remove(this.items, index)
+                return true
+            } end if
+        } end for
+        return false
+    } end fn
+} end class
+
+pub class Optional<T> {
+    items: T[]
+
+    fn validate() {
+        if length(this.items) > 1 {
+            throw "Optional can contain at most one value"
+        } end if
+    } end fn
+
+    fn isSome() -> boolean {
+        this.validate()
+        return length(this.items) != 0
+    } end fn
+
+    fn unwrap() -> T {
+        this.validate()
+        if length(this.items) == 0 {
+            throw "cannot unwrap an empty Optional"
+        } end if
+        return this.items[0]
+    } end fn
+
+    fn unwrapOr(fallback: T) -> T {
+        this.validate()
+        if length(this.items) == 0 {
+            return fallback
+        } end if
+        return this.items[0]
+    } end fn
+} end class
+
+pub class Map<K: equatable, V> {
+    keys: K[]
+    values: V[]
+
+    fn validate() {
+        if length(this.keys) != length(this.values) {
+            throw "Map keys and values must have matching lengths"
+        } end if
+        for left in 0..length(this.keys) {
+            for right in left + 1..length(this.keys) {
+                if this.keys[left] == this.keys[right] {
+                    throw "Map cannot contain duplicate initial keys"
+                } end if
+            } end for
+        } end for
+    } end fn
+
+    fn size() -> number {
+        this.validate()
+        return length(this.keys)
+    } end fn
+
+    fn set(key: K, value: V) {
+        this.validate()
+        for index in 0..length(this.keys) {
+            if this.keys[index] == key {
+                this.values[index] = value
+                return
+            } end if
+        } end for
+        push(this.keys, key)
+        push(this.values, value)
+    } end fn
+
+    fn get(key: K) -> Optional<V> {
+        this.validate()
+        for index in 0..length(this.keys) {
+            if this.keys[index] == key {
+                return Optional<V>([this.values[index]])
+            } end if
+        } end for
+        return Optional<V>([])
+    } end fn
+
+    fn remove(key: K) -> Optional<V> {
+        this.validate()
+        for index in 0..length(this.keys) {
+            if this.keys[index] == key {
+                let value = this.values[index]
+                remove(this.keys, index)
+                remove(this.values, index)
+                return Optional<V>([value])
+            } end if
+        } end for
+        return Optional<V>([])
+    } end fn
+} end class
 } stop

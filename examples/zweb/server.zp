@@ -1,0 +1,87 @@
+use zweb as web
+
+start {
+    let routes = "[]"
+    routes = web.routeAdd(routes, "GET", "/health", "health")
+    routes = web.routeAdd(routes, "GET", "/users/{id}", "user")
+    routes = web.routeAdd(routes, "POST", "/echo", "echo")
+    routes = web.routeAdd(routes, "POST", "/form", "form")
+    routes = web.routeAdd(routes, "POST", "/session", "cookie")
+    routes = web.routeAdd(routes, "GET", "/assets/index.html", "static")
+    routes = web.routeAdd(routes, "POST", "/__stop", "stop")
+    routes = web.routeGroup("/api", routes)
+
+    let server = web.serverCreate("127.0.0.1", 8080)
+    web.serverConfigure(server, 1048576, 30000)
+    web.configureCors(server, "http://localhost:3000", "GET, POST, OPTIONS", "Content-Type")
+    web.serverStart(server)
+
+    let serving = true
+    while serving {
+        let request = web.serverNext(server, 250)
+        if request != "" {
+            let method = web.requestMethod(request)
+            let path = web.requestPath(request)
+            let id = web.requestNumber(request)
+            let matched = web.routeMatch(routes, method, path)
+            let status = web.jsonGetNumber(matched, "/status")
+            let responseHeaders = web.securityHeaders("{\"content-type\":\"application/json\"}")
+
+            if status == 404 {
+                web.serverRespond(server, id, 404, responseHeaders, "{\"error\":\"not found\"}")
+            } else {
+                if status == 405 {
+                    let allow = web.jsonGetString(matched, "/allow")
+                    let methodHeaders = "{\"content-type\":\"application/json\",\"allow\":" + web.jsonQuote(allow) + "}"
+                    web.serverRespond(server, id, 405, web.securityHeaders(methodHeaders), "{\"error\":\"method not allowed\"}")
+                } else {
+                    let handler = web.jsonGetString(matched, "/handler")
+                    if handler == "health" {
+                        web.serverRespond(server, id, 200, responseHeaders, "{\"status\":\"ok\"}")
+                    } else {
+                        if handler == "user" {
+                            let parameters = web.jsonGet(matched, "/params")
+                            let userId = web.jsonGetString(parameters, "/id")
+                            let body = "{\"id\":" + web.jsonQuote(userId) + "}"
+                            web.serverRespond(server, id, 200, responseHeaders, body)
+                        } else {
+                            if handler == "echo" {
+                                let body = web.requestBody(request)
+                                if web.jsonValid(body) {
+                                    web.serverRespond(server, id, 200, responseHeaders, web.jsonCompact(body))
+                                } else {
+                                    web.serverRespond(server, id, 400, responseHeaders, "{\"error\":\"invalid JSON\"}")
+                                } end if
+                            } else {
+                                if handler == "form" {
+                                    let form = web.parseForm(web.requestBody(request))
+                                    let name = web.formValue(form, "name")
+                                    let body = "{\"name\":" + web.jsonQuote(name) + "}"
+                                    web.serverRespond(server, id, 200, responseHeaders, body)
+                                } else {
+                                    if handler == "cookie" {
+                                        let cookie = web.cookieHeader("session", "demo", 3600, "/", "", true, true, "Lax")
+                                        let headers = "{\"content-type\":\"application/json\",\"set-cookie\":" + web.jsonQuote(cookie) + "}"
+                                        web.serverRespond(server, id, 200, web.securityHeaders(headers), "{\"status\":\"cookie set\"}")
+                                    } else {
+                                        if handler == "static" {
+                                            let headers = "{\"content-type\":" + web.jsonQuote(web.mimeType("index.html")) + "}"
+                                            web.serverRespondFile(server, id, 200, web.securityHeaders(headers), "examples/zweb/public", "index.html", 1048576)
+                                        } else {
+                                            if handler == "stop" {
+                                                web.serverRespond(server, id, 200, responseHeaders, "{\"status\":\"stopping\"}")
+                                                serving = false
+                                            } end if
+                                        } end if
+                                    } end if
+                                } end if
+                            } end if
+                        } end if
+                    } end if
+                } end if
+            } end if
+        } end if
+    } end while
+
+    web.serverStop(server)
+} stop

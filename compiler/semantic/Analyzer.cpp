@@ -132,25 +132,30 @@ bool Analyzer::declareSymbol(
 
 void Analyzer::error(
     const zplus::ast::Node& node,
-    const std::string& message
+    const std::string& message,
+    zplus::DiagnosticCategory category
 ) {
 
     error(
         node.location,
-        message
+        message,
+        category
     );
 }
 
 void Analyzer::error(
     const zplus::ast::Location& location,
-    const std::string& message
+    const std::string& message,
+    zplus::DiagnosticCategory category
 ) {
 
     errors_.push_back({
         message,
         location.sourceFile,
         static_cast<std::size_t>(location.line),
-        static_cast<std::size_t>(location.column)
+        static_cast<std::size_t>(location.column),
+        "E2001",
+        category
     });
 }
 
@@ -183,8 +188,10 @@ bool Analyzer::isNumeric(
     const Type& type
 ) const {
 
-    return type.kind ==
-        TypeKind::Number;
+    return type.kind == TypeKind::Number ||
+        (type.kind == TypeKind::TypeParameter &&
+         std::find(type.constraints.begin(), type.constraints.end(),
+                   TypeConstraint::Numeric) != type.constraints.end());
 }
 
 bool Analyzer::isBoolean(
@@ -242,6 +249,14 @@ Type Analyzer::resolveType(
             return Type::voidType();
 
         case zplus::ast::Type::Kind::Custom: {
+            if (const Type* parameter = findGenericTypeParameter(type.name)) {
+                if (!type.arguments.empty()) {
+                    error(type, "type parameter '" + type.name +
+                                    "' cannot have type arguments",
+                          zplus::DiagnosticCategory::Type);
+                }
+                return *parameter;
+            }
             const std::string sourceModule =
                 moduleNameForFile(type.location.sourceFile).empty()
                     ? currentModuleName_
@@ -250,12 +265,42 @@ Type Analyzer::resolveType(
                 ? type.name
                 : sourceModule + "::" + type.name;
             const auto localType = userTypes_.find(qualifiedName);
-            if (localType != userTypes_.end()) {
-                return Type::custom(qualifiedName);
+            auto resolvedDeclaration = localType;
+            if (resolvedDeclaration == userTypes_.end()) {
+                resolvedDeclaration = userTypes_.find(type.name);
             }
-            const auto publicType = userTypes_.find(type.name);
-            if (publicType != userTypes_.end()) {
-                return publicType->second;
+            if (resolvedDeclaration != userTypes_.end()) {
+                const Type& declaration = resolvedDeclaration->second;
+                if (type.arguments.size() != declaration.arguments.size()) {
+                    const std::string expected =
+                        declaration.arguments.empty()
+                            ? "no type arguments"
+                            : "exactly " +
+                                  std::to_string(declaration.arguments.size()) +
+                                  " type argument(s)";
+                    error(type, "type '" + type.name + "' requires " + expected,
+                          zplus::DiagnosticCategory::Type);
+                    return Type::unknown();
+                }
+                std::vector<Type> arguments;
+                arguments.reserve(type.arguments.size());
+                TypeSubstitution substitutions;
+                for (std::size_t index = 0; index < type.arguments.size(); ++index) {
+                    if (!type.arguments[index]) {
+                        arguments.push_back(Type::unknown());
+                        continue;
+                    }
+                    Type argument = resolveType(*type.arguments[index]);
+                    if (!unify(declaration.arguments[index], argument, substitutions)) {
+                        error(*type.arguments[index],
+                              "type argument '" + typeName(argument) +
+                                  "' does not satisfy the constraint for '" +
+                                  typeName(declaration.arguments[index]) + "'",
+                              zplus::DiagnosticCategory::Type);
+                    }
+                    arguments.push_back(std::move(argument));
+                }
+                return Type::custom(declaration.name, std::move(arguments));
             }
             if (ambiguousPublicTypeNames_.contains(type.name)) {
                 error(type, "type '" + type.name +
@@ -269,40 +314,88 @@ Type Analyzer::resolveType(
                                 privateType->second + "'");
                 return Type::unknown();
             }
+            if (!type.arguments.empty()) {
+                error(type, "unknown generic type '" + type.name + "'",
+                      zplus::DiagnosticCategory::Type);
+                return Type::unknown();
+            }
             return Type::custom(type.name);
         }
 
         case zplus::ast::Type::Kind::Array:
-
             if (!type.elementType) {
-                return Type(
-                    TypeKind::Array
-                );
+                return Type(TypeKind::Array);
             }
-
-            return Type::array(
-                resolveType(
-                    *type.elementType
-                )
-            );
+            return Type::array(resolveType(*type.elementType));
 
         case zplus::ast::Type::Kind::Pointer:
-
             if (!type.elementType) {
-                return Type(
-                    TypeKind::Pointer
-                );
+                return Type(TypeKind::Pointer);
             }
-
-            return Type::pointer(
-                resolveType(
-                    *type.elementType
-                )
-            );
+            return Type::pointer(resolveType(*type.elementType));
 
         default:
             return Type::unknown();
     }
+}
+
+void Analyzer::pushGenericTypeParameters(
+    const std::vector<zplus::ast::GenericParameter>& parameters,
+    const std::string& owner
+) {
+    std::unordered_map<std::string, Type> scope;
+    std::vector<GenericTypeParameter> orderedParameters;
+    orderedParameters.reserve(parameters.size());
+    for (const auto& parameter : parameters) {
+        std::vector<TypeConstraint> constraints;
+        if (parameter.constraint == "number" ||
+            parameter.constraint == "numeric") {
+            constraints.push_back(TypeConstraint::Numeric);
+        } else if (parameter.constraint == "equatable" ||
+                   parameter.constraint == "equality") {
+            constraints.push_back(TypeConstraint::Equatable);
+        } else if (!parameter.constraint.empty()) {
+            error(parameter.location,
+                  "unknown generic constraint '" + parameter.constraint +
+                      "'; supported constraints are 'number' and 'equatable'",
+                  zplus::DiagnosticCategory::Type);
+        }
+
+        parameter.bindingName = owner + "$type$" + parameter.name;
+        Type type = Type::typeParameter(
+            parameter.bindingName, parameter.name, std::move(constraints));
+        orderedParameters.push_back(
+            {type.name, parameter.name, type.constraints});
+        if (!scope.emplace(parameter.name, std::move(type)).second) {
+            error(parameter.location,
+                  "duplicate generic type parameter '" + parameter.name + "'",
+                  zplus::DiagnosticCategory::Type);
+        }
+    }
+    genericTypeScopes_.push_back(std::move(scope));
+    genericParameterScopes_.push_back(std::move(orderedParameters));
+}
+
+void Analyzer::popGenericTypeParameters() {
+    if (!genericTypeScopes_.empty()) genericTypeScopes_.pop_back();
+    if (!genericParameterScopes_.empty()) genericParameterScopes_.pop_back();
+}
+
+std::vector<GenericTypeParameter> Analyzer::activeGenericTypeParameters() const {
+    std::vector<GenericTypeParameter> parameters;
+    for (const auto& scope : genericParameterScopes_) {
+        parameters.insert(parameters.end(), scope.begin(), scope.end());
+    }
+    return parameters;
+}
+
+const Type* Analyzer::findGenericTypeParameter(const std::string& name) const {
+    for (auto scope = genericTypeScopes_.rbegin();
+         scope != genericTypeScopes_.rend(); ++scope) {
+        const auto found = scope->find(name);
+        if (found != scope->end()) return &found->second;
+    }
+    return nullptr;
 }
 
 
@@ -319,8 +412,11 @@ bool Analyzer::analyze(
 ) {
 
     scopes_.clear();
+    genericTypeScopes_.clear();
+    genericParameterScopes_.clear();
     errors_.clear();
     warnings_.clear();
+    builtinRegistry_.clear();
     nextBindingId_ = 0;
 
     userTypes_.clear();
@@ -338,6 +434,7 @@ bool Analyzer::analyze(
         Type::voidType();
 
     currentFunctionName_.clear();
+    expectedExpressionType_.reset();
 
     enterScope();
 
@@ -345,79 +442,67 @@ bool Analyzer::analyze(
     // Built-ins
     // --------------------------------------------------------
 
-    declareSymbol({
-        "say",
-        Type::function(
-            {
-                Type::unknown()
-            },
-            Type::voidType()
-        ),
-        false,
-        true,
-        true,
-        false
-    });
-
-    declareSymbol({
-        "printz",
-        Type::function(
-            {
-                Type::unknown()
-            },
-            Type::voidType()
-        ),
-        false,
-        true,
-        true,
-        false
-    });
-
-    declareSymbol({
-        "printm",
-        Type::function(
-            {
-                Type::unknown()
-            },
-            Type::voidType()
-        ),
-        false,
-        true,
-        true,
-        false
-    });
-
-    auto declareBuiltin = [this](
+    auto registerBuiltin = [this](
         const std::string& name,
         std::vector<Type> parameters,
-        Type result
+        Type result,
+        std::size_t requiredParameterCount,
+        bool variadic
     ) {
         Symbol symbol;
         symbol.name = name;
         symbol.originalName = name;
         symbol.type = Type::function(std::move(parameters), result);
+        symbol.type.requiredParameterCount = requiredParameterCount;
+        builtinRegistry_.add(name, symbol.type, variadic);
         symbol.isFunction = true;
         symbol.initialized = true;
         symbol.isBuiltin = true;
         (void)declareSymbol(symbol);
     };
+    auto declareBuiltin = [&registerBuiltin](
+        const std::string& name,
+        std::vector<Type> parameters,
+        Type result
+    ) {
+        const std::size_t requiredParameterCount = parameters.size();
+        registerBuiltin(name, std::move(parameters), std::move(result),
+                        requiredParameterCount, false);
+    };
+    auto declareVariadicBuiltin = [&registerBuiltin](
+        const std::string& name,
+        std::vector<Type> parameters,
+        Type result,
+        std::size_t minimumArgumentCount
+    ) {
+        registerBuiltin(name, std::move(parameters), std::move(result),
+                        minimumArgumentCount, true);
+    };
     const Type number = Type::number();
     const Type string = Type::string();
     const Type boolean = Type::boolean();
     const Type voidType = Type::voidType();
+    declareVariadicBuiltin("say", {Type::unknown()}, voidType, 1);
+    declareVariadicBuiltin("printz", {Type::unknown()}, voidType, 1);
+    declareVariadicBuiltin("printm", {Type::unknown()}, voidType, 1);
+    declareVariadicBuiltin("println", {Type::unknown()}, voidType, 0);
+    declareVariadicBuiltin("print", {Type::unknown()}, voidType, 0);
+    declareBuiltin("time", {}, number);
     declareBuiltin("read", {}, string);
     declareBuiltin("read_number", {}, number);
     declareBuiltin("read_integer", {}, number);
     declareBuiltin("read_boolean", {}, boolean);
     declareBuiltin("to_string", {number}, string);
     declareBuiltin("__zgraphics_createWindow", {string, number, number}, number);
-    declareBuiltin("length", {Type::unknown()}, number);
-    declareBuiltin("push", {Type::unknown(), Type::unknown()}, voidType);
-    declareBuiltin("pop", {Type::unknown()}, Type::unknown());
-    declareBuiltin("clear", {Type::unknown()}, voidType);
-    declareBuiltin("insert", {Type::unknown(), number, Type::unknown()}, voidType);
-    declareBuiltin("remove", {Type::unknown(), number}, Type::unknown());
-    declareBuiltin("contains", {Type::unknown(), Type::unknown()}, boolean);
+    const Type element = Type::typeParameter("T");
+    const Type elements = Type::array(element);
+    declareBuiltin("length", {elements}, number);
+    declareBuiltin("push", {elements, element}, voidType);
+    declareBuiltin("pop", {elements}, element);
+    declareBuiltin("clear", {elements}, voidType);
+    declareBuiltin("insert", {elements, number, element}, voidType);
+    declareBuiltin("remove", {elements, number}, element);
+    declareBuiltin("contains", {elements, element}, boolean);
     declareBuiltin("__zmemory_heapUsed", {}, number);
     declareBuiltin("__zmemory_heapObjects", {}, number);
     declareBuiltin("__zmemory_collect", {}, voidType);
@@ -543,6 +628,8 @@ bool Analyzer::analyze(
     declareBuiltin("__zhttp_serverPort", {number}, number);
     declareBuiltin("__zhttp_serverNext", {number, number}, string);
     declareBuiltin("__zhttp_serverRespond", {number, number, number, string, string}, boolean);
+    declareBuiltin("__zhttp_serverRespondBinary",
+        {number, number, number, string, string}, boolean);
     declareBuiltin("__zhttp_serverStop", {number}, voidType);
     declareBuiltin("__zhttp_serverConfigure", {number, number, number}, voidType);
     declareBuiltin("__zhttp_configureCors", {number, string, string, string}, voidType);
@@ -551,6 +638,60 @@ bool Analyzer::analyze(
     declareBuiltin("__zhttp_requestHeader", {string, string}, string);
     declareBuiltin("__zhttp_clientRequest",
         {string, string, string, string, number}, string);
+    declareBuiltin("__zhttp_clientRequestBinary",
+        {string, string, string, string, number}, string);
+    declareBuiltin("__zweb_urlEncode", {string}, string);
+    declareBuiltin("__zweb_urlDecode", {string}, string);
+    declareBuiltin("__zweb_parseUrl", {string}, string);
+    declareBuiltin("__zweb_buildUrl",
+        {string, string, string, string, string, string}, string);
+    declareBuiltin("__zweb_parseForm", {string}, string);
+    declareBuiltin("__zweb_parseCookies", {string}, string);
+    declareBuiltin("__zweb_cookieHeader",
+        {string, string, number, string, string, boolean, boolean, string}, string);
+    declareBuiltin("__zweb_cookieHeaderExpires",
+        {string, string, number, string, string, string, boolean, boolean, string}, string);
+    declareBuiltin("__zweb_securityHeaders", {string}, string);
+    declareBuiltin("__zweb_routeAdd", {string, string, string, string}, string);
+    declareBuiltin("__zweb_routeGroup", {string, string}, string);
+    declareBuiltin("__zweb_routeMatch", {string, string, string}, string);
+    declareBuiltin("__zweb_routeAddConfigured",
+        {string, string, string, string, string, string}, string);
+    declareBuiltin("__zweb_routeUrl", {string, string, string}, string);
+    declareBuiltin("__zweb_response", {number, string, string}, string);
+    declareBuiltin("__zweb_jsonResponse", {number, string, string}, string);
+    declareBuiltin("__zweb_parseJsonBody", {string}, string);
+    declareBuiltin("__zweb_notFoundResponse", {string}, string);
+    declareBuiltin("__zweb_methodNotAllowedResponse", {string, string}, string);
+    declareBuiltin("__zweb_mimeType", {string}, string);
+    declareBuiltin("__zweb_staticFile", {string, string, number}, string);
+    declareBuiltin("__zweb_respondFile",
+        {number, number, number, string, string, string, number}, boolean);
+    declareBuiltin("__zweb_respondStatic",
+        {number, number, number, string, string, string, string, number, string}, boolean);
+    declareBuiltin("__zweb_parseMultipart", {string, number}, string);
+    declareBuiltin("__zweb_saveUpload",
+        {string, number, string, string, number}, string);
+    declareBuiltin("__zweb_validateForm", {string, string}, string);
+    declareBuiltin("__zweb_formHas", {string, string}, boolean);
+    declareBuiltin("__zweb_formNumber", {string, string}, number);
+    declareBuiltin("__zweb_loadTemplate", {string, string, number}, string);
+    declareBuiltin("__zweb_renderTemplate", {string, string}, string);
+    declareBuiltin("__zweb_middlewareUse", {string, string, string}, string);
+    declareBuiltin("__zweb_middlewareBefore", {string, string}, string);
+    declareBuiltin("__zweb_middlewareAfter", {string, string, string}, string);
+    declareBuiltin("__zweb_sessionStoreCreate", {}, number);
+    declareBuiltin("__zweb_sessionStoreClose", {number}, voidType);
+    declareBuiltin("__zweb_sessionCreate", {number, number}, string);
+    declareBuiltin("__zweb_sessionSet", {number, string, string, string}, boolean);
+    declareBuiltin("__zweb_sessionGet", {number, string, string}, string);
+    declareBuiltin("__zweb_sessionHas", {number, string, string}, boolean);
+    declareBuiltin("__zweb_sessionInvalidate", {number, string}, boolean);
+    declareBuiltin("__zweb_sessionRotate", {number, string, number}, string);
+    declareBuiltin("__zweb_sessionCsrfToken", {number, string}, string);
+    declareBuiltin("__zweb_sessionValidateCsrf", {number, string, string}, boolean);
+    declareBuiltin("__zweb_sessionCookie",
+        {string, string, number, boolean, string}, string);
     declareBuiltin("__zsqlite_open", {string}, number);
     declareBuiltin("__zsqlite_close", {number}, voidType);
     declareBuiltin("__zsqlite_execute", {number, string, string}, number);
@@ -788,14 +929,26 @@ void Analyzer::predeclareTypes(
                 ? node->name
                 : node->moduleName + "::" + node->name;
             structDeclarations_[key] = node;
-            if (!userTypes_.emplace(key, Type::custom(key)).second) {
+            pushGenericTypeParameters(node->genericParameters, key);
+            std::vector<Type> genericArguments;
+            genericArguments.reserve(node->genericParameters.size());
+            for (const auto& parameter : node->genericParameters) {
+                if (const Type* resolved =
+                        findGenericTypeParameter(parameter.name)) {
+                    genericArguments.push_back(*resolved);
+                }
+            }
+            const Type declarationType = Type::custom(key, genericArguments);
+            node->resolvedType = declarationType;
+            popGenericTypeParameters();
+            if (!userTypes_.emplace(key, declarationType).second) {
                 error(*node, "duplicate type declaration '" + node->name + "'");
             }
             if (!node->moduleName.empty()) {
                 moduleNamesByFile_[node->location.sourceFile] = node->moduleName;
                 if (node->isPublic && publicTypeCounts[node->name] == 1) {
                     structDeclarations_[node->name] = node;
-                    if (!userTypes_.emplace(node->name, Type::custom(key)).second) {
+                    if (!userTypes_.emplace(node->name, declarationType).second) {
                         error(*node, "duplicate type declaration '" + node->name + "'");
                     }
                 } else if (!node->isPublic) {
@@ -817,14 +970,26 @@ void Analyzer::predeclareTypes(
                 ? node->name
                 : node->moduleName + "::" + node->name;
             classDeclarations_[key] = node;
-            if (!userTypes_.emplace(key, Type::custom(key)).second) {
+            pushGenericTypeParameters(node->genericParameters, key);
+            std::vector<Type> genericArguments;
+            genericArguments.reserve(node->genericParameters.size());
+            for (const auto& parameter : node->genericParameters) {
+                if (const Type* resolved =
+                        findGenericTypeParameter(parameter.name)) {
+                    genericArguments.push_back(*resolved);
+                }
+            }
+            const Type declarationType = Type::custom(key, genericArguments);
+            node->resolvedType = declarationType;
+            popGenericTypeParameters();
+            if (!userTypes_.emplace(key, declarationType).second) {
                 error(*node, "duplicate type declaration '" + node->name + "'");
             }
             if (!node->moduleName.empty()) {
                 moduleNamesByFile_[node->location.sourceFile] = node->moduleName;
                 if (node->isPublic && publicTypeCounts[node->name] == 1) {
                     classDeclarations_[node->name] = node;
-                    if (!userTypes_.emplace(node->name, Type::custom(key)).second) {
+                    if (!userTypes_.emplace(node->name, declarationType).second) {
                         error(*node, "duplicate type declaration '" + node->name + "'");
                     }
                 } else if (!node->isPublic) {
@@ -903,6 +1068,11 @@ void Analyzer::predeclareFunctions(
             continue;
         }
 
+        const std::string functionName = function->internalName.empty()
+            ? function->name
+            : function->internalName;
+        pushGenericTypeParameters(
+            function->genericParameters, functionName);
         std::vector<Type> parameters;
 
         for (const auto& parameter :
@@ -946,7 +1116,8 @@ void Analyzer::predeclareFunctions(
         symbol.type =
             Type::function(
                 std::move(parameters),
-                returnType
+                returnType,
+                activeGenericTypeParameters()
             );
         symbol.type.requiredParameterCount = 0;
         for (const auto& parameter : function->parameters) {
@@ -991,6 +1162,8 @@ void Analyzer::predeclareFunctions(
                 }
             }
         }
+        function->resolvedType = symbol.type;
+        popGenericTypeParameters();
     }
 }
 
@@ -1399,12 +1572,13 @@ void Analyzer::analyzeVariable(
             )
             : Type::unknown();
 
+    const std::optional<Type> previousExpectedType = expectedExpressionType_;
+    if (statement.type) expectedExpressionType_ = declaredType;
     Type valueType =
         statement.initializer
-            ? expressionType(
-                *statement.initializer
-            )
+            ? expressionType(*statement.initializer)
             : Type::unknown();
+    expectedExpressionType_ = previousExpectedType;
 
     if (
         statement.initializer &&
@@ -1606,12 +1780,13 @@ void Analyzer::analyzeReturn(
         return;
     }
 
+    const std::optional<Type> previousExpectedType = expectedExpressionType_;
+    if (statement.value) expectedExpressionType_ = currentReturnType_;
     Type actual =
         statement.value
-            ? expressionType(
-                *statement.value
-            )
+            ? expressionType(*statement.value)
             : Type::voidType();
+    expectedExpressionType_ = previousExpectedType;
 
     if (
         !isAssignable(
@@ -1880,6 +2055,8 @@ void Analyzer::analyzeFunction(
     const std::string symbolName = statement.internalName.empty()
         ? statement.name
         : statement.internalName;
+    pushGenericTypeParameters(
+        statement.genericParameters, symbolName);
     const Symbol* existing = findSymbol(symbolName);
 
     if (
@@ -1915,7 +2092,9 @@ void Analyzer::analyzeFunction(
         symbol.moduleName = statement.moduleName;
         symbol.sourceFile = statement.location.sourceFile;
         symbol.isPublic = statement.moduleName.empty() || statement.isPublic;
-        symbol.type = Type::function(std::move(parameterTypes), returnType);
+        symbol.type = Type::function(
+            std::move(parameterTypes), returnType,
+            activeGenericTypeParameters());
         symbol.type.requiredParameterCount = 0;
         for (const auto& parameter : statement.parameters) {
             if (parameter && parameter->defaultValue) {
@@ -1957,7 +2136,14 @@ void Analyzer::analyzeFunction(
         receiver.name = "this";
         receiver.bindingName = "this";
         receiver.sourceFile = statement.location.sourceFile;
-        receiver.type = Type::custom(statement.ownerClass);
+        std::vector<Type> receiverArguments;
+        const auto ownerClass = classDeclarations_.find(statement.ownerClass);
+        if (ownerClass != classDeclarations_.end() &&
+            ownerClass->second->resolvedType) {
+            receiverArguments = ownerClass->second->resolvedType->arguments;
+        }
+        receiver.type = Type::custom(
+            statement.ownerClass, std::move(receiverArguments));
         receiver.initialized = true;
         declareSymbol(receiver);
     }
@@ -2062,6 +2248,7 @@ void Analyzer::analyzeFunction(
 
     currentFunctionName_ =
         previousFunction;
+    popGenericTypeParameters();
 }
 
 
@@ -2146,6 +2333,10 @@ void Analyzer::analyzeStruct(
     const zplus::ast::StructDeclaration& statement
 ) {
 
+    const std::string declaredTypeName = statement.moduleName.empty()
+        ? statement.name
+        : statement.moduleName + "::" + statement.name;
+    pushGenericTypeParameters(statement.genericParameters, declaredTypeName);
     std::unordered_set<std::string> fieldNames;
     bool optionalFieldSeen = false;
     for (const auto& field :
@@ -2188,6 +2379,7 @@ void Analyzer::analyzeStruct(
             field->resolvedType = expressionType(*field->defaultValue);
         }
     }
+    popGenericTypeParameters();
 }
 
 
@@ -2199,6 +2391,10 @@ void Analyzer::analyzeClass(
     const zplus::ast::ClassDeclaration& statement
 ) {
 
+    const std::string declaredTypeName = statement.moduleName.empty()
+        ? statement.name
+        : statement.moduleName + "::" + statement.name;
+    pushGenericTypeParameters(statement.genericParameters, declaredTypeName);
     std::unordered_set<std::string> memberNames;
     for (const auto& field :
          statement.fields) {
@@ -2254,6 +2450,7 @@ void Analyzer::analyzeClass(
             );
         }
     }
+    popGenericTypeParameters();
 }
 
 
@@ -2597,11 +2794,9 @@ Type Analyzer::typeOfIdentifier(
                               "' is private to module '" + symbol->moduleName + "'");
         return Type::unknown();
     }
-    if (!symbol->isFunction) {
-        expression.bindingName = symbol->bindingName.empty()
-            ? symbol->name
-            : symbol->bindingName;
-    }
+    expression.bindingName = symbol->bindingName.empty()
+        ? symbol->name
+        : symbol->bindingName;
     return symbol->type;
 }
 
@@ -2647,7 +2842,9 @@ Type Analyzer::typeOfUnary(
                 return Type::unknown();
             }
 
-            return Type::number();
+            return operand.kind == TypeKind::TypeParameter
+                ? operand
+                : Type::number();
 
         case zplus::TokenType::Exclamation:
         case zplus::TokenType::Not:
@@ -2682,7 +2879,9 @@ Type Analyzer::typeOfUnary(
                 return Type::unknown();
             }
 
-            return Type::number();
+            return operand.kind == TypeKind::TypeParameter
+                ? operand
+                : Type::number();
 
         case zplus::TokenType::PlusPlus:
         case zplus::TokenType::MinusMinus:
@@ -2840,6 +3039,10 @@ Type Analyzer::typeOfBinary(
                 return Type::unknown();
             }
 
+            if (left.kind == TypeKind::TypeParameter &&
+                typesEqual(left, right)) {
+                return left;
+            }
             return Type::number();
 
         // ----------------------------------------------------
@@ -3042,7 +3245,8 @@ Type Analyzer::typeOfAssignment(
 
                     error(
                         expression,
-                        "'+=' requires compatible values"
+                        "'+=' requires compatible values",
+                        zplus::DiagnosticCategory::Type
                     );
                 }
 
@@ -3065,7 +3269,8 @@ Type Analyzer::typeOfAssignment(
 
                     error(
                         expression,
-                        "compound assignment requires numbers"
+                        "compound assignment requires numbers",
+                        zplus::DiagnosticCategory::Type
                     );
                 }
 
@@ -3089,7 +3294,8 @@ Type Analyzer::typeOfAssignment(
             typeName(value) +
             "' to '" +
             typeName(target) +
-            "'"
+            "'",
+            zplus::DiagnosticCategory::Type
         );
 
         return Type::unknown();
@@ -3210,6 +3416,13 @@ Type Analyzer::typeOfConditional(
 Type Analyzer::typeOfCall(
     const zplus::ast::CallExpression& expression
 ) {
+    const std::optional<Type> expectedReturnType = expectedExpressionType_;
+    struct ExpectedTypeRestore {
+        std::optional<Type>& slot;
+        std::optional<Type> value;
+        ~ExpectedTypeRestore() { slot = std::move(value); }
+    } restoreExpectedType{expectedExpressionType_, expectedExpressionType_};
+    expectedExpressionType_.reset();
 
     if (!expression.callee) {
 
@@ -3235,83 +3448,168 @@ Type Analyzer::typeOfCall(
                 structKey = localKey;
             }
         }
+
+        const auto instantiateRecord =
+            [&](const Type& declarationType,
+                const std::vector<Type>& fieldTypes,
+                std::size_t requiredCount,
+                const std::string& recordName) -> Type {
+                if (expression.arguments.size() < requiredCount ||
+                    expression.arguments.size() > fieldTypes.size()) {
+                    error(expression, "constructor for '" + recordName +
+                        "' expects " +
+                        (requiredCount == fieldTypes.size()
+                            ? std::to_string(fieldTypes.size())
+                            : std::to_string(requiredCount) + " to " +
+                                  std::to_string(fieldTypes.size())) +
+                        " arguments");
+                    return Type::unknown();
+                }
+
+                std::vector<Type> argumentTypes;
+                argumentTypes.reserve(expression.arguments.size());
+                for (const auto& argument : expression.arguments) {
+                    argumentTypes.push_back(
+                        argument ? expressionType(*argument) : Type::unknown());
+                }
+
+                if (!expression.explicitTypeArguments.empty() &&
+                    expression.explicitTypeArguments.size() !=
+                        declarationType.arguments.size()) {
+                    error(expression, "generic type '" + recordName +
+                        "' requires exactly " +
+                        std::to_string(declarationType.arguments.size()) +
+                        " explicit type argument(s)",
+                        zplus::DiagnosticCategory::Type);
+                    return Type::unknown();
+                }
+
+                TypeSubstitution substitutions;
+                std::vector<Type> typeArguments;
+                typeArguments.reserve(declarationType.arguments.size());
+                if (!expression.explicitTypeArguments.empty()) {
+                    for (std::size_t index = 0;
+                         index < expression.explicitTypeArguments.size();
+                         ++index) {
+                        Type actual = resolveType(
+                            *expression.explicitTypeArguments[index]);
+                        if (!unify(declarationType.arguments[index], actual,
+                                   substitutions)) {
+                            error(*expression.explicitTypeArguments[index],
+                                  "invalid type argument '" + typeName(actual) +
+                                      "' for '" + recordName + "'",
+                                  zplus::DiagnosticCategory::Type);
+                            return Type::unknown();
+                        }
+                        typeArguments.push_back(std::move(actual));
+                    }
+                }
+
+                for (std::size_t index = 0; index < argumentTypes.size(); ++index) {
+                    const Type expected = substitute(fieldTypes[index], substitutions);
+                    const bool matched = expression.explicitTypeArguments.empty()
+                        ? unify(fieldTypes[index], argumentTypes[index], substitutions)
+                        : isAssignable(expected, argumentTypes[index]);
+                    if (!matched) {
+                        error(*expression.arguments[index],
+                              "constructor argument for field " +
+                                  std::to_string(index + 1) + " of '" + recordName +
+                                  "' has type '" + typeName(argumentTypes[index]) +
+                                  "', expected '" +
+                                  typeName(substitute(fieldTypes[index], substitutions)) +
+                                  "'",
+                              zplus::DiagnosticCategory::Type);
+                        return Type::unknown();
+                    }
+                }
+
+                if (expression.explicitTypeArguments.empty()) {
+                    for (const Type& parameter : declarationType.arguments) {
+                        Type argument = substitute(parameter, substitutions);
+                        if ((argument.kind == TypeKind::TypeParameter &&
+                             argument.name == parameter.name) ||
+                            argument.kind == TypeKind::Unknown) {
+                            error(expression, "cannot infer type parameter '" +
+                                typeName(parameter) + "' for '" + recordName + "'",
+                                zplus::DiagnosticCategory::Type);
+                            return Type::unknown();
+                        }
+                        typeArguments.push_back(std::move(argument));
+                    }
+                }
+                expression.resolvedTypeArguments = typeArguments;
+                return Type::custom(declarationType.name, std::move(typeArguments));
+            };
+
         const auto structure = structDeclarations_.find(structKey);
         if (structure != structDeclarations_.end()) {
-            const auto& fields = structure->second->fields;
-            std::vector<Type> argumentTypes;
-            argumentTypes.reserve(expression.arguments.size());
-            for (const auto& argument : expression.arguments) {
-                if (argument) argumentTypes.push_back(expressionType(*argument));
+            const auto& declaration = *structure->second;
+            const auto type = userTypes_.find(structKey);
+            const Type declarationType = type == userTypes_.end()
+                ? Type::custom(structKey)
+                : type->second;
+            pushGenericTypeParameters(
+                declaration.genericParameters, declarationType.name);
+            std::vector<Type> fieldTypes;
+            std::size_t requiredCount = declaration.fields.size();
+            for (const auto& field : declaration.fields) {
+                if (!field) {
+                    fieldTypes.push_back(Type::unknown());
+                    continue;
+                }
+                fieldTypes.push_back(
+                    field->type
+                        ? resolveType(*field->type)
+                        : (field->defaultValue
+                            ? expressionType(*field->defaultValue)
+                            : Type::unknown()));
             }
-
-            std::size_t requiredCount = fields.size();
-            while (requiredCount > 0 && fields[requiredCount - 1] &&
-                   fields[requiredCount - 1]->defaultValue) {
+            while (requiredCount > 0 &&
+                   declaration.fields[requiredCount - 1] &&
+                   declaration.fields[requiredCount - 1]->defaultValue) {
                 --requiredCount;
             }
-            if (argumentTypes.size() < requiredCount ||
-                argumentTypes.size() > fields.size()) {
-                error(expression, "constructor for '" + structure->second->name +
-                                      "' expects " +
-                                      (requiredCount == fields.size()
-                                           ? std::to_string(fields.size())
-                                           : std::to_string(requiredCount) + " to " +
-                                                 std::to_string(fields.size())) +
-                                      " arguments");
-                return Type::unknown();
-            }
-            for (std::size_t i = 0; i < argumentTypes.size(); ++i) {
-                if (!fields[i] || !fields[i]->type) continue;
-                const Type expected = resolveType(*fields[i]->type);
-                if (!isAssignable(expected, argumentTypes[i])) {
-                    error(*expression.arguments[i],
-                          "constructor argument for field '" + fields[i]->name +
-                              "' has type '" + typeName(argumentTypes[i]) +
-                              "', expected '" + typeName(expected) + "'");
-                }
-            }
-            return Type::custom(structKey);
+            Type result = instantiateRecord(
+                declarationType, fieldTypes, requiredCount, declaration.name);
+            popGenericTypeParameters();
+            return result;
         }
 
         const auto klass = classDeclarations_.find(structKey);
         if (klass != classDeclarations_.end()) {
-            std::vector<Type> argumentTypes;
-            argumentTypes.reserve(expression.arguments.size());
-            for (const auto& argument : expression.arguments) {
-                if (argument) argumentTypes.push_back(expressionType(*argument));
+            const auto& declaration = *klass->second;
+            const std::string canonicalName = declaration.moduleName.empty()
+                ? declaration.name
+                : declaration.moduleName + "::" + declaration.name;
+            const auto type = userTypes_.find(structKey);
+            const Type declarationType = type == userTypes_.end()
+                ? Type::custom(canonicalName)
+                : type->second;
+            pushGenericTypeParameters(
+                declaration.genericParameters, declarationType.name);
+            std::vector<Type> fieldTypes;
+            std::size_t requiredCount = declaration.fields.size();
+            for (const auto& field : declaration.fields) {
+                if (!field) {
+                    fieldTypes.push_back(Type::unknown());
+                    continue;
+                }
+                fieldTypes.push_back(
+                    field->type
+                        ? resolveType(*field->type)
+                        : (field->initializer
+                            ? expressionType(*field->initializer)
+                            : Type::unknown()));
             }
-
-            const auto& fields = klass->second->fields;
-            std::size_t requiredCount = fields.size();
-            while (requiredCount > 0 && fields[requiredCount - 1] &&
-                   fields[requiredCount - 1]->initializer) {
+            while (requiredCount > 0 &&
+                   declaration.fields[requiredCount - 1] &&
+                   declaration.fields[requiredCount - 1]->initializer) {
                 --requiredCount;
             }
-            if (argumentTypes.size() < requiredCount ||
-                argumentTypes.size() > fields.size()) {
-                error(expression, "constructor for class '" + klass->second->name +
-                                      "' expects " +
-                                      (requiredCount == fields.size()
-                                           ? std::to_string(fields.size())
-                                           : std::to_string(requiredCount) + " to " +
-                                                 std::to_string(fields.size())) +
-                                      " arguments");
-                return Type::unknown();
-            }
-            for (std::size_t i = 0; i < argumentTypes.size(); ++i) {
-                if (!fields[i] || !fields[i]->type) continue;
-                const Type expected = resolveType(*fields[i]->type);
-                if (!isAssignable(expected, argumentTypes[i])) {
-                    error(*expression.arguments[i],
-                          "constructor argument for class field '" + fields[i]->name +
-                              "' has type '" + typeName(argumentTypes[i]) +
-                              "', expected '" + typeName(expected) + "'");
-                }
-            }
-            const std::string className = klass->second->moduleName.empty()
-                ? klass->second->name
-                : klass->second->moduleName + "::" + klass->second->name;
-            return Type::custom(className);
+            Type result = instantiateRecord(
+                declarationType, fieldTypes, requiredCount, declaration.name);
+            popGenericTypeParameters();
+            return result;
         }
     }
 
@@ -3346,105 +3644,207 @@ Type Analyzer::typeOfCall(
         }
     }
 
-    if (calleeIdentifier && calleeIdentifier->name == "to_string") {
-        if (argumentTypes.size() != 1) {
-            error(expression, "to_string expects exactly one argument");
-            return Type::unknown();
-        }
-        if (argumentTypes[0].kind != TypeKind::Number &&
-            argumentTypes[0].kind != TypeKind::Unknown) {
-            error(expression, "to_string expects a number, got '" +
-                typeName(argumentTypes[0]) + "'");
-            return Type::unknown();
-        }
-        return Type::string();
-    }
-
-    if (
-        calleeType.kind ==
-        TypeKind::Unknown
-    ) {
-        return Type::unknown();
-    }
-
-    if (
-        calleeType.kind !=
-        TypeKind::Function
-    ) {
-
-        error(
-            expression,
-            "expression is not callable"
-        );
-
-        return Type::unknown();
-    }
-
     if (calleeIdentifier) {
-        if (calleeIdentifier->name == "printz" ||
-            calleeIdentifier->name == "printm") {
-            if (argumentTypes.empty()) {
-                error(expression, calleeIdentifier->name + " expects at least one argument");
+        if (const BuiltinMetadata* builtin =
+                builtinRegistry_.find(calleeIdentifier->name)) {
+            const std::size_t parameterCount =
+                builtin->signature.parameters.size();
+            if (argumentTypes.size() < builtin->minimumArgumentCount()) {
+                error(expression, builtin->name + " expects at least " +
+                    std::to_string(builtin->minimumArgumentCount()) +
+                    (builtin->minimumArgumentCount() == 1 ? " argument" : " arguments"),
+                    zplus::DiagnosticCategory::Type);
+                return Type::unknown();
             }
-            return Type::voidType();
+            if ((!builtin->variadic && argumentTypes.size() > parameterCount) ||
+                (parameterCount == 0 && !argumentTypes.empty())) {
+                error(expression, "too many arguments to " + builtin->name,
+                    zplus::DiagnosticCategory::Type);
+                return Type::unknown();
+            }
+
+            TypeSubstitution substitutions;
+            bool validArguments = true;
+            for (std::size_t i = 0; i < argumentTypes.size(); ++i) {
+                if (parameterCount == 0) break;
+                const Type& expected =
+                    builtin->signature.parameters[std::min(i, parameterCount - 1)];
+                if (i == 0 && expected.kind == TypeKind::Array &&
+                    argumentTypes[i].kind != TypeKind::Array &&
+                    argumentTypes[i].kind != TypeKind::Unknown) {
+                    error(expression, builtin->name +
+                        " expects an array as its first argument",
+                        zplus::DiagnosticCategory::Type);
+                    validArguments = false;
+                    continue;
+                }
+                if (!unify(expected, argumentTypes[i], substitutions)) {
+                    if ((builtin->name == "insert" || builtin->name == "remove") &&
+                        i == 1) {
+                        error(expression, builtin->name +
+                            " index must be a number",
+                            zplus::DiagnosticCategory::Type);
+                    } else if (i == 0 && parameterCount == 1) {
+                        error(expression, builtin->name + " expects a " +
+                            typeName(expected) + ", got '" +
+                            typeName(argumentTypes[i]) + "'",
+                            zplus::DiagnosticCategory::Type);
+                    } else if (expected.kind == TypeKind::TypeParameter) {
+                        error(expression, builtin->name + " value has type '" +
+                            typeName(argumentTypes[i]) + "', expected '" +
+                            typeName(substitute(expected, substitutions)) + "'",
+                            zplus::DiagnosticCategory::Type);
+                    } else {
+                        error(expression, builtin->name + " argument " +
+                            std::to_string(i + 1) + " has type '" +
+                            typeName(argumentTypes[i]) + "', expected '" +
+                            typeName(substitute(expected, substitutions)) + "'",
+                            zplus::DiagnosticCategory::Type);
+                    }
+                    validArguments = false;
+                }
+            }
+            if (!validArguments) return Type::unknown();
+            if (!builtin->signature.returnType) return Type::voidType();
+            return substitute(*builtin->signature.returnType, substitutions);
         }
-        const std::string& builtin = calleeIdentifier->name;
-        const bool isArrayBuiltin =
-            builtin == "length" || builtin == "push" || builtin == "pop" ||
-            builtin == "clear" || builtin == "insert" || builtin == "remove" ||
-            builtin == "contains";
-        if (isArrayBuiltin) {
-            const std::size_t expected =
-                builtin == "push" || builtin == "contains" ? 2 :
-                builtin == "insert" ? 3 :
-                builtin == "remove" ? 2 :
-                builtin == "length" || builtin == "pop" ||
-                        builtin == "clear" ? 1 : 0;
-            if (argumentTypes.size() != expected) {
-                error(expression, builtin + " expects exactly " +
-                    std::to_string(expected) + (expected == 1 ? " argument" : " arguments"));
-                return Type::unknown();
-            }
-            if (argumentTypes.empty() ||
-                (argumentTypes[0].kind != TypeKind::Array &&
-                 argumentTypes[0].kind != TypeKind::Unknown)) {
-                error(expression, builtin + " expects an array as its first argument");
-                return Type::unknown();
-            }
-            if (builtin == "length") return Type::number();
-            if (builtin == "remove" &&
-                argumentTypes[1].kind != TypeKind::Number &&
-                argumentTypes[1].kind != TypeKind::Unknown) {
-                error(expression, "remove index must be a number");
-            }
-            if (builtin == "pop" || builtin == "remove") {
-                return argumentTypes[0].elementType
-                    ? *argumentTypes[0].elementType
-                    : Type::unknown();
-            }
-            if (builtin == "insert") {
-                if (argumentTypes[1].kind != TypeKind::Number &&
-                    argumentTypes[1].kind != TypeKind::Unknown) {
-                    error(expression, "insert index must be a number");
-                }
-            }
-            if (builtin == "push" || builtin == "insert" ||
-                builtin == "contains") {
-                const std::size_t valueIndex = builtin == "insert" ? 2 : 1;
-                if (argumentTypes[0].elementType &&
-                    !isAssignable(*argumentTypes[0].elementType,
-                                  argumentTypes[valueIndex])) {
-                    error(expression, builtin + " value has type '" +
-                        typeName(argumentTypes[valueIndex]) + "', expected '" +
-                        typeName(*argumentTypes[0].elementType) + "'");
-                }
-            }
-            if (builtin == "contains") return Type::boolean();
-            if (builtin == "push" || builtin == "clear" || builtin == "insert") {
-                return Type::voidType();
-            }
+    }
+
+    if (calleeType.kind == TypeKind::Unknown) {
+        return Type::unknown();
+    }
+
+    if (calleeType.kind != TypeKind::Function) {
+        error(expression, "expression is not callable");
+        return Type::unknown();
+    }
+
+    const auto* memberCallee =
+        as<zplus::ast::MemberExpression>(expression.callee.get());
+    if (memberCallee && memberCallee->requiresReceiver) {
+        expression.resolvedTypeArguments =
+            memberCallee->resolvedGenericTypeArguments;
+    } else {
+        expression.resolvedTypeArguments.clear();
+    }
+
+    if (!calleeType.genericParameters.empty()) {
+        const auto& genericParameters = calleeType.genericParameters;
+        if (argumentTypes.size() > calleeType.parameters.size()) {
+            error(expression, "too many arguments to generic function",
+                  zplus::DiagnosticCategory::Type);
             return Type::unknown();
         }
+        if (argumentTypes.size() < calleeType.requiredParameterCount) {
+            error(expression, "generic function expects at least " +
+                std::to_string(calleeType.requiredParameterCount) +
+                (calleeType.requiredParameterCount == 1
+                    ? " argument" : " arguments"),
+                zplus::DiagnosticCategory::Type);
+            return Type::unknown();
+        }
+        if (!expression.explicitTypeArguments.empty() &&
+            expression.explicitTypeArguments.size() != genericParameters.size()) {
+            error(expression, "generic function expects exactly " +
+                std::to_string(genericParameters.size()) +
+                " explicit type argument(s)",
+                zplus::DiagnosticCategory::Type);
+            return Type::unknown();
+        }
+
+        TypeSubstitution substitutions;
+        if (!expression.explicitTypeArguments.empty()) {
+            for (std::size_t index = 0;
+                 index < expression.explicitTypeArguments.size(); ++index) {
+                Type argument = resolveType(*expression.explicitTypeArguments[index]);
+                const auto& parameter = genericParameters[index];
+                bool satisfiesConstraints = true;
+                for (const TypeConstraint constraint : parameter.constraints) {
+                    if (argument.kind == TypeKind::TypeParameter) {
+                        satisfiesConstraints =
+                            std::find(argument.constraints.begin(),
+                                      argument.constraints.end(),
+                                      constraint) != argument.constraints.end();
+                    } else if (constraint == TypeConstraint::Numeric) {
+                        satisfiesConstraints =
+                            argument.kind == TypeKind::Number;
+                    } else {
+                        satisfiesConstraints =
+                            argument.kind == TypeKind::Number ||
+                            argument.kind == TypeKind::String ||
+                            argument.kind == TypeKind::Character ||
+                            argument.kind == TypeKind::Boolean ||
+                            argument.kind == TypeKind::Null ||
+                            argument.kind == TypeKind::Custom ||
+                            argument.kind == TypeKind::Array ||
+                            argument.kind == TypeKind::Pointer;
+                    }
+                    if (!satisfiesConstraints) break;
+                }
+                if (!satisfiesConstraints) {
+                    error(*expression.explicitTypeArguments[index],
+                          "type argument '" + typeName(argument) +
+                              "' does not satisfy constraints for '" +
+                              parameter.name + "'",
+                          zplus::DiagnosticCategory::Type);
+                    return Type::unknown();
+                }
+                substitutions.emplace(parameter.id, std::move(argument));
+            }
+        }
+
+        const std::size_t count = std::min(
+            argumentTypes.size(), calleeType.parameters.size());
+        for (std::size_t index = 0; index < count; ++index) {
+            if (!unify(calleeType.parameters[index], argumentTypes[index],
+                       substitutions)) {
+                error(*expression.arguments[index],
+                      "generic argument " + std::to_string(index + 1) +
+                          " has type '" + typeName(argumentTypes[index]) +
+                          "', which conflicts with parameter type '" +
+                          typeName(calleeType.parameters[index]) + "'",
+                      zplus::DiagnosticCategory::Type);
+                return Type::unknown();
+            }
+        }
+        if (expectedReturnType &&
+            expectedReturnType->kind != TypeKind::Unknown &&
+            calleeType.returnType &&
+            !unify(*calleeType.returnType, *expectedReturnType,
+                   substitutions)) {
+            error(expression, "generic return type cannot be inferred as '" +
+                typeName(*expectedReturnType) + "'",
+                zplus::DiagnosticCategory::Type);
+            return Type::unknown();
+        }
+
+        expression.resolvedTypeArguments.reserve(
+            expression.resolvedTypeArguments.size() + genericParameters.size());
+        for (const auto& parameter : genericParameters) {
+            Type argument = substitute(
+                Type::typeParameter(parameter.id, parameter.name,
+                                    parameter.constraints),
+                substitutions);
+            if ((argument.kind == TypeKind::TypeParameter &&
+                 argument.name == parameter.id) ||
+                argument.kind == TypeKind::Unknown) {
+                error(expression, "cannot infer generic type parameter '" +
+                    parameter.name + "'",
+                    zplus::DiagnosticCategory::Type);
+                return Type::unknown();
+            }
+            expression.resolvedTypeArguments.push_back(std::move(argument));
+        }
+        if (calleeType.returnType) {
+            return substitute(*calleeType.returnType, substitutions);
+        }
+        return Type::voidType();
+    }
+
+    if (!expression.explicitTypeArguments.empty()) {
+        error(expression, "type arguments were provided to a non-generic function",
+              zplus::DiagnosticCategory::Type);
+        return Type::unknown();
     }
 
     // --------------------------------------------------------
@@ -3649,38 +4049,59 @@ Type Analyzer::typeOfMember(
         }
         const auto klass = classDeclarations_.find(objectType.name);
         if (klass != classDeclarations_.end()) {
+            TypeSubstitution classSubstitution;
+            const Type declarationType =
+                klass->second->resolvedType.value_or(
+                    Type::custom(objectType.name));
+            const std::size_t classParameterCount =
+                declarationType.arguments.size();
+            if (objectType.arguments.size() != classParameterCount) {
+                error(expression, "class type '" + typeName(objectType) +
+                                      "' has invalid generic arguments",
+                      zplus::DiagnosticCategory::Type);
+                return Type::unknown();
+            }
+            for (std::size_t index = 0; index < classParameterCount; ++index) {
+                if (!unify(declarationType.arguments[index],
+                           objectType.arguments[index], classSubstitution)) {
+                    error(expression, "invalid type arguments for class '" +
+                                          klass->second->name + "'",
+                          zplus::DiagnosticCategory::Type);
+                    return Type::unknown();
+                }
+            }
+            expression.resolvedGenericTypeArguments = objectType.arguments;
             for (const auto& field : klass->second->fields) {
                 if (field && field->name == expression.member) {
-                    return field->type
+                    const Type fieldType = field->resolvedType
+                        ? *field->resolvedType
+                        : field->type
                         ? resolveType(*field->type)
                         : (field->initializer
                                ? expressionType(*field->initializer)
                                : Type::unknown());
+                    return substitute(fieldType, classSubstitution);
                 }
             }
             for (const auto& method : klass->second->methods) {
                 if (!method || method->name != expression.member) continue;
-                std::vector<Type> parameterTypes;
-                parameterTypes.reserve(method->parameters.size());
-                std::size_t requiredParameterCount = 0;
-                for (const auto& parameter : method->parameters) {
-                    if (!parameter) continue;
-                    parameterTypes.push_back(
-                        parameter->type
-                            ? resolveType(*parameter->type)
-                            : Type::unknown()
-                    );
-                    if (!parameter->defaultValue) {
-                        ++requiredParameterCount;
-                    }
+                Type methodType = method->resolvedType.value_or(Type::function(
+                    {}, method->returnType
+                            ? resolveType(*method->returnType)
+                            : Type::voidType()));
+                for (Type& parameter : methodType.parameters) {
+                    parameter = substitute(parameter, classSubstitution);
                 }
-                Type methodType = Type::function(
-                    std::move(parameterTypes),
-                    method->returnType
-                        ? resolveType(*method->returnType)
-                        : Type::voidType()
-                );
-                methodType.requiredParameterCount = requiredParameterCount;
+                if (methodType.returnType) {
+                    methodType.returnType = std::make_shared<Type>(
+                        substitute(*methodType.returnType, classSubstitution));
+                }
+                if (methodType.genericParameters.size() >= classParameterCount) {
+                    methodType.genericParameters.erase(
+                        methodType.genericParameters.begin(),
+                        methodType.genericParameters.begin() +
+                            static_cast<std::ptrdiff_t>(classParameterCount));
+                }
                 expression.resolvedName = method->internalName.empty()
                     ? klass->second->name + "::" + method->name
                     : method->internalName;
@@ -3694,10 +4115,34 @@ Type Analyzer::typeOfMember(
         }
         const auto structure = structDeclarations_.find(objectType.name);
         if (structure != structDeclarations_.end()) {
+            const Type declarationType =
+                structure->second->resolvedType.value_or(
+                    Type::custom(objectType.name));
+            if (objectType.arguments.size() != declarationType.arguments.size()) {
+                error(expression, "struct type '" + typeName(objectType) +
+                                      "' has invalid generic arguments",
+                      zplus::DiagnosticCategory::Type);
+                return Type::unknown();
+            }
+            TypeSubstitution substitutions;
+            for (std::size_t index = 0;
+                 index < declarationType.arguments.size(); ++index) {
+                if (!unify(declarationType.arguments[index],
+                           objectType.arguments[index], substitutions)) {
+                    error(expression, "invalid type arguments for struct '" +
+                                          structure->second->name + "'",
+                          zplus::DiagnosticCategory::Type);
+                    return Type::unknown();
+                }
+            }
             for (const auto& field : structure->second->fields) {
                 if (field && field->name == expression.member) {
-                    if (!field->type) return Type::unknown();
-                    return resolveType(*field->type);
+                    const Type fieldType = field->resolvedType
+                        ? *field->resolvedType
+                        : field->type
+                        ? resolveType(*field->type)
+                        : Type::unknown();
+                    return substitute(fieldType, substitutions);
                 }
             }
             error(expression, "struct '" + structure->second->name +
@@ -3926,10 +4371,9 @@ Type Analyzer::targetType(
                 zplus::ast::IndexExpression
             >(&target)
     ) {
-
-        return typeOfIndex(
-            *index
-        );
+        const Type result = typeOfIndex(*index);
+        index->resolvedType = result;
+        return result;
     }
 
     if (
@@ -3938,10 +4382,9 @@ Type Analyzer::targetType(
                 zplus::ast::MemberExpression
             >(&target)
     ) {
-
-        return typeOfMember(
-            *member
-        );
+        const Type result = typeOfMember(*member);
+        member->resolvedType = result;
+        return result;
     }
 
     return Type::unknown();

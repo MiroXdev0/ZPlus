@@ -382,6 +382,16 @@ private:
     std::unique_ptr<zplus::ast::Type>
     parseType();
 
+    std::vector<zplus::ast::GenericParameter>
+    parseGenericParameters();
+
+    std::vector<std::unique_ptr<zplus::ast::Type>>
+    parseTypeArguments();
+
+    const zplus::Token& consumeGenericGreater(const std::string& message);
+
+    bool looksLikeGenericCall() const;
+
     bool isTypeStart() const;
 
     bool isTypeToken(

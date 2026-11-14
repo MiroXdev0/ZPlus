@@ -1,0 +1,6 @@
+use zcollections
+
+start {
+    let value = Optional<number>([1, 2])
+    say(value.isSome())
+} stop

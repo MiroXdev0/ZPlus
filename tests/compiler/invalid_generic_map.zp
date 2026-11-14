@@ -1,0 +1,6 @@
+use zcollections
+
+start {
+    let map = Map<string, number>(["key"], [])
+    say(map.size())
+} stop

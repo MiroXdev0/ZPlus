@@ -17,6 +17,13 @@ bool respond(
     const std::string& headersJson,
     std::string body
 );
+bool respondBinary(
+    std::int64_t handle,
+    std::int64_t requestId,
+    std::int64_t status,
+    const std::string& headersJson,
+    const std::string& bodyBase64
+);
 void stopServer(std::int64_t handle);
 void shutdownServers() noexcept;
 void configureServer(
@@ -38,6 +45,13 @@ std::string clientRequest(
     std::string url,
     const std::string& headersJson,
     std::string body,
+    std::int64_t timeoutMilliseconds
+);
+std::string clientRequestBinary(
+    std::string method,
+    std::string url,
+    const std::string& headersJson,
+    const std::string& bodyBase64,
     std::int64_t timeoutMilliseconds
 );
 

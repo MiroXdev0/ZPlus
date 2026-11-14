@@ -1,0 +1,28 @@
+use zweb as web
+
+start {
+    let health = web.get("http://127.0.0.1:8080/api/health", "{}", 3000)
+    say(web.responseStatus(health))
+    say(web.responseBody(health))
+
+    let echoed = web.post("http://127.0.0.1:8080/api/echo", "{\"content-type\":\"application/json\"}", "{\"message\":\"hello\"}", 3000)
+    say(web.jsonGetString(web.responseBody(echoed), "/message"))
+
+    let user = web.get("http://127.0.0.1:8080/api/users/42", "{}", 3000)
+    say(web.jsonGetString(web.responseBody(user), "/id"))
+
+    let form = web.post("http://127.0.0.1:8080/api/form", "{\"content-type\":\"application/x-www-form-urlencoded\"}", "name=Jane+Doe", 3000)
+    say(web.jsonGetString(web.responseBody(form), "/name"))
+
+    let cookieResponse = web.post("http://127.0.0.1:8080/api/session", "{}", "", 3000)
+    say(web.jsonGetString(cookieResponse, "/headers/set-cookie"))
+
+    let staticPage = web.get("http://127.0.0.1:8080/api/assets/index.html", "{}", 3000)
+    say(web.responseStatus(staticPage))
+
+    let missing = web.get("http://127.0.0.1:8080/api/missing", "{}", 3000)
+    say(web.responseStatus(missing))
+
+    let stopped = web.post("http://127.0.0.1:8080/api/__stop", "{}", "", 3000)
+    say(web.responseStatus(stopped))
+} stop

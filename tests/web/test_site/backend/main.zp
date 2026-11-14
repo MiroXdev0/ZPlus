@@ -1,0 +1,201 @@
+use zweb as web
+use zstring as text
+use zfile as file
+
+start {
+    fn validEmail(value: string): boolean {
+        let email = text.trim(value)
+        if email != value {
+            return false
+        } end if
+        if text.contains(email, "@") == false {
+            return false
+        } end if
+        if text.contains(email, ".") == false {
+            return false
+        } end if
+        if text.contains(email, " ") {
+            return false
+        } end if
+        if text.startsWith(email, "@") or text.endsWith(email, "@") {
+            return false
+        } end if
+        if text.contains(email, "@.") or text.contains(email, "..") {
+            return false
+        } end if
+        return true
+    } end fn
+
+    fn validateContact(formJson: string): string {
+        let validation = web.validateForm(formJson, "[{\"name\":\"name\",\"required\":true,\"minLength\":2,\"maxLength\":80},{\"name\":\"email\",\"required\":true,\"minLength\":6,\"maxLength\":254},{\"name\":\"message\",\"required\":true,\"minLength\":15,\"maxLength\":2000}]")
+        if web.jsonGetBoolean(validation, "/valid") == false {
+            return validation
+        } end if
+
+        if validEmail(web.formValue(formJson, "email")) == false {
+            return "{\"valid\":false,\"errors\":[{\"field\":\"email\",\"rule\":\"format\",\"message\":\"Enter a valid email address.\"}]}"
+        } end if
+        return validation
+    } end fn
+
+    fn sendJson(server: number, requestId: number, status: number, bodyJson: string) {
+        web.serverRespondJson(server, requestId, status, web.securityHeaders("{}"), bodyJson)
+    } end fn
+
+    fn sendHtml(server: number, requestId: number, status: number, body: string) {
+        let headers = web.securityHeaders("{\"content-type\":\"text/html; charset=utf-8\"}")
+        web.serverRespond(server, requestId, status, headers, body)
+    } end fn
+
+    fn handleContact(server: number, requestJson: string, isApi: boolean) {
+        let requestId = web.requestNumber(requestJson)
+        let contentType = text.lower(web.requestHeader(requestJson, "content-type"))
+        if text.startsWith(contentType, "application/x-www-form-urlencoded") == false {
+            if isApi {
+                sendJson(server, requestId, 415, "{\"error\":\"Use application/x-www-form-urlencoded.\"}")
+            } else {
+                let page = web.loadTemplate("public/templates", "contact-invalid.html", 65536)
+                sendHtml(server, requestId, 415, web.renderTemplate(page, "{}"))
+            } end if
+            return
+        } end if
+
+        let form = web.parseForm(web.requestBody(requestJson))
+        let validation = validateContact(form)
+        if web.jsonGetBoolean(validation, "/valid") == false {
+            if isApi {
+                sendJson(server, requestId, 400, validation)
+            } else {
+                let page = web.loadTemplate("public/templates", "contact-invalid.html", 65536)
+                sendHtml(server, requestId, 400, web.renderTemplate(page, "{}"))
+            } end if
+            return
+        } end if
+
+        let name = web.formValue(form, "name")
+        let email = web.formValue(form, "email")
+        let message = web.formValue(form, "message")
+        let record = "{\"name\":" + web.jsonQuote(name)
+        record = record + ",\"email\":" + web.jsonQuote(email)
+        record = record + ",\"message\":" + web.jsonQuote(message) + "}"
+        file.append("data/contact_messages.jsonl", record + "\n")
+
+        if isApi {
+            let result = "{\"ok\":true,\"message\":\"Your inquiry was received.\",\"name\":" + web.jsonQuote(name) + "}"
+            sendJson(server, requestId, 201, result)
+        } else {
+            let page = web.loadTemplate("public/templates", "contact-success.html", 65536)
+            let context = "{\"name\":" + web.jsonQuote(name) + "}"
+            sendHtml(server, requestId, 201, web.renderTemplate(page, context))
+        } end if
+    } end fn
+
+    fn dispatch(server: number, requestJson: string, routes: string): boolean {
+        let requestId = web.requestNumber(requestJson)
+        let method = web.requestMethod(requestJson)
+        let path = web.requestPath(requestJson)
+        let matched = web.routeMatch(routes, method, path)
+        let routeStatus = web.jsonGetNumber(matched, "/status")
+
+        if routeStatus == 404 {
+            sendJson(server, requestId, 404, "{\"error\":\"Not found.\"}")
+            return false
+        } end if
+        if routeStatus == 405 {
+            let allow = web.jsonGetString(matched, "/allow")
+            let headers = "{\"content-type\":\"application/json\",\"allow\":" + web.jsonQuote(allow) + "}"
+            web.serverRespond(server, requestId, 405, web.securityHeaders(headers), "{\"error\":\"Method not allowed.\"}")
+            return false
+        } end if
+
+        let handler = web.jsonGetString(matched, "/handler")
+        if handler == "home" {
+            let sent = web.serverRespondStatic(server, requestId, 200, web.securityHeaders("{}"), "public", "/", "index.html", 1048576, "public, max-age=300")
+            if sent == false {
+                sendJson(server, requestId, 404, "{\"error\":\"Homepage is unavailable.\"}")
+            } end if
+        } else if handler == "style" {
+            let sent = web.serverRespondStatic(server, requestId, 200, web.securityHeaders("{}"), "public", "css/style.css", "index.html", 262144, "public, max-age=3600")
+            if sent == false {
+                sendJson(server, requestId, 404, "{\"error\":\"Stylesheet is unavailable.\"}")
+            } end if
+        } else if handler == "health" {
+            sendJson(server, requestId, 200, "{\"status\":\"ok\",\"service\":\"northstar-studio\"}")
+        } else if handler == "service" {
+            let parameters = web.jsonGet(matched, "/params")
+            let serviceId = web.jsonGetString(parameters, "/id")
+            let title = ""
+            let description = ""
+            if serviceId == "strategy" {
+                title = "Digital strategy"
+                description = "Research, positioning and a clear roadmap for what comes next."
+            } else if serviceId == "identity" {
+                title = "Brand identity"
+                description = "A distinctive, flexible identity built to work everywhere."
+            } else if serviceId == "products" {
+                title = "Digital products"
+                description = "Thoughtful websites and product experiences made for people."
+            } else {
+                sendJson(server, requestId, 404, "{\"error\":\"Service not found.\"}")
+                return false
+            } end if
+
+            let source = web.queryValue(web.requestQuery(requestJson), "source")
+            if source == "" {
+                source = "direct"
+            } end if
+            let result = "{\"id\":" + web.jsonQuote(serviceId)
+            result = result + ",\"title\":" + web.jsonQuote(title)
+            result = result + ",\"description\":" + web.jsonQuote(description)
+            result = result + ",\"source\":" + web.jsonQuote(source) + "}"
+            sendJson(server, requestId, 200, result)
+        } else if handler == "contact-page" {
+            handleContact(server, requestJson, false)
+        } else if handler == "contact-api" {
+            handleContact(server, requestJson, true)
+        } else if handler == "shutdown" {
+            sendJson(server, requestId, 200, "{\"status\":\"stopping\"}")
+            return true
+        } else {
+            sendJson(server, requestId, 404, "{\"error\":\"Not found.\"}")
+        } end if
+        return false
+    } end fn
+
+    let routes = "[]"
+    routes = web.routeAdd(routes, "GET", "/", "home")
+    routes = web.routeAdd(routes, "GET", "/assets/style.css", "style")
+    routes = web.routeAdd(routes, "GET", "/api/health", "health")
+    routes = web.routeAdd(routes, "GET", "/api/services/{id}", "service")
+    routes = web.routeAdd(routes, "POST", "/contact", "contact-page")
+    routes = web.routeAdd(routes, "POST", "/api/contact", "contact-api")
+    routes = web.routeAdd(routes, "POST", "/__dev/shutdown", "shutdown")
+
+    if file.exists("data") == false {
+        if file.createDirectory("data") == false {
+            say("Could not create the local data directory.")
+        } end if
+    } end if
+
+    let server = web.serverCreate("127.0.0.1", 8765)
+    web.serverConfigure(server, 1048576, 10000)
+    if web.serverStart(server) == false {
+        say("Could not start Northstar Studio on 127.0.0.1:8765.")
+        web.serverStop(server)
+    } else {
+        say("Northstar Studio is running at http://127.0.0.1:8765")
+        let serving = true
+        while serving {
+            if web.serverRunning(server) == false {
+                serving = false
+            } else {
+                let request = web.serverNext(server, 250)
+                if request != "" {
+                    serving = dispatch(server, request, routes) == false
+                } end if
+            } end if
+        } end while
+        web.serverStop(server)
+        say("Northstar Studio stopped.")
+    } end if
+} stop

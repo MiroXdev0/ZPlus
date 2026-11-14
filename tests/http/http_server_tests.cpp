@@ -6,6 +6,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -30,6 +31,16 @@ namespace {
 
 void require(bool condition, const char* message) {
     if (!condition) throw std::runtime_error(message);
+}
+
+template<typename Function>
+void requireThrows(Function&& function, const char* message) {
+    try {
+        function();
+    } catch (const std::exception&) {
+        return;
+    }
+    throw std::runtime_error(message);
 }
 
 void closeSocket(TestSocket socket) {
@@ -86,6 +97,13 @@ std::string readResponse(TestSocket socket) {
     }
     const auto lengthStart = buffer.find("Content-Length:");
     if (lengthStart == std::string::npos) {
+        const auto statusLineEnd = buffer.find("\r\n");
+        const std::string_view statusLine(buffer.data(),
+            statusLineEnd == std::string::npos ? buffer.size() : statusLineEnd);
+        if (statusLine.starts_with("HTTP/1.1 204 ") ||
+            statusLine.starts_with("HTTP/1.1 304 ")) {
+            return buffer.substr(0, headerEnd + 4);
+        }
         throw std::runtime_error("server omitted Content-Length");
     }
     const auto lengthEnd = buffer.find("\r\n", lengthStart);
@@ -120,6 +138,72 @@ std::string methodRequest(
         (closeConnection ? "close" : "keep-alive") + "\r\nContent-Length: 0\r\n\r\n";
 }
 
+std::string runClientAgainstRawServer(const std::string& response) {
+    const TestSocket listener = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (listener == invalidTestSocket) throw std::runtime_error("raw server socket failed");
+    sockaddr_in address{};
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    address.sin_port = 0;
+    if (bind(listener, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0 ||
+        listen(listener, 1) != 0) {
+        closeSocket(listener);
+        throw std::runtime_error("raw test server could not listen");
+    }
+#ifdef _WIN32
+    int addressLength = sizeof(address);
+#else
+    socklen_t addressLength = sizeof(address);
+#endif
+    if (getsockname(listener, reinterpret_cast<sockaddr*>(&address),
+            &addressLength) != 0) {
+        closeSocket(listener);
+        throw std::runtime_error("raw test server could not determine its port");
+    }
+    const auto port = ntohs(address.sin_port);
+    std::exception_ptr serverError;
+    std::thread server([&] {
+        TestSocket client = accept(listener, nullptr, nullptr);
+        if (client == invalidTestSocket) {
+            serverError = std::make_exception_ptr(
+                std::runtime_error("raw test server accept failed"));
+            closeSocket(listener);
+            return;
+        }
+        try {
+            std::string request;
+            while (request.find("\r\n\r\n") == std::string::npos) {
+                char chunk[1024];
+#ifdef _WIN32
+                const int received = recv(client, chunk, static_cast<int>(sizeof(chunk)), 0);
+#else
+                const auto received = recv(client, chunk, sizeof(chunk), 0);
+#endif
+                if (received <= 0) throw std::runtime_error("raw client request was incomplete");
+                request.append(chunk, static_cast<std::size_t>(received));
+            }
+            writeAll(client, response);
+        } catch (...) {
+            serverError = std::current_exception();
+        }
+        closeSocket(client);
+        closeSocket(listener);
+    });
+
+    std::string result;
+    std::exception_ptr clientError;
+    try {
+        result = zplus::http::clientRequest("GET",
+            "http://127.0.0.1:" + std::to_string(port) + "/", "{}", "", 3000);
+    } catch (...) {
+        clientError = std::current_exception();
+    }
+    server.join();
+    if (serverError) std::rethrow_exception(serverError);
+    if (clientError) std::rethrow_exception(clientError);
+    return result;
+}
+
 } // namespace
 
 int main() {
@@ -148,6 +232,34 @@ int main() {
                 "/users",
             "query parameter decoding failed");
 
+        const auto chunkedResponse = runClientAgainstRawServer(
+            "HTTP/1.1 200 OK\r\n"
+            "Transfer-Encoding: chunked\r\n"
+            "Trailer: X-Checksum\r\n"
+            "Connection: close\r\n\r\n"
+            "4\r\nWiki\r\n"
+            "5;ext=value\r\npedia\r\n"
+            "0\r\nX-Checksum: ok\r\n\r\n");
+        require(zplus::json::getString(chunkedResponse, "/body") == "Wikipedia",
+            "chunked HTTP response decoding failed");
+        requireThrows([&] {
+            (void)runClientAgainstRawServer(
+                "HTTP/1.1 200 OK\r\n"
+                "Transfer-Encoding: chunked\r\n"
+                "Content-Length: 0\r\n\r\n0\r\n\r\n");
+        }, "ambiguous Transfer-Encoding and Content-Length response was accepted");
+        requireThrows([&] {
+            (void)runClientAgainstRawServer(
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Length: 0\r\n"
+                "Content-Length: 0\r\n\r\n");
+        }, "duplicate response Content-Length was accepted");
+        requireThrows([&] {
+            (void)runClientAgainstRawServer(
+                "HTTP/1.1 200 OK\r\n"
+                "Transfer-Encoding: gzip\r\n\r\n");
+        }, "unsupported response Transfer-Encoding was accepted");
+
         std::string firstClientResponse;
         std::exception_ptr firstClientError;
         std::thread firstClient([&] {
@@ -156,6 +268,7 @@ int main() {
                 writeAll(socket,
                     "POST /api/items/7?verbose=1 HTTP/1.1\r\n"
                     "Host: localhost\r\n"
+                    "Origin: https://example.test\r\n"
                     "X-Request: integration\r\n"
                     "Content-Length: 5\r\n"
                     "Connection: close\r\n\r\n"
@@ -196,6 +309,39 @@ int main() {
                 std::string::npos,
             "configured CORS origin was not included");
 
+        const TestSocket preflightClient = connectTo(port);
+        writeAll(preflightClient,
+            "OPTIONS /api/items/7 HTTP/1.1\r\n"
+            "Host: localhost\r\n"
+            "Origin: https://example.test\r\n"
+            "Access-Control-Request-Method: POST\r\n"
+            "Access-Control-Request-Headers: Content-Type\r\n"
+            "Connection: close\r\n\r\n");
+        const std::string preflightResponse = readResponse(preflightClient);
+        closeSocket(preflightClient);
+        require(preflightResponse.find("HTTP/1.1 204 No Content\r\n") == 0 &&
+                preflightResponse.find(
+                    "access-control-allow-origin: https://example.test\r\n") !=
+                    std::string::npos &&
+                preflightResponse.find(
+                    "access-control-allow-methods: GET, POST, OPTIONS\r\n") !=
+                    std::string::npos,
+            "valid CORS preflight was not answered with its configured policy");
+
+        const TestSocket deniedPreflightClient = connectTo(port);
+        writeAll(deniedPreflightClient,
+            "OPTIONS /api/items/7 HTTP/1.1\r\n"
+            "Host: localhost\r\n"
+            "Origin: https://attacker.test\r\n"
+            "Access-Control-Request-Method: POST\r\n"
+            "Connection: close\r\n\r\n");
+        const std::string deniedPreflightResponse = readResponse(deniedPreflightClient);
+        closeSocket(deniedPreflightClient);
+        require(deniedPreflightResponse.find("HTTP/1.1 403 Forbidden\r\n") == 0 &&
+                deniedPreflightResponse.find("access-control-allow-origin:") ==
+                    std::string::npos,
+            "disallowed CORS preflight received an allow-origin header");
+
         const TestSocket oversizedClient = connectTo(port);
         writeAll(oversizedClient,
             "POST /large HTTP/1.1\r\nHost: localhost\r\n"
@@ -212,6 +358,62 @@ int main() {
         closeSocket(malformedClient);
         require(malformedResponse.find("HTTP/1.1 400 Bad Request\r\n") == 0,
             "malformed request was not rejected safely");
+
+        const TestSocket duplicateLengthClient = connectTo(port);
+        writeAll(duplicateLengthClient,
+            "POST /duplicate-length HTTP/1.1\r\n"
+            "Host: localhost\r\n"
+            "Content-Length: 0\r\n"
+            "Content-Length: 0\r\n"
+            "Connection: close\r\n\r\n");
+        const std::string duplicateLengthResponse = readResponse(duplicateLengthClient);
+        closeSocket(duplicateLengthClient);
+        require(duplicateLengthResponse.find("HTTP/1.1 400 Bad Request\r\n") == 0,
+            "duplicate Content-Length request framing was accepted");
+
+        std::string pipelinedResponses;
+        std::exception_ptr pipelinedClientError;
+        std::thread pipelinedClient([&] {
+            try {
+                const TestSocket socket = connectTo(port);
+                writeAll(socket,
+                    "GET /pipeline-first HTTP/1.1\r\n"
+                    "Host: localhost\r\n"
+                    "Connection: keep-alive\r\n\r\n"
+                    "POST /pipeline-large HTTP/1.1\r\n"
+                    "Host: localhost\r\n"
+                    "Content-Length: 100\r\n"
+                    "Connection: close\r\n\r\n" + std::string(100, 'x'));
+                pipelinedResponses = readResponse(socket);
+                closeSocket(socket);
+            } catch (...) {
+                pipelinedClientError = std::current_exception();
+            }
+        });
+        const std::string pipelineFirst = zplus::http::nextRequest(server, 3000);
+        require(zplus::json::getString(pipelineFirst, "/path") == "/pipeline-first",
+            "buffered pipelined bytes incorrectly rejected the first request");
+        require(zplus::http::respond(server,
+            static_cast<std::int64_t>(zplus::json::getNumber(pipelineFirst, "/id")),
+            200, "{}", "first"), "server rejected the first pipelined response");
+        pipelinedClient.join();
+        if (pipelinedClientError) std::rethrow_exception(pipelinedClientError);
+        require(pipelinedResponses.find("HTTP/1.1 200 OK\r\n") == 0,
+            "buffered pipelined request bytes incorrectly caused a 413 response");
+
+        std::string excessiveHeaders =
+            "GET /too-many-headers HTTP/1.1\r\nHost: localhost\r\n";
+        for (int i = 0; i < 100; ++i) {
+            excessiveHeaders += "X-Test-" + std::to_string(i) + ": x\r\n";
+        }
+        excessiveHeaders += "Connection: close\r\n\r\n";
+        const TestSocket excessiveHeadersClient = connectTo(port);
+        writeAll(excessiveHeadersClient, excessiveHeaders);
+        const std::string excessiveHeadersResponse = readResponse(excessiveHeadersClient);
+        closeSocket(excessiveHeadersClient);
+        require(excessiveHeadersResponse.find(
+                    "HTTP/1.1 431 Request Header Fields Too Large\r\n") == 0,
+            "request header-count limit was not enforced");
 
         std::string persistentResponse;
         std::exception_ptr persistentClientError;
@@ -306,7 +508,7 @@ int main() {
                 clientResult = zplus::http::clientRequest(
                     "POST",
                     "http://127.0.0.1:" + std::to_string(port) + "/client?mode=json",
-                    R"({"content-type":"application/json","x-client":"integration"})",
+                    R"({"content-type":"application/json","x-client":"integration","origin":"https://example.test"})",
                     R"({"active":true})",
                     3000);
             } catch (...) {

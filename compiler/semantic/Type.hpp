@@ -23,12 +23,26 @@ enum class TypeKind {
     TypeParameter
 };
 
+enum class TypeConstraint {
+    Numeric,
+    Equatable
+};
+
+struct GenericTypeParameter {
+    std::string id;
+    std::string name;
+    std::vector<TypeConstraint> constraints;
+};
+
 struct Type {
     TypeKind kind = TypeKind::Unknown;
     std::string name;
     std::shared_ptr<Type> elementType;
     std::vector<Type> arguments;
     std::vector<Type> parameters;
+    std::vector<GenericTypeParameter> genericParameters;
+    std::vector<TypeConstraint> constraints;
+    std::string displayName;
     std::size_t requiredParameterCount = 0;
     std::shared_ptr<Type> returnType;
 
@@ -42,14 +56,26 @@ struct Type {
     static Type boolean() { return Type(TypeKind::Boolean); }
     static Type voidType() { return Type(TypeKind::Void); }
     static Type null() { return Type(TypeKind::Null); }
-    static Type typeParameter(std::string name);
+    static Type typeParameter(
+        std::string name,
+        std::string displayName = {},
+        std::vector<TypeConstraint> constraints = {}
+    );
     static Type custom(std::string name, std::vector<Type> arguments = {});
     static Type array(const Type& element);
     static Type array(Type&& element);
     static Type pointer(const Type& element);
     static Type pointer(Type&& element);
-    static Type function(std::vector<Type> parameters, const Type& returnType);
-    static Type function(std::vector<Type> parameters, Type&& returnType);
+    static Type function(
+        std::vector<Type> parameters,
+        const Type& returnType,
+        std::vector<GenericTypeParameter> genericParameters = {}
+    );
+    static Type function(
+        std::vector<Type> parameters,
+        Type&& returnType,
+        std::vector<GenericTypeParameter> genericParameters = {}
+    );
 };
 
 using TypeSubstitution = std::unordered_map<std::string, Type>;

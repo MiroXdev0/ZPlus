@@ -254,6 +254,7 @@ struct Type final : Node {
     std::string name;
 
     TypePtr elementType;
+    std::vector<TypePtr> arguments;
 
     bool isArray() const {
         return kind == Kind::Array;
@@ -278,6 +279,13 @@ struct Type final : Node {
                 return false;
         }
     }
+};
+
+struct GenericParameter {
+    std::string name;
+    std::string constraint;
+    mutable std::string bindingName;
+    Location location;
 };
 
 
@@ -668,6 +676,8 @@ struct CallExpression final : Expression {
 
     Expr callee;
 
+    std::vector<TypePtr> explicitTypeArguments;
+    mutable std::vector<zplus::semantic::Type> resolvedTypeArguments;
     std::vector<Expr> arguments;
 
     std::size_t argumentCount() const {
@@ -710,6 +720,7 @@ struct MemberExpression final : Expression {
     mutable std::string resolvedName;
 
     mutable bool requiresReceiver = false;
+    mutable std::vector<zplus::semantic::Type> resolvedGenericTypeArguments;
 };
 
 
@@ -1140,6 +1151,7 @@ struct FunctionDeclaration final : Statement {
 
     std::string name;
 
+    std::vector<GenericParameter> genericParameters;
     std::vector<ParameterPtr> parameters;
 
     TypePtr returnType;
@@ -1214,6 +1226,7 @@ struct StructDeclaration final : Statement {
 
     std::string name;
 
+    std::vector<GenericParameter> genericParameters;
     std::vector<
         std::unique_ptr<StructField>
     > fields;
@@ -1276,6 +1289,7 @@ struct ClassDeclaration final : Statement {
 
     std::string baseClass;
 
+    std::vector<GenericParameter> genericParameters;
     std::vector<
         std::unique_ptr<ClassField>
     > fields;

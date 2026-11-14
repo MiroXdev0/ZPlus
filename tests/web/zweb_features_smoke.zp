@@ -1,0 +1,71 @@
+use zweb as web
+
+start {
+    let routes = web.routeAddConfigured("[]", "GET", "/users/{id}", "showUser", "user.show", "{\"auth\":true}")
+    routes = web.routeGroup("/v1", routes)
+    let matched = web.routeMatch(routes, "GET", "/v1/users/42")
+    say(web.jsonGetString(matched, "/name"))
+    say(web.jsonGetBoolean(matched, "/configuration/auth"))
+    say(web.routeUrl(routes, "user.show", "{\"id\":\"a b\"}"))
+
+    let reply = web.jsonResponse(201, "{}", "{\"created\":true}")
+    say(web.responseStatus(reply))
+    say(web.jsonGetBoolean(web.responseBody(reply), "/created"))
+    say(web.parseJsonBody("{\"body\":\"{\\\"ok\\\":true}\",\"bodyEncoding\":\"utf8\"}"))
+    say(web.jsonGetNumber(web.notFoundResponse("missing"), "/status"))
+    say(web.jsonGetString(web.methodNotAllowedResponse("GET, HEAD", "wrong method"), "/headers/allow"))
+
+    let form = web.parseForm("name=Ada&age=37&tag=one&tag=two")
+    let validation = web.validateForm(form, "[{\"name\":\"name\",\"required\":true,\"minLength\":2},{\"name\":\"age\",\"numeric\":true}]")
+    say(web.jsonGetBoolean(validation, "/valid"))
+    say(web.formNumber(form, "age"))
+    say(web.formValue(form, "tag"))
+
+    let html = web.renderTemplate("<h1>{{name}}</h1>{{#if active}}<ul>{{#each items}}<li>{{this}}</li>{{/each}}</ul>{{/if}}", "{\"name\":\"<Ada>\",\"active\":true,\"items\":[\"one\",\"two\"]}")
+    say(html)
+
+    let store = web.sessionStoreCreate()
+    let sessionId = web.sessionCreate(store, 60)
+    say(web.sessionSet(store, sessionId, "user", "Ada"))
+    say(web.sessionGet(store, sessionId, "user"))
+    say(web.sessionHas(store, sessionId, "user"))
+    let csrf = web.sessionCsrfToken(store, sessionId)
+    say(web.sessionValidateCsrf(store, sessionId, csrf))
+    let oldSessionId = sessionId
+    sessionId = web.sessionRotate(store, sessionId, 60)
+    say(sessionId != oldSessionId)
+    say(web.sessionHas(store, oldSessionId, "user"))
+    say(web.sessionValidateCsrf(store, sessionId, csrf))
+    say(web.sessionValidateCsrf(store, sessionId, web.sessionCsrfToken(store, sessionId)))
+    say(web.sessionInvalidate(store, sessionId))
+    web.sessionStoreClose(store)
+
+    let cookie = web.cookieHeaderExpires("sid", "value", 60, "Wed, 21 Oct 2015 07:28:00 GMT", "/", "", true, true, "Lax")
+    say(cookie)
+
+    let pipeline = web.middlewareUse("[]", "requireHeader", "{\"header\":\"x-api-key\",\"equals\":\"secret\"}")
+    pipeline = web.middlewareUse(pipeline, "requestTiming", "{}")
+    pipeline = web.middlewareUse(pipeline, "securityHeaders", "{}")
+    pipeline = web.middlewareUse(pipeline, "cors", "{\"origin\":\"https://example.test\",\"methods\":\"GET, POST\"}")
+    pipeline = web.middlewareUse(pipeline, "requestLog", "{}")
+    let request = "{\"method\":\"GET\",\"path\":\"/private\",\"headers\":{\"x-api-key\":\"secret\",\"origin\":\"https://example.test\"},\"body\":\"\"}"
+    let before = web.middlewareBefore(pipeline, request)
+    say(web.jsonGetBoolean(before, "/proceed"))
+    let after = web.middlewareAfter(pipeline, web.jsonGet(before, "/request"), "{\"status\":200,\"headers\":{},\"body\":\"ok\"}")
+    say(web.jsonGetString(after, "/headers/access-control-allow-origin"))
+    say(web.jsonArrayLength(after, "/logs"))
+
+    let multipartRequest = "{\"headers\":{\"content-type\":\"multipart/form-data; boundary=b\"},\"bodyBase64\":\"LS1iDQpDb250ZW50LURpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9Im5vdGUiDQoNCmhlbGxvDQotLWINCkNvbnRlbnQtRGlzcG9zaXRpb246IGZvcm0tZGF0YTsgbmFtZT0iYXNzZXQiOyBmaWxlbmFtZT0iYS50eHQiDQpDb250ZW50LVR5cGU6IHRleHQvcGxhaW4NCg0KZmlsZS1kYXRhDQotLWItLQ0K\"}"
+    let multipart = web.parseMultipart(multipartRequest, 1024)
+    say(web.multipartFieldValue(multipart, "note"))
+    say(web.uploadCount(multipart))
+    web.saveUpload(multipart, 0, "uploads", "zweb-smoke.bin", 1024)
+    say(web.staticFile("uploads", "zweb-smoke.bin", 1024) == "file-data")
+
+    if web.jsonValid("[]") == false {
+        let binaryClient = web.requestBinary("GET", "http://127.0.0.1:1/", "{}", "", 100)
+        let noContent = web.options("http://127.0.0.1:1/", "{}", 100)
+        web.serverRespondBinary(0, 0, 200, "{}", "")
+        web.serverRespondStatic(0, 0, 200, "{}", ".", "/", "index.html", 1024, "")
+    } end if
+} stop

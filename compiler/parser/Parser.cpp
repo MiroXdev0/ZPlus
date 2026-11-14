@@ -1410,6 +1410,7 @@ Parser::parseFunction() {
 
     advance();
 
+    function->genericParameters = parseGenericParameters();
     function->parameters =
         parseParameters();
 
@@ -2799,6 +2800,23 @@ Parser::parsePostfix() {
 
     while (!isAtEnd()) {
 
+        if (check(TokenType::Less) && looksLikeGenericCall()) {
+            std::vector<std::unique_ptr<zplus::ast::Type>> typeArguments =
+                parseTypeArguments();
+            if (!check(TokenType::LeftParen)) {
+                error("expected '(' after generic type arguments");
+                return nullptr;
+            }
+            auto call = parseCall(std::move(expression));
+            if (auto* callExpression =
+                    dynamic_cast<zplus::ast::CallExpression*>(call.get())) {
+                callExpression->explicitTypeArguments =
+                    std::move(typeArguments);
+            }
+            expression = std::move(call);
+            continue;
+        }
+
         // ----------------------------------------------------
         // Call
         // ----------------------------------------------------
@@ -3552,6 +3570,14 @@ Parser::parseType() {
                 );
 
             advance();
+            if (match(TokenType::Less)) {
+                do {
+                    auto argument = parseType();
+                    if (!argument) return nullptr;
+                    type->arguments.push_back(std::move(argument));
+                } while (match(TokenType::Comma));
+                consumeGenericGreater("expected '>' after generic type arguments");
+            }
             break;
 
         default:
@@ -3620,6 +3646,103 @@ Parser::parseType() {
     }
 
     return type;
+}
+
+std::vector<zplus::ast::GenericParameter>
+Parser::parseGenericParameters() {
+    std::vector<zplus::ast::GenericParameter> parameters;
+    if (!match(TokenType::Less)) return parameters;
+
+    do {
+        if (!check(TokenType::Identifier)) {
+            error("expected a type parameter name");
+            return parameters;
+        }
+        zplus::ast::GenericParameter parameter;
+        parameter.name = current().value;
+        parameter.location = {
+            current().line,
+            current().column,
+            current().sourceFile
+        };
+        advance();
+        if (match(TokenType::Colon)) {
+            if (check(TokenType::NumberType)) {
+                parameter.constraint = "number";
+                advance();
+            } else if (check(TokenType::Identifier)) {
+                parameter.constraint = current().value;
+                advance();
+            } else {
+                error("expected a generic constraint after ':'");
+                return parameters;
+            }
+        }
+        parameters.push_back(std::move(parameter));
+    } while (match(TokenType::Comma));
+
+    consumeGenericGreater("expected '>' after generic parameter list");
+    return parameters;
+}
+
+std::vector<std::unique_ptr<zplus::ast::Type>>
+Parser::parseTypeArguments() {
+    std::vector<std::unique_ptr<zplus::ast::Type>> arguments;
+    consume(TokenType::Less, "expected '<'");
+    do {
+        auto argument = parseType();
+        if (!argument) return arguments;
+        arguments.push_back(std::move(argument));
+    } while (match(TokenType::Comma));
+    consumeGenericGreater("expected '>' after generic type arguments");
+    return arguments;
+}
+
+const zplus::Token& Parser::consumeGenericGreater(
+    const std::string& message
+) {
+    if (check(TokenType::Greater)) return advance();
+    if (check(TokenType::RightShift)) {
+        zplus::Token second = current();
+        second.type = TokenType::Greater;
+        second.value = ">";
+        ++second.column;
+        tokens_[current_].type = TokenType::Greater;
+        tokens_[current_].value = ">";
+        tokens_.insert(tokens_.begin() + static_cast<std::ptrdiff_t>(current_ + 1),
+                       std::move(second));
+        return advance();
+    }
+    return consume(TokenType::Greater, message);
+}
+
+bool Parser::looksLikeGenericCall() const {
+    if (!check(TokenType::Less)) return false;
+    std::size_t depth = 0;
+    for (std::size_t index = current_; index < tokens_.size(); ++index) {
+        const TokenType token = tokens_[index].type;
+        if (token == TokenType::Less) {
+            ++depth;
+        } else if (token == TokenType::Greater) {
+            if (depth == 0) return false;
+            if (--depth == 0) {
+                return index + 1 < tokens_.size() &&
+                    tokens_[index + 1].type == TokenType::LeftParen;
+            }
+        } else if (token == TokenType::RightShift) {
+            if (depth < 2) return false;
+            depth -= 2;
+            if (depth == 0) {
+                return index + 1 < tokens_.size() &&
+                    tokens_[index + 1].type == TokenType::LeftParen;
+            }
+        } else if (token == TokenType::EndOfFile ||
+                   token == TokenType::Newline ||
+                   token == TokenType::Semicolon) {
+            return false;
+        }
+    }
+    return false;
 }
 
 // ============================================================
@@ -3905,6 +4028,7 @@ Parser::parseStruct() {
 
     advance();
 
+    declaration->genericParameters = parseGenericParameters();
     const bool braced = match(TokenType::LeftBrace);
     const Token opening = braced ? previous() : token;
     if (braced) {
@@ -4043,6 +4167,7 @@ Parser::parseClass() {
 
     advance();
 
+    declaration->genericParameters = parseGenericParameters();
     const bool braced = match(TokenType::LeftBrace);
     const Token opening = braced ? previous() : token;
     if (braced) {

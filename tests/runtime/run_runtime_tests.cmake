@@ -68,6 +68,10 @@ run_success(
     "empty=0\nsingle=1\nwords=3\nflags=2\nnested=2\npositive=42\nnegative=-17\nzero=0\ndecimal=2.5\nexpression=7\nfactorial=120\n"
 )
 run_success(
+    "tests/runtime/legacy_output_builtins.zp"
+    "printline\ntrue\n\n"
+)
+run_success(
     "tests/runtime/structs.zp"
     "true\nfalse\nis player\nAlex\n100\n0\n90\n50\n4\nAlex\n95\n95\n"
 )

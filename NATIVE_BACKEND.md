@@ -26,6 +26,7 @@ The backend emits actual x86-64 machine code and executable containers. Its supp
 - Windows x64 arrays: fixed and dynamically growing array literals (including empty and nested arrays), indexed reads/writes, compound indexed assignment, `length`, `push`, `pop`, `clear`, `insert`, `remove`, `contains`, and array arguments/returns with shared mutation semantics. Append growth is geometric; capacity is retained when logical length shrinks. Runtime checks reject invalid indices and popping an empty array.
 - Windows x64 structs: managed references with positional construction, typed/defaulted fields, reads/writes, nested struct and array references, function arguments/returns, identity comparisons, and `is` checks. Struct and array references share the native tagged-object tracing heap; native regression tests force collection and verify that reachable nested references survive.
 - Windows x64 classes: managed instances with positional construction, typed fields, literal defaults, field reads/writes, instance methods, `this`, and function arguments/returns. Inheritance and explicit constructors are not implemented.
+- Generic functions, structs, and classes: used type combinations are specialized into concrete IR before native code generation. Nested generic types, generic class methods, inferred/explicit arguments, and the generic collection classes are covered by interpreter/native parity tests. Expanding recursive specialization is rejected. Linux native generic execution is not claimed or verified.
 - Windows x64 enums: typed numeric members with equality/comparison and function argument/return support; explicit member values must be numeric literals.
 - `say(boolean)` prints `true` or `false`, matching interpreter output.
 - `to_string(number)` uses the native runtime's round-trip decimal formatter and returns a managed string.
@@ -88,7 +89,7 @@ allocated independently. Linux native execution is not validated on this host.
 
 ## Validation status
 
-The CTest suite builds and executes Windows PE fixtures for floating-point arithmetic, formatting, comparisons, special values, function arguments/returns, arrays and collections, standard-library runtime bindings, physics/audio, branching and loops, module initialization, and interpreter/native exception-defer parity. It also checks runtime error reporting, unsupported IR, runtime packaging, and PE/ELF structure. Linux ELF execution must be tested separately.
+The CTest suite builds and executes Windows PE fixtures for floating-point arithmetic, formatting, comparisons, special values, generic functions/structs/classes/collections, function arguments/returns, arrays and collections, standard-library runtime bindings, physics/audio, branching and loops, module initialization, and interpreter/native exception-defer parity. It also checks runtime error reporting, unsupported IR, runtime packaging, and PE/ELF structure. Linux ELF execution must be tested separately.
 
 Linux ELF execution must be tested on a Linux host. Structural ELF checks alone
 do not claim that Linux runtime execution has been validated.

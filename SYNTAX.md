@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This reference describes the language accepted by the Z+ 1.1.6 command-line compiler in this repository. It follows the lexer, parser, semantic analyzer, IR builder, and interpreter—not proposed or aspirational features.
+This reference describes the language accepted by the Z+ 1.2.0 command-line compiler in this repository. It follows the lexer, parser, semantic analyzer, IR builder, and interpreter—not proposed or aspirational features.
 
 The status labels used below mean:
 
@@ -295,6 +295,48 @@ start {
 ```
 
 Default expressions are type-checked and evaluated only when their trailing argument is omitted. They are evaluated in parameter order and may refer to earlier parameters. Parameters without defaults cannot follow parameters with defaults. The interpreter and native backend receive the completed argument list, so both execution paths use the same defaults. **Default arguments: implemented.**
+
+### Generic declarations and types
+
+Functions, structs, and classes may declare type parameters. A parameter can
+appear in nested parameter, return, and field types. Type arguments are
+inferred from function arguments and record constructor arguments where
+possible, or supplied explicitly with `<...>`:
+
+```zp
+start {
+    fn identity<T>(value: T) -> T {
+        return value
+    } end fn
+
+    struct Box<T> {
+        value: T
+    } end struct
+
+    fn unbox<T>(box: Box<T>) -> T {
+        return box.value
+    } end fn
+
+    let text = identity("inferred")
+    let number = identity<number>(42)
+    let box = Box<number>(number)
+    say(text)
+    say(unbox(box))
+} stop
+```
+
+Generic parameter constraints currently support `number` and `equatable`,
+written as `T: number` or `T: equatable`. Arguments and nested generic types
+are checked structurally; unresolved or conflicting type parameters are
+diagnosed. Generic class methods may use class and method type parameters.
+Each concrete use is specialized before IR verification, interpreter
+execution, or native code generation. Expanding recursive specialization is
+rejected instead of generating an unbounded set of implementations.
+
+The interpreter and Windows x64 native backend support these specializations.
+Generic inheritance, user-defined constraints/traits, and generic type
+inference across arbitrary function-value contexts are not implemented.
+**Generic functions, structs, and classes: implemented.**
 
 ## 7. Control Flow
 
@@ -592,6 +634,10 @@ start {
 |---|---|---|---|
 | `length(array)` | Any `T[]`, including nested arrays | `number` | Returns the element count, including `0` for an empty array. A non-array argument is a compile-time type error. |
 | `to_string(value)` | `number` | `string` | Formats the number using round-trip decimal formatting, consistent with numeric output. Other argument types produce a compile-time type error. |
+
+The compiler represents the array element in these signatures with an internal
+type parameter. This does not add user-declared generic functions or generic
+type syntax.
 
 ```zp
 start {
