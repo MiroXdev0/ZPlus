@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { after, before, beforeEach, test } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { createRegistryHandler, extractArchive } from "../lib/registry.js";
+import { createVercelNodeHandler } from "../lib/vercel-adapter.js";
 
 const publicOrigin = "https://zpluse.vercel.app";
 const baseUrl = `${publicOrigin}/api/registry`;
@@ -34,6 +36,9 @@ const storage = {
   }
 };
 const handler = createRegistryHandler({ pool, storage, publicOrigin });
+let nodeOrigin;
+let nodeHandler;
+const nodeServer = createServer((request, response) => nodeHandler(request, response));
 
 before(async () => {
   const firstMigration = await readFile(
@@ -46,6 +51,13 @@ before(async () => {
   );
   await database.exec(firstMigration);
   await database.exec(secondMigration);
+  nodeServer.listen(0, "127.0.0.1");
+  await new Promise((resolve, reject) => {
+    nodeServer.once("listening", resolve);
+    nodeServer.once("error", reject);
+  });
+  nodeOrigin = `http://127.0.0.1:${nodeServer.address().port}`;
+  nodeHandler = createVercelNodeHandler(handler, nodeOrigin);
 });
 
 beforeEach(async () => {
@@ -58,6 +70,9 @@ beforeEach(async () => {
 });
 
 after(async () => {
+  await new Promise((resolve, reject) => {
+    nodeServer.close(error => error ? reject(error) : resolve());
+  });
   await database.close();
 });
 
@@ -356,6 +371,48 @@ test("expired sessions cannot authenticate", async () => {
     headers: { authorization: `Bearer ${token}` }
   }));
   assert.equal(response.status, 401);
+});
+
+test("adapts Vercel Node requests for authentication and registry routes", async () => {
+  const registered = await fetch(`${nodeOrigin}/api/registry/auth/register`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      origin: publicOrigin,
+      "x-real-ip": "203.0.113.31"
+    },
+    body: JSON.stringify({
+      username: "node-runtime-user",
+      email: "node-runtime@example.com",
+      password: "correct-horse-battery-staple"
+    })
+  });
+  assert.equal(registered.status, 201);
+
+  const cookie = registered.headers.get("set-cookie").split(";")[0];
+  const unauthenticated = await fetch(`${nodeOrigin}/api/registry/auth/me`);
+  assert.equal(unauthenticated.status, 401);
+  assert.equal((await unauthenticated.json()).error.code, "unauthorized");
+
+  const authenticated = await fetch(`${nodeOrigin}/api/registry/auth/me`, {
+    headers: { cookie }
+  });
+  assert.equal(authenticated.status, 200);
+  assert.equal((await authenticated.json()).user.username, "node-runtime-user");
+
+  const invalid = await fetch(`${nodeOrigin}/api/registry/auth/me`, {
+    headers: { cookie: "zpm_session=invalid" }
+  });
+  assert.equal(invalid.status, 401);
+
+  await pool.query("UPDATE zpm_sessions SET expires_at = now() - interval '1 second'");
+  const expired = await fetch(`${nodeOrigin}/api/registry/auth/me`, {
+    headers: { cookie }
+  });
+  assert.equal(expired.status, 401);
+
+  const search = await fetch(`${nodeOrigin}/api/registry/search?q=node-runtime`);
+  assert.equal(search.status, 200);
 });
 
 test("prevents another account from claiming the package or replacing its version", async () => {
