@@ -72,6 +72,23 @@ void closeSocket(NativeSocket socket) noexcept {
 #endif
 }
 
+class SocketGuard {
+public:
+    explicit SocketGuard(NativeSocket socket) noexcept : socket_(socket) {}
+    ~SocketGuard() { close(); }
+    SocketGuard(const SocketGuard&) = delete;
+    SocketGuard& operator=(const SocketGuard&) = delete;
+
+    void close() noexcept {
+        if (socket_ == invalidSocket) return;
+        closeSocket(socket_);
+        socket_ = invalidSocket;
+    }
+
+private:
+    NativeSocket socket_;
+};
+
 void shutdownSocket(NativeSocket socket) noexcept {
     if (socket == invalidSocket) return;
 #ifdef _WIN32
@@ -230,6 +247,7 @@ std::string reasonPhrase(std::int64_t status) {
         case 201: return "Created";
         case 202: return "Accepted";
         case 204: return "No Content";
+        case 205: return "Reset Content";
         case 301: return "Moved Permanently";
         case 302: return "Found";
         case 304: return "Not Modified";
@@ -321,8 +339,10 @@ bool sendAll(NativeSocket socket, std::string_view bytes) {
 #ifdef _WIN32
         const int sent = send(socket, bytes.data(),
             static_cast<int>(std::min<std::size_t>(bytes.size(), INT_MAX)), sendFlags);
+        if (sent == SOCKET_ERROR && WSAGetLastError() == WSAEINTR) continue;
 #else
         const auto sent = send(socket, bytes.data(), bytes.size(), sendFlags);
+        if (sent < 0 && errno == EINTR) continue;
 #endif
         if (sent <= 0) return false;
         bytes.remove_prefix(static_cast<std::size_t>(sent));
@@ -332,14 +352,18 @@ bool sendAll(NativeSocket socket, std::string_view bytes) {
 
 bool receiveMore(NativeSocket socket, std::string& buffer) {
     char chunk[8192];
+    for (;;) {
 #ifdef _WIN32
-    const int received = recv(socket, chunk, static_cast<int>(sizeof(chunk)), 0);
+        const int received = recv(socket, chunk, static_cast<int>(sizeof(chunk)), 0);
+        if (received == SOCKET_ERROR && WSAGetLastError() == WSAEINTR) continue;
 #else
-    const auto received = recv(socket, chunk, sizeof(chunk), 0);
+        const auto received = recv(socket, chunk, sizeof(chunk), 0);
+        if (received < 0 && errno == EINTR) continue;
 #endif
-    if (received <= 0) return false;
-    buffer.append(chunk, static_cast<std::size_t>(received));
-    return true;
+        if (received <= 0) return false;
+        buffer.append(chunk, static_cast<std::size_t>(received));
+        return true;
+    }
 }
 
 bool readRequest(
@@ -513,16 +537,30 @@ std::map<std::string, std::string> parseHeaderObject(
     const std::string& source,
     bool forbidManagedHeaders
 ) {
+    if (source.size() > maximumHeaderBytes) {
+        throw std::length_error("HTTP header JSON exceeds the 16 KiB limit");
+    }
     const json::Value value = json::parse(source);
     const auto* object = std::get_if<json::Value::Object>(&value.data);
     if (!object) throw std::invalid_argument("HTTP response headers must be a JSON object");
     std::map<std::string, std::string> headers;
+    std::size_t headerBytes = 0;
+    std::size_t headerCount = 0;
     for (const auto& [rawName, rawValue] : *object) {
         const auto* headerValue = std::get_if<std::string>(&rawValue.data);
         if (!headerValue || !validHeaderName(rawName) ||
             !validHeaderValue(*headerValue)) {
             throw std::invalid_argument("invalid HTTP response header");
         }
+        if (++headerCount > maximumHeaderCount) {
+            throw std::length_error("HTTP header count exceeds the 100-field limit");
+        }
+        if (rawName.size() > maximumHeaderBytes - headerBytes ||
+            headerValue->size() > maximumHeaderBytes - headerBytes - rawName.size() ||
+            4 > maximumHeaderBytes - headerBytes - rawName.size() - headerValue->size()) {
+            throw std::length_error("HTTP headers exceed the 16 KiB limit");
+        }
+        headerBytes += rawName.size() + headerValue->size() + 4;
         const std::string name = lower(rawName);
         if (forbidManagedHeaders &&
             (name == "content-length" || name == "connection" ||
@@ -662,9 +700,6 @@ std::string decodeChunkedResponse(
                 if (trailerBytes > maximumHeaderBytes) {
                     throw std::runtime_error("HTTP response trailers exceed the configured limit");
                 }
-                if (++chunkCount > maximumChunkCount) {
-                    throw std::runtime_error("HTTP response contains too many chunks");
-                }
                 if (trailer.empty()) return body;
                 if (++trailerCount > maximumHeaderCount) {
                     throw std::runtime_error("HTTP response contains too many trailers");
@@ -683,6 +718,9 @@ std::string decodeChunkedResponse(
                     throw std::runtime_error("forbidden HTTP response trailer field");
                 }
             }
+        }
+        if (++chunkCount > maximumChunkCount) {
+            throw std::runtime_error("HTTP response contains too many chunks");
         }
         if (chunkSize > maximumClientResponseBytes - body.size()) {
             throw std::runtime_error("HTTP response exceeds the configured size limit");
@@ -779,6 +817,9 @@ std::string performClientRequest(
     if (timeoutMilliseconds <= 0 || timeoutMilliseconds > 300000) {
         throw std::invalid_argument("HTTP timeout must be between 1 and 300000 milliseconds");
     }
+    if (body.size() > maximumConfigurableBodyBytes) {
+        throw std::length_error("HTTP request body exceeds the 16 MiB limit");
+    }
     if (method.empty() || !std::all_of(method.begin(), method.end(), [](unsigned char ch) {
             return std::isalpha(ch) != 0;
         })) {
@@ -822,18 +863,25 @@ std::string performClientRequest(
     if (connection == invalidSocket) {
         throw std::runtime_error("HTTP connection failed or timed out");
     }
+    SocketGuard connectionGuard(connection);
 #ifdef _WIN32
     DWORD timeout = static_cast<DWORD>(timeoutMilliseconds);
-    setsockopt(connection, SOL_SOCKET, SO_RCVTIMEO,
-        reinterpret_cast<const char*>(&timeout), sizeof(timeout));
-    setsockopt(connection, SOL_SOCKET, SO_SNDTIMEO,
-        reinterpret_cast<const char*>(&timeout), sizeof(timeout));
+    if (setsockopt(connection, SOL_SOCKET, SO_RCVTIMEO,
+            reinterpret_cast<const char*>(&timeout), sizeof(timeout)) != 0 ||
+        setsockopt(connection, SOL_SOCKET, SO_SNDTIMEO,
+            reinterpret_cast<const char*>(&timeout), sizeof(timeout)) != 0) {
+        connectionGuard.close();
+        throw std::runtime_error("could not configure HTTP client socket timeouts");
+    }
 #else
     timeval timeout{
         static_cast<long>(timeoutMilliseconds / 1000),
         static_cast<long>((timeoutMilliseconds % 1000) * 1000)};
-    setsockopt(connection, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
-    setsockopt(connection, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+    if (setsockopt(connection, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) != 0 ||
+        setsockopt(connection, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) != 0) {
+        connectionGuard.close();
+        throw std::runtime_error("could not configure HTTP client socket timeouts");
+    }
 #endif
     std::string request = method + " " + target + " HTTP/1.1\r\nHost: " +
         authority + "\r\nConnection: close\r\nContent-Length: " +
@@ -842,9 +890,13 @@ std::string performClientRequest(
         request += name + ": " + value + "\r\n";
     }
     request += "\r\n";
+    if (request.size() > maximumHeaderBytes) {
+        connectionGuard.close();
+        throw std::length_error("HTTP request headers exceed the 16 KiB limit");
+    }
     request += body;
     if (!sendAll(connection, request)) {
-        closeSocket(connection);
+        connectionGuard.close();
         throw std::runtime_error("failed to send HTTP request");
     }
 
@@ -852,7 +904,7 @@ std::string performClientRequest(
     std::size_t headerEnd = std::string::npos;
     while ((headerEnd = buffer.find("\r\n\r\n")) == std::string::npos) {
         if (buffer.size() > maximumHeaderBytes || !receiveMore(connection, buffer)) {
-            closeSocket(connection);
+            connectionGuard.close();
             throw std::runtime_error("incomplete or oversized HTTP response headers");
         }
     }
@@ -867,7 +919,7 @@ std::string performClientRequest(
         (statusLine.size() > 12 && statusLine[12] != ' ') ||
         std::any_of(statusLine.begin() + 12, statusLine.end(),
             [](unsigned char ch) { return ch < 0x20 || ch == 0x7f; })) {
-        closeSocket(connection);
+        connectionGuard.close();
         throw std::runtime_error("malformed HTTP response status line");
     }
     std::int64_t status = 0;
@@ -875,8 +927,13 @@ std::string performClientRequest(
         statusLine.data() + 9, statusLine.data() + 12, status);
     if (statusError != std::errc{} || statusEnd != statusLine.data() + 12 ||
         status < 100 || status > 599) {
-        closeSocket(connection);
+        connectionGuard.close();
         throw std::runtime_error("invalid HTTP response status");
+    }
+    if (status < 200) {
+        connectionGuard.close();
+        throw std::runtime_error(
+            "informational and protocol-upgrade HTTP responses are unsupported");
     }
     std::map<std::string, std::string> responseHeaders;
     std::optional<std::size_t> contentLength;
@@ -885,7 +942,7 @@ std::string performClientRequest(
     std::size_t responseHeaderCount = 0;
     while (lineStart < headerBlock.size()) {
         if (++responseHeaderCount > maximumHeaderCount) {
-            closeSocket(connection);
+            connectionGuard.close();
             throw std::runtime_error("HTTP response contains too many headers");
         }
         const auto lineEnd = headerBlock.find("\r\n", lineStart);
@@ -894,31 +951,31 @@ std::string performClientRequest(
                 ? headerBlock.size() - lineStart : lineEnd - lineStart);
         const auto colon = line.find(':');
         if (colon == std::string_view::npos || !validHeaderName(line.substr(0, colon))) {
-            closeSocket(connection);
+            connectionGuard.close();
             throw std::runtime_error("malformed HTTP response header");
         }
         const std::string name = lower(std::string(line.substr(0, colon)));
         const std::string value = trim(line.substr(colon + 1));
         if (!validHeaderValue(value)) {
-            closeSocket(connection);
+            connectionGuard.close();
             throw std::runtime_error("invalid HTTP response header value");
         }
         if (name == "content-length") {
             if (contentLength) {
-                closeSocket(connection);
+                connectionGuard.close();
                 throw std::runtime_error("duplicate HTTP response Content-Length");
             }
             std::size_t length = 0;
             const auto [end, error] = std::from_chars(
                 value.data(), value.data() + value.size(), length);
             if (error != std::errc{} || end != value.data() + value.size()) {
-                closeSocket(connection);
+                connectionGuard.close();
                 throw std::runtime_error("invalid HTTP response Content-Length");
             }
             contentLength = length;
         }
         if (name == "transfer-encoding" && responseHeaders.contains(name)) {
-            closeSocket(connection);
+            connectionGuard.close();
             throw std::runtime_error("duplicate HTTP response Transfer-Encoding");
         }
         responseHeaders[name] = responseHeaders.contains(name)
@@ -930,26 +987,26 @@ std::string performClientRequest(
     std::string responseBody;
     const auto transferEncoding = responseHeaders.find("transfer-encoding");
     if (transferEncoding != responseHeaders.end() && contentLength) {
-        closeSocket(connection);
+        connectionGuard.close();
         throw std::runtime_error(
             "HTTP response contains both Transfer-Encoding and Content-Length");
     }
-    if (status == 204 || status == 304 || method == "HEAD") {
+    if (status == 204 || status == 205 || status == 304 || method == "HEAD") {
         responseBody.clear();
     } else if (transferEncoding != responseHeaders.end() &&
         lower(trim(transferEncoding->second)) == "chunked") {
         responseBody = decodeChunkedResponse(connection, buffer);
     } else if (transferEncoding != responseHeaders.end()) {
-        closeSocket(connection);
+        connectionGuard.close();
         throw std::runtime_error("unsupported HTTP response Transfer-Encoding");
     } else if (contentLength) {
         if (*contentLength > maximumClientResponseBytes) {
-            closeSocket(connection);
+            connectionGuard.close();
             throw std::runtime_error("HTTP response exceeds the configured size limit");
         }
         while (buffer.size() < *contentLength) {
             if (!receiveMore(connection, buffer)) {
-                closeSocket(connection);
+                connectionGuard.close();
                 throw std::runtime_error("incomplete HTTP response body");
             }
         }
@@ -957,19 +1014,19 @@ std::string performClientRequest(
     } else {
         responseBody = std::move(buffer);
         if (responseBody.size() > maximumClientResponseBytes) {
-            closeSocket(connection);
+            connectionGuard.close();
             throw std::runtime_error("HTTP response exceeds the configured size limit");
         }
         while (receiveMore(connection, buffer)) {
             if (buffer.size() > maximumClientResponseBytes - responseBody.size()) {
-                closeSocket(connection);
+                connectionGuard.close();
                 throw std::runtime_error("HTTP response exceeds the configured size limit");
             }
             responseBody += buffer;
             buffer.clear();
         }
     }
-    closeSocket(connection);
+    connectionGuard.close();
     json::Value::Object responseHeaderValues;
     for (auto& [name, value] : responseHeaders) {
         responseHeaderValues.emplace_back(name, json::Value{std::move(value)});
@@ -1127,8 +1184,8 @@ public:
         if (status < 200 || status > 599) {
             throw std::invalid_argument("HTTP status must be between 200 and 599");
         }
-        if ((status == 204 || status == 304) && !body.empty()) {
-            throw std::invalid_argument("204 and 304 HTTP responses cannot include a body");
+        if ((status == 204 || status == 205 || status == 304) && !body.empty()) {
+            throw std::invalid_argument("204, 205, and 304 HTTP responses cannot include a body");
         }
         if (body.size() > maximumServerResponseBytes) {
             throw std::length_error("HTTP response body exceeds the 16 MiB limit");

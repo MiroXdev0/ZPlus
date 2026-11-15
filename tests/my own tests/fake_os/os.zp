@@ -1,13 +1,13 @@
 start{
     fn commands() {
-        say("command list :")
-        say("exit - exit the OS")
-        say("help - show this command list")
-        say("clear - clear the screen")
+        say("command list :\n")
+        say("exit - exit the OS\n")
+        say("help - show this command list\n")
+        say("clear - clear the screen\n")
         say("echo - echo a message")
     } end fn
 
-    say("This is a OS")
+    say("This is a OS\n")
     say("not a short script writen which Z+")
     commands()
     say("type a command :")

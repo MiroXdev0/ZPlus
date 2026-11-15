@@ -91,9 +91,32 @@ Z+ arrays are mutable dynamic arrays: `push(values, value)`, `insert(values,
 index, value)`, `pop(values)`, `remove(values, index)`, `contains(values,
 value)`, `clear(values)`, and `length(values)` provide insertion, removal,
 membership, clearing, and size operations. Arrays can be iterated with `for`.
-These core operations support typed arrays in both the interpreter and
-Windows x64 native runtime. Dedicated map and set types are not currently
-provided.
+
+The module also exports generic `List<T>`, `Stack<T>`, `Queue<T>`,
+`Set<T: equatable>`, `Map<K: equatable, V>`, and `Optional<T>` classes.
+Initialize array-backed collections with typed arrays, for example
+`List<number>([])`, `Map<string, number>([], [])`, or
+`Optional<string>(["ready"])`.
+
+- `List<T>`: `size()`, `add(value)`, `get(index)`, `removeAt(index)`, and `clear()`.
+- `Stack<T>`: `size()`, `push(value)`, and `pop()`; popping an empty stack uses
+  the underlying array bounds diagnostic.
+- `Queue<T>`: `size()`, `enqueue(value)`, and `dequeue()`; removing from an
+  empty queue uses the underlying array bounds diagnostic.
+- `Set<T>`: `size()`, `contains(value)`, `add(value)`, and `remove(value)`.
+  Initial values must not contain duplicates.
+- `Map<K, V>`: `size()`, `set(key, value)`, `get(key)`, and `remove(key)`.
+  `get` and `remove` return `Optional<V>`. Initial key/value arrays must have
+  equal lengths and unique keys; the class validates this before operations.
+- `Optional<T>`: construct with `[]` for none or `[value]` for some; use
+  `isSome()`, `unwrap()`, and `unwrapOr(fallback)`. More than one initial value
+  is rejected.
+
+The generic collection classes use Z+ mutable dynamic arrays and generic
+specialization. They are supported by the interpreter and Windows x64 native
+backend. Native numeric values remain integer-only. Directly accessing the
+backing array fields can bypass collection invariants; use the methods above
+for normal operations.
 
 ### `zfile as file`
 
@@ -252,7 +275,72 @@ file. File access and hashing failures are runtime errors.
 
 Server and client operations may report invalid handles, malformed JSON,
 network, bind, and timeout errors. Request and response objects are exchanged
-as JSON strings. Networking support depends on the platform runtime.
+as JSON strings. HTTP headers are limited to 16 KiB and 100 fields; client
+request bodies are limited to 16 MiB. Networking support depends on the
+platform runtime.
+
+### `zweb as web`
+
+`zweb` is the unified public web module for HTTP/1.x, route tables,
+URL-encoded and multipart forms, validation, cookies, in-memory sessions,
+declarative middleware, templates, JSON responses, and safe static files.
+Existing `zhttp` and `zjson` imports remain supported.
+
+| Area | Public operations |
+|---|---|
+| HTTP | `serverCreate`, `serverStart`, `serverRunning`, `serverPort`, `serverNext`, `serverRespond`, `serverRespondBinary`, `serverRespondFile`, `serverRespondStatic`, `serverStop`, `serverConfigure`, `configureCors`, `request`, `requestBinary`, `get`, `head`, `post`, `put`, `patch`, `deleteRequest`, `options` |
+| Request/response | `routeParams`, `queryValue`, `requestHeader`, `requestMethod`, `requestPath`, `requestQuery`, `requestBody`, `requestBodyEncoding`, `requestBodyBase64`, `parseJsonBody`, `requestNumber`, `response`, `jsonResponse`, `notFoundResponse`, `methodNotAllowedResponse` |
+| JSON | `jsonValid`, `jsonCompact`, `jsonQuote`, `jsonGet`, `jsonGetString`, `jsonGetNumber`, `jsonGetBoolean`, `jsonArrayLength`, `jsonArrayGet`, `jsonKind` |
+| URLs and forms | `urlEncode`, `urlDecode`, `parseUrl`, `buildUrl`, `parseForm`, `formHas`, `formValue`, `formNumber`, `validateForm` |
+| Cookies and sessions | `parseCookies`, `cookieValue`, `cookieHeader`, `cookieHeaderExpires`, `sessionStoreCreate`, `sessionStoreClose`, `sessionCreate`, `sessionSet`, `sessionGet`, `sessionHas`, `sessionInvalidate`, `sessionRotate`, `sessionCsrfToken`, `sessionValidateCsrf`, `sessionCookie` |
+| Routing | `routeAdd`, `routeAddConfigured`, `routeGroup`, `routeMatch`, `routeUrl` |
+| Middleware | `middlewareUse`, `middlewareBefore`, `middlewareAfter`, `securityHeaders` |
+| Multipart | `parseMultipart`, `multipartFieldValue`, `uploadCount`, `uploadedFile`, `uploadDataBase64`, `saveUpload` |
+| Templates and files | `loadTemplate`, `renderTemplate`, `mimeType`, `staticFile` |
+
+`routeAdd` returns an updated route-table JSON string. `routeAddConfigured`
+adds route metadata and an optional name; `routeGroup` preserves this data
+when prefixing patterns; `routeMatch` returns a status, handler identifier,
+extracted parameters, and optional configuration. `routeUrl` builds a path
+for a named route. Since Z+ does not have first-class function values,
+applications dispatch handler identifiers in their polling loop rather than
+registering callbacks.
+
+`parseForm` handles URL-encoded bodies and repeated fields. `validateForm`
+supports required values, string-length bounds, finite numeric checks and
+ranges, a conservative ASCII email check, and allowed-value lists.
+`parseMultipart` returns repeated fields, untrusted filename metadata, and
+base64 file data. `saveUpload` writes bytes beneath a configured root using a
+caller-supplied relative path, refuses overwrites, and applies a size limit.
+Multipart requests are limited to 16 MiB, 256 parts, and 32 headers per part.
+`parseCookies` returns a JSON object; cookie creation supports expiration,
+Max-Age, Path, Domain, Secure, HttpOnly, and SameSite. The session store is
+memory-only and process-local; IDs and CSRF tokens use the operating-system
+cryptographic random source. Session rotation invalidates the prior ID;
+CSRF tokens are bound to session expiration.
+
+The declarative middleware operations run only when the application invokes
+`middlewareBefore` and `middlewareAfter`; they do not provide callbacks or
+automatic exception handling. Request logs contain method, path, status,
+duration when available, byte counts, and a broad error category, not request
+bodies or secrets. Server CORS checks the configured origin and answers
+preflight requests, but is not CSRF protection. `renderTemplate` HTML-escapes
+variables for HTML text-node use and supports simple `if` and `each` sections;
+untrusted interpolations must not be used in script, style, or URL contexts.
+`serverRespondStatic` supports a document root, index file, MIME type, and
+Cache-Control header while rejecting canonical path escape. Concurrent
+filesystem replacement can still race those path checks. Binary HTTP data
+uses base64 fields rather than unsafe UTF-8 conversion.
+
+TLS/HTTPS, HTTP/2/3, chunked request decoding, persistent sessions,
+callback-based middleware, concurrent Z+ handlers, and native Linux runtime
+imports remain unsupported. HTTP parsing is bounded and tested but is not
+claimed to implement every HTTP/1.1 requirement. Canonical filesystem checks
+cannot prevent races from concurrent path replacement. Native execution for
+these runtime functions is Windows x64 only, matching the current backend.
+See the [ZWeb API guide](../docs/ZWEB.md),
+[backend runtime guide](../docs/BACKEND.md), and runnable
+[`examples/zweb/`](../examples/zweb/) programs.
 
 ### `zsqlite as sqlite`
 

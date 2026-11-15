@@ -275,7 +275,9 @@ file. File access and hashing failures are runtime errors.
 
 Server and client operations may report invalid handles, malformed JSON,
 network, bind, and timeout errors. Request and response objects are exchanged
-as JSON strings. Networking support depends on the platform runtime.
+as JSON strings. HTTP headers are limited to 16 KiB and 100 fields; client
+request bodies are limited to 16 MiB. Networking support depends on the
+platform runtime.
 
 ### `zweb as web`
 

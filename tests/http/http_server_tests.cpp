@@ -43,6 +43,16 @@ void requireThrows(Function&& function, const char* message) {
     throw std::runtime_error(message);
 }
 
+template<typename Exception, typename Function>
+void requireThrowsType(Function&& function, const char* message) {
+    try {
+        function();
+    } catch (const Exception&) {
+        return;
+    }
+    throw std::runtime_error(message);
+}
+
 void closeSocket(TestSocket socket) {
     if (socket == invalidTestSocket) return;
 #ifdef _WIN32
@@ -138,7 +148,11 @@ std::string methodRequest(
         (closeConnection ? "close" : "keep-alive") + "\r\nContent-Length: 0\r\n\r\n";
 }
 
-std::string runClientAgainstRawServer(const std::string& response) {
+std::string runClientAgainstRawServer(
+    const std::string& response,
+    const std::string& headersJson = "{}",
+    bool expectRequest = true
+) {
     const TestSocket listener = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (listener == invalidTestSocket) throw std::runtime_error("raw server socket failed");
     sockaddr_in address{};
@@ -171,18 +185,32 @@ std::string runClientAgainstRawServer(const std::string& response) {
             return;
         }
         try {
-            std::string request;
-            while (request.find("\r\n\r\n") == std::string::npos) {
-                char chunk[1024];
+            if (expectRequest) {
+                std::string request;
+                while (request.find("\r\n\r\n") == std::string::npos) {
+                    char chunk[1024];
 #ifdef _WIN32
-                const int received = recv(client, chunk, static_cast<int>(sizeof(chunk)), 0);
+                    const int received = recv(client, chunk, static_cast<int>(sizeof(chunk)), 0);
 #else
-                const auto received = recv(client, chunk, sizeof(chunk), 0);
+                    const auto received = recv(client, chunk, sizeof(chunk), 0);
 #endif
-                if (received <= 0) throw std::runtime_error("raw client request was incomplete");
-                request.append(chunk, static_cast<std::size_t>(received));
+                    if (received <= 0) {
+                        throw std::runtime_error("raw client request was incomplete");
+                    }
+                    request.append(chunk, static_cast<std::size_t>(received));
+                }
+                writeAll(client, response);
+            } else {
+                char firstByte = 0;
+#ifdef _WIN32
+                const int received = recv(client, &firstByte, 1, 0);
+#else
+                const auto received = recv(client, &firstByte, 1, 0);
+#endif
+                if (received > 0) {
+                    throw std::runtime_error("oversized request headers were sent");
+                }
             }
-            writeAll(client, response);
         } catch (...) {
             serverError = std::current_exception();
         }
@@ -194,7 +222,8 @@ std::string runClientAgainstRawServer(const std::string& response) {
     std::exception_ptr clientError;
     try {
         result = zplus::http::clientRequest("GET",
-            "http://127.0.0.1:" + std::to_string(port) + "/", "{}", "", 3000);
+            "http://127.0.0.1:" + std::to_string(port) + "/",
+            headersJson, "", 3000);
     } catch (...) {
         clientError = std::current_exception();
     }
@@ -220,6 +249,9 @@ int main() {
         require(zplus::http::startServer(server), "server failed to start");
         const auto port = zplus::http::serverPort(server);
         require(port > 0, "server did not report its ephemeral port");
+        requireThrows([&] {
+            (void)zplus::http::respond(server, -1, 205, "{}", "unexpected");
+        }, "HTTP 205 response accepted a body");
         const std::string matched = zplus::http::routeParams(
             "/api/items/7", "/api/items/{id}");
         require(zplus::json::getString(matched, "/id") == "7",
@@ -231,6 +263,35 @@ int main() {
                 zplus::http::queryValue("name=Jane+Doe&next=%2Fusers", "next") ==
                 "/users",
             "query parameter decoding failed");
+        requireThrowsType<std::length_error>([&] {
+            const std::string oversizedHeaders = "{\"x\":\"" +
+                std::string(16 * 1024, 'x') + "\"}";
+            (void)zplus::http::clientRequest("GET",
+                "http://127.0.0.1:1/", oversizedHeaders, "", 100);
+        }, "oversized outbound HTTP headers were accepted");
+        std::string tooManyOutboundHeaders = "{";
+        for (std::size_t i = 0; i <= 100; ++i) {
+            if (i != 0) tooManyOutboundHeaders += ",";
+            tooManyOutboundHeaders +=
+                "\"x-" + std::to_string(i) + "\":\"v\"";
+        }
+        tooManyOutboundHeaders += "}";
+        requireThrowsType<std::length_error>([&] {
+            (void)zplus::http::clientRequest("GET", "http://127.0.0.1:1/",
+                tooManyOutboundHeaders, "", 100);
+        }, "excessive outbound HTTP header count was accepted");
+        const std::string oversizedWireHeaders = "{\"x\":\"" +
+            std::string(16 * 1024 - 14, 'x') + "\"}";
+        require(oversizedWireHeaders.size() <= 16 * 1024,
+            "outbound wire-header test input exceeded the JSON limit");
+        requireThrowsType<std::length_error>([&] {
+            (void)runClientAgainstRawServer("", oversizedWireHeaders, false);
+        }, "oversized serialized HTTP request headers were accepted");
+        requireThrowsType<std::length_error>([&] {
+            (void)zplus::http::clientRequest("POST",
+                "http://127.0.0.1:1/", "{}",
+                std::string(16 * 1024 * 1024 + 1, 'x'), 100);
+        }, "oversized outbound HTTP body was accepted");
 
         const auto chunkedResponse = runClientAgainstRawServer(
             "HTTP/1.1 200 OK\r\n"
@@ -242,6 +303,32 @@ int main() {
             "0\r\nX-Checksum: ok\r\n\r\n");
         require(zplus::json::getString(chunkedResponse, "/body") == "Wikipedia",
             "chunked HTTP response decoding failed");
+        const auto resetContentResponse = runClientAgainstRawServer(
+            "HTTP/1.1 205 Reset Content\r\nContent-Length: 0\r\n\r\n");
+        require(zplus::json::getNumber(resetContentResponse, "/status") == 205 &&
+                zplus::json::getString(resetContentResponse, "/body").empty(),
+            "HTTP 205 response handling was invalid");
+        bool rejectedInformationalResponse = false;
+        try {
+            (void)runClientAgainstRawServer(
+                "HTTP/1.1 100 Continue\r\n\r\n"
+                "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
+        } catch (const std::runtime_error& error) {
+            rejectedInformationalResponse =
+                std::string_view(error.what()).find("informational") !=
+                std::string_view::npos;
+        }
+        require(rejectedInformationalResponse,
+            "informational HTTP response was not rejected explicitly");
+        std::string tooManyChunks =
+            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n";
+        for (std::size_t i = 0; i <= 65536; ++i) {
+            tooManyChunks += "1\r\nx\r\n";
+        }
+        tooManyChunks += "0\r\n\r\n";
+        requireThrows([&] {
+            (void)runClientAgainstRawServer(tooManyChunks);
+        }, "chunked HTTP response count limit was not enforced");
         requireThrows([&] {
             (void)runClientAgainstRawServer(
                 "HTTP/1.1 200 OK\r\n"

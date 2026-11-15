@@ -111,6 +111,26 @@
                 "command": "zplus.zbuildTestProject",
                 "title": "Z+: ZBuild Test Project",
                 "category": "Z+"
+            },
+            {
+                "command": "zplus.zpmInstall",
+                "title": "Z+: ZPM Install Dependencies",
+                "category": "Z+"
+            },
+            {
+                "command": "zplus.zpmAdd",
+                "title": "Z+: ZPM Add Local Package",
+                "category": "Z+"
+            },
+            {
+                "command": "zplus.zpmRemove",
+                "title": "Z+: ZPM Remove Package",
+                "category": "Z+"
+            },
+            {
+                "command": "zplus.zpmList",
+                "title": "Z+: ZPM List Packages",
+                "category": "Z+"
             }
         ],
 
@@ -129,6 +149,12 @@
                     "type": "string",
                     "default": "",
                     "description": "Path to zbuild. Leave empty to find zbuild (or zbuild.exe) on PATH."
+                },
+
+                "zplus.zpmPath": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Path to zpm. Leave empty to find zpm (or zpm.exe) on PATH."
                 },
 
                 "zplus.outputPath": {

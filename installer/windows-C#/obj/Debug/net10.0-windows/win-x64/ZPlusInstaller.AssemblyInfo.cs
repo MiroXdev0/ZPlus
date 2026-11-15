@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ZPlus-1.1.2-Setup")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+978b6a32d527000cc8d7f75f0f661c77c81963f2")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+06c751f119f7267a9a4e79cd1907b4453eb72877")]
 [assembly: System.Reflection.AssemblyProductAttribute("ZPlus-1.1.2-Setup")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ZPlus-1.1.2-Setup")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -138,7 +138,8 @@ function createVscodeMock() {
             showWarningMessage: async () => {},
             showErrorMessage: async () => {},
             showInformationMessage: async () => {},
-            showOpenDialog: async () => undefined
+            showOpenDialog: async () => undefined,
+            showInputBox: async () => undefined
         },
         registrations,
         configuration
@@ -226,7 +227,8 @@ test("manifest, grammar, language configuration and snippets are loadable", () =
     for (const command of [
         "zplus.checkFile", "zplus.runFile", "zplus.buildFile",
         "zplus.selectCompiler", "zplus.showCompilerVersion",
-        "zplus.zbuildBuildProject", "zplus.zbuildRunProject", "zplus.zbuildTestProject"
+        "zplus.zbuildBuildProject", "zplus.zbuildRunProject", "zplus.zbuildTestProject",
+        "zplus.zpmInstall", "zplus.zpmAdd", "zplus.zpmRemove", "zplus.zpmList"
     ]) {
         assert.ok(manifest.contributes.commands.some(item => item.command === command), command);
     }
@@ -265,7 +267,8 @@ test("activation registers commands and editor providers", () => {
         [
             "zplus.checkFile", "zplus.runFile", "zplus.buildFile",
             "zplus.selectCompiler", "zplus.showCompilerVersion",
-            "zplus.zbuildBuildProject", "zplus.zbuildRunProject", "zplus.zbuildTestProject"
+            "zplus.zbuildBuildProject", "zplus.zbuildRunProject", "zplus.zbuildTestProject",
+            "zplus.zpmInstall", "zplus.zpmAdd", "zplus.zpmRemove", "zplus.zpmList"
         ]
     );
     assert.deepEqual(
@@ -284,6 +287,21 @@ test("ZBuild project discovery walks from the active file to zproject.toml", asy
             document: { uri: { fsPath: path.join(directory, "src", "main.zp") } }
         };
         assert.equal(await extension.findZBuildProjectRoot(), directory);
+    } finally {
+        vscodeMock.window.activeTextEditor = undefined;
+        await fs.promises.rm(directory, { recursive: true, force: true });
+    }
+});
+
+test("ZPM project discovery walks from the active file to zpm.json", async () => {
+    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "zplus zpm project "));
+    try {
+        await fs.promises.mkdir(path.join(directory, "src"));
+        await fs.promises.writeFile(path.join(directory, "zpm.json"), "{}");
+        vscodeMock.window.activeTextEditor = {
+            document: { uri: { fsPath: path.join(directory, "src", "main.zp") } }
+        };
+        assert.equal(await extension.findZpmProjectRoot(), directory);
     } finally {
         vscodeMock.window.activeTextEditor = undefined;
         await fs.promises.rm(directory, { recursive: true, force: true });

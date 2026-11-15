@@ -51,7 +51,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visibl
 .menu-toggle { display: none; }
 
 main { min-height: calc(100vh - 260px); outline: none; }
-.hero, .section-block, .page-hero, .article-grid, .examples-grid, .release-section, .install-guide, .course-overview, .glossary, .package-status { width: min(1120px, calc(100% - 56px)); margin-left: auto; margin-right: auto; }
+.hero, .section-block, .page-hero, .article-grid, .examples-grid, .release-section, .install-guide, .course-overview, .glossary, .package-status, .registry-layout, .package-detail { width: min(1120px, calc(100% - 56px)); margin-left: auto; margin-right: auto; }
 .hero { min-height: 490px; padding: 92px 0 78px; display: grid; grid-template-columns: 1fr 1.01fr; align-items: center; gap: 65px; }
 .hero-copy { max-width: 495px; }
 .eyebrow { margin: 0 0 12px; color: var(--accent); font: 500 10px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase; }
@@ -291,6 +291,63 @@ pre, code { font-family: var(--mono); }
 .package-status h2 { margin-bottom: 7px; font-size: 22px; }
 .package-status p:not(.eyebrow) { max-width: 760px; color: var(--muted); font-size: 13px; }
 .package-status .text-link { display: inline-block; }
+.registry-layout { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 22px; align-items: start; padding-bottom: 70px; }
+.registry-search, .registry-panel, .package-detail-card { border: 1px solid var(--line); background: var(--surface); }
+.registry-search { padding: 18px; }
+.registry-search > label, .registry-publish-form > label, .registry-auth-grid label { display: grid; gap: 7px; color: var(--muted); font-size: 12px; }
+.registry-search > div { display: flex; gap: 9px; margin-top: 8px; }
+.registry-search input, .registry-auth-grid input, .registry-publish-form input { width: 100%; min-width: 0; min-height: 40px; padding: 8px 10px; border: 1px solid var(--line-strong); background: #101213; color: var(--text); }
+.registry-search button, .registry-auth-grid button, .registry-publish-form button, [data-registry-logout] { cursor: pointer; }
+.registry-results { margin-top: 12px; }
+.registry-message { margin: 0; padding: 14px; color: var(--muted); font-size: 12px; }
+.registry-error { color: var(--red); }
+.registry-package-list { border: 1px solid var(--line); }
+.registry-package { display: flex; justify-content: space-between; gap: 18px; padding: 17px 18px; border-bottom: 1px solid var(--line); }
+.registry-package:last-child { border-bottom: 0; }
+.registry-package h2 { margin: 0 0 6px; font: 600 16px var(--mono); letter-spacing: 0; }
+.registry-package h2 a:hover, .registry-managed-list a:hover { color: var(--accent); }
+.registry-package p { margin: 0; color: var(--muted); font-size: 12px; }
+.registry-package-meta { display: flex; flex: 0 0 auto; flex-direction: column; align-items: flex-end; gap: 3px; color: var(--quiet); font: 10px var(--mono); }
+.registry-account { min-width: 0; }
+.registry-panel { padding: 19px; }
+.registry-panel > h2 { margin-bottom: 8px; font-size: 19px; }
+.registry-panel > p:not(.eyebrow) { color: var(--muted); font-size: 12px; }
+.registry-auth-grid { display: grid; gap: 18px; }
+.registry-auth-grid form { display: grid; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+.registry-auth-grid h3 { margin: 0; font-size: 15px; }
+.registry-auth-grid .button { justify-self: start; }
+.registry-subheading { margin: 24px 0 9px; font-size: 15px; }
+.registry-publish-form { display: grid; gap: 12px; }
+.registry-publish-form .button { justify-self: start; }
+.registry-managed-list { margin: 0; padding-left: 18px; color: var(--muted); font-size: 12px; }
+.registry-managed-list li { padding: 4px 0; }
+.package-owner-tools { border-top: 1px solid var(--line); padding-top: 18px; }
+.package-owner-tools form { display: grid; gap: 10px; max-width: 430px; margin: 14px 0; }
+.package-owner-tools form > label:not(.ownership-confirm) { display: grid; gap: 7px; color: var(--muted); font-size: 12px; }
+.package-owner-tools input[type="text"] { min-height: 40px; padding: 8px 10px; border: 1px solid var(--line-strong); background: #101213; color: var(--text); }
+.package-owner-tools ul { display: grid; gap: 7px; margin: 12px 0; padding: 0; list-style: none; }
+.package-owner-tools li { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; }
+.ownership-confirm { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.ownership-confirm input { accent-color: var(--accent); }
+.package-detail { padding-bottom: 65px; }
+.package-detail-card { padding: 24px; }
+.package-detail-heading { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; }
+.package-detail-heading h1 { margin: 0 0 10px; font: 700 27px var(--mono); letter-spacing: -.04em; }
+.package-detail-heading p:not(.eyebrow) { max-width: 760px; color: var(--muted); font-size: 13px; }
+.package-version-badge { flex: 0 0 auto; padding: 7px 10px; border: 1px solid var(--accent-deep); color: var(--accent); font: 11px var(--mono); }
+.package-detail-meta { display: flex; flex-wrap: wrap; gap: 8px 17px; padding: 13px 0 21px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); color: var(--quiet); font-size: 11px; }
+.package-detail-meta a { color: var(--accent); }
+.package-detail-card section { margin-top: 26px; }
+.package-detail-card section h2 { margin-bottom: 10px; font-size: 19px; }
+.package-detail-card .code-frame { max-width: 650px; }
+.package-note { margin: 8px 0 0; color: var(--muted); font-size: 11px; }
+.registry-version-list { border-top: 1px solid var(--line); }
+.registry-version-list article { display: grid; grid-template-columns: 1fr auto; gap: 8px 15px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.registry-version-list article > div { display: grid; gap: 4px; }
+.registry-version-list small, .registry-version-list span { color: var(--muted); font-size: 10px; }
+.registry-version-list a { color: var(--accent); }
+.registry-version-list p { grid-column: 1 / -1; margin: 0; color: var(--muted); overflow-wrap: anywhere; }
+.package-readme { max-height: 500px; overflow: auto; margin: 0; padding: 16px; border: 1px solid var(--line); background: #111314; color: var(--muted); font: 12px/1.7 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .site-footer { margin-top: 50px; border-top: 1px solid #2a2e30; background: #141617; }
 .footer-inner { width: min(1120px, calc(100% - 56px)); margin: 0 auto; padding: 28px 0 24px; display: grid; grid-template-columns: 1fr auto; gap: 10px 30px; align-items: center; }
@@ -321,7 +378,7 @@ pre, code { font-family: var(--mono); }
   .site-search { margin-left: 0; width: min(175px, 43vw); height: 33px; }
   .site-search input { font-size: 10px; }
   .search-results { right: 12px; top: 56px; width: min(420px, calc(100vw - 24px)); }
-  .hero, .section-block, .page-hero, .article-grid, .examples-grid, .release-section, .install-guide, .course-overview, .glossary, .package-status { width: calc(100% - 36px); }
+  .hero, .section-block, .page-hero, .article-grid, .examples-grid, .release-section, .install-guide, .course-overview, .glossary, .package-status, .registry-layout, .package-detail { width: calc(100% - 36px); }
   .hero { padding: 62px 0 53px; grid-template-columns: 1fr; gap: 32px; }
   .hero h1 { font-size: 58px; }
   .hero-lede { font-size: 15px; }
@@ -364,6 +421,13 @@ pre, code { font-family: var(--mono); }
   .latest-stable { justify-self: start; }
   .install-guide { grid-template-columns: 1fr; gap: 17px; padding: 35px 0 60px; }
   .package-status { padding: 16px; }
+  .registry-layout { grid-template-columns: 1fr; }
+  .registry-package { flex-direction: column; }
+  .registry-package-meta { align-items: flex-start; flex-direction: row; flex-wrap: wrap; gap: 4px 12px; }
+  .package-detail-card { padding: 16px; }
+  .package-detail-heading { flex-direction: column; gap: 0; }
+  .registry-version-list article { grid-template-columns: 1fr; }
+  .registry-version-list p { grid-column: 1; }
   .footer-inner { width: calc(100% - 36px); grid-template-columns: 1fr; padding: 22px 0; }
   .footer-links { grid-column: 1; grid-row: auto; flex-wrap: wrap; gap: 12px 17px; }
   .footer-inner > small { grid-column: 1; }

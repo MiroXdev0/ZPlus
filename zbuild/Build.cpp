@@ -5,7 +5,9 @@
 #include "Dependencies.hpp"
 #include "Filesystem.hpp"
 #include "Hash.hpp"
+#include "Packages.hpp"
 #include "Process.hpp"
+#include "RegistryPackages.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -63,6 +65,29 @@ std::string trim(std::string value) {
     const auto begin = std::find_if(value.begin(), value.end(), notSpace);
     const auto end = std::find_if(value.rbegin(), value.rend(), notSpace).base();
     return begin < end ? std::string(begin, end) : std::string{};
+}
+
+std::string compilerVersionNumber(const std::string& output) {
+    constexpr std::string_view prefix = "Z+ Compiler ";
+    const std::string version = trim(output);
+    if (!version.starts_with(prefix)) {
+        throw std::runtime_error("unrecognized Z+ compiler version: " + version);
+    }
+    return version.substr(prefix.size());
+}
+
+void preparePackageDependencies(
+    const std::filesystem::path& projectRoot,
+    const std::string& compilerVersion
+) {
+    const bool locked = std::filesystem::is_regular_file(
+        projectRoot / "zpm-lock.json");
+    prepareRegistryPackages(projectRoot, compilerVersion, locked);
+    const auto packages = installPackages(projectRoot, compilerVersion, locked);
+    if (!packages.empty()) {
+        std::cout << "[packages] resolved " << packages.size()
+                  << " package(s) from zpm.json\n";
+    }
 }
 
 std::string readText(const std::filesystem::path& path) {
@@ -612,6 +637,8 @@ BuildResult BuildEngine::build(const BuildOptions& options) {
         throw std::runtime_error("cannot query compiler version:\n" + version.output);
     }
     const std::string compilerVersion = trim(version.output);
+    preparePackageDependencies(project_.root,
+        compilerVersionNumber(compilerVersion));
 
     BuildResult result;
     std::unordered_set<std::string> completed;
@@ -1367,6 +1394,13 @@ int BuildEngine::check(const BuildOptions& options) {
         throw std::runtime_error(
             "configured Z+ compiler does not exist: '" + pathToUtf8(compiler_) + "'");
     }
+    const ProcessResult version = runProcess(
+        {pathToUtf8(compiler_), "version"}, project_.root);
+    if (version.exitCode != 0) {
+        throw std::runtime_error("cannot query compiler version:\n" + version.output);
+    }
+    preparePackageDependencies(project_.root,
+        compilerVersionNumber(version.output));
 
     for (const std::string& name : order) {
         const auto target = std::find_if(

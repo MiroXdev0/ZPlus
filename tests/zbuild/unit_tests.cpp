@@ -1,14 +1,18 @@
 #include "Config.hpp"
 #include "BuildGraph.hpp"
 #include "Hash.hpp"
+#include "Packages.hpp"
+#include "RegistryClient.hpp"
 #include "Template.hpp"
 
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -24,11 +28,57 @@ void requireThrows(Function&& function, const std::string& expected) {
     try {
         function();
     } catch (const std::exception& error) {
-        require(std::string(error.what()).find(expected) != std::string::npos,
-            "exception did not contain the expected diagnostic");
+        if (std::string(error.what()).find(expected) == std::string::npos) {
+            throw std::runtime_error(
+                "expected diagnostic containing '" + expected +
+                "', got '" + error.what() + "'");
+        }
         return;
     }
     throw std::runtime_error("expected operation to fail");
+}
+
+void writePackage(
+    const std::filesystem::path& directory,
+    const std::string& name,
+    const std::string& version,
+    const std::string& dependencies = "{}"
+) {
+    std::filesystem::create_directories(directory / "src");
+    std::ofstream source(directory / "src" / "main.zh", std::ios::binary);
+    source << "start {\n} stop\n";
+    std::ofstream manifest(directory / "zpm.json", std::ios::binary);
+    manifest << "{\"name\":\"" << name << "\",\"version\":\"" << version
+             << "\",\"main\":\"src/main.zh\",\"compiler\":\">=1.2.0\","
+                "\"dependencies\":"
+             << dependencies << "}";
+}
+
+void writeU32(std::ostream& output, std::uint32_t value) {
+    for (unsigned shift = 0; shift < 32; shift += 8) {
+        output.put(static_cast<char>(value >> shift));
+    }
+}
+
+void writeU64(std::ostream& output, std::uint64_t value) {
+    for (unsigned shift = 0; shift < 64; shift += 8) {
+        output.put(static_cast<char>(value >> shift));
+    }
+}
+
+std::optional<std::string> environmentValue(const char* name) {
+    const char* value = std::getenv(name);
+    if (!value) return std::nullopt;
+    return std::string(value);
+}
+
+void setEnvironment(const char* name, const std::optional<std::string>& value) {
+#ifdef _WIN32
+    _putenv_s(name, value ? value->c_str() : "");
+#else
+    if (value) setenv(name, value->c_str(), 1);
+    else unsetenv(name);
+#endif
 }
 
 } // namespace
@@ -48,6 +98,41 @@ int main(int, char** argv) {
             ("zbuild-unit-" + std::to_string(
                 std::chrono::steady_clock::now().time_since_epoch().count()));
         try {
+            const std::vector<std::pair<std::string, std::optional<std::string>>> savedEnvironment{
+                {"ZPM_REGISTRY_URL", environmentValue("ZPM_REGISTRY_URL")},
+#ifdef _WIN32
+                {"LOCALAPPDATA", environmentValue("LOCALAPPDATA")},
+                {"APPDATA", environmentValue("APPDATA")}
+#else
+                {"XDG_CONFIG_HOME", environmentValue("XDG_CONFIG_HOME")}
+#endif
+            };
+            setEnvironment("ZPM_REGISTRY_URL",
+                "https://zpm-unit.invalid/api/registry");
+#ifdef _WIN32
+            setEnvironment("LOCALAPPDATA",
+                (temporary / "local-app-data").string());
+            setEnvironment("APPDATA",
+                (temporary / "app-data").string());
+#else
+            setEnvironment("XDG_CONFIG_HOME",
+                (temporary / "config").string());
+#endif
+            const std::string registryToken =
+                "unit-test-token-1234567890-abcde";
+            zbuild::storeRegistryToken(registryToken);
+            require(zbuild::loadRegistryToken() == registryToken,
+                "saved registry token should round-trip through protected storage");
+            zbuild::removeRegistryToken();
+            require(zbuild::loadRegistryToken().empty(),
+                "removed registry token should not remain in storage");
+            requireThrows(
+                [] { zbuild::storeRegistryToken("invalid"); },
+                "invalid session token");
+            for (const auto& [name, value] : savedEnvironment) {
+                setEnvironment(name.c_str(), value);
+            }
+
 #ifdef _WIN32
             _putenv_s("ZBUILD_TEMPLATES_DIR",
                 (temporary / "custom-templates").string().c_str());
@@ -169,6 +254,137 @@ int main(int, char** argv) {
             require(lockContents.find("version_integrity = \"0.1.0:") != std::string::npos,
                 "lockfile should record the dependency version and manifest hash");
             lockfile.close();
+
+            const auto packageCache = temporary / "package-cache";
+#ifdef _WIN32
+            _putenv_s("ZPM_CACHE_DIR", packageCache.string().c_str());
+#else
+            setenv("ZPM_CACHE_DIR", packageCache.string().c_str(), 1);
+#endif
+            const auto semanticOld = temporary / "semantic-old";
+            const auto semanticNew = temporary / "semantic-new";
+            const auto semanticLatest = temporary / "semantic-latest";
+            writePackage(semanticOld, "semantic-lib", "1.0.0-alpha.2");
+            writePackage(semanticNew, "semantic-lib", "1.0.0-alpha.10");
+            writePackage(semanticLatest, "semantic-lib", "1.0.0-beta.1");
+            zbuild::cachePackage(semanticOld);
+            zbuild::cachePackage(semanticNew);
+            const auto foreignPackage = temporary / "foreign-package";
+            writePackage(foreignPackage, "foreign-package", "0.1.0");
+            {
+                std::ofstream foreignSource(
+                    foreignPackage / "src" / "implementation.py");
+                foreignSource << "print('not Z+')\n";
+            }
+            requireThrows(
+                [&] { (void)zbuild::loadPackageManifest(foreignPackage); },
+                "alternative-language implementations");
+            const auto invalidVersionPackage = temporary / "invalid-version-package";
+            writePackage(invalidVersionPackage, "invalid-version-package", "1.0.0-alpha.01");
+            requireThrows(
+                [&] { (void)zbuild::loadPackageManifest(invalidVersionPackage); },
+                "invalid semantic version");
+            const auto packageConsumer = temporary / "package-consumer";
+            zbuild::initializePackage(packageConsumer, "package-consumer");
+            {
+                std::ofstream manifest(packageConsumer / "zpm.json", std::ios::trunc);
+                manifest << "{\"name\":\"package-consumer\",\"version\":\"0.1.0\","
+                    "\"main\":\"src/main.zh\",\"compiler\":\">=1.2.0\","
+                    "\"dependencies\":{\"semantic-lib\":\"^1.0.0-alpha.2\"}}";
+            }
+            auto resolvedPackages = zbuild::installPackages(
+                packageConsumer, "1.2.0");
+            require(resolvedPackages.size() == 1 &&
+                    resolvedPackages.front().version == "1.0.0-alpha.10",
+                "semantic versions must order prerelease numeric identifiers numerically");
+            zbuild::cachePackage(semanticLatest);
+            resolvedPackages = zbuild::installPackages(packageConsumer, "1.2.0", true);
+            require(resolvedPackages.size() == 1 &&
+                    resolvedPackages.front().version == "1.0.0-alpha.10",
+                "locked installs must retain their exact version when newer cache versions exist");
+            {
+                std::ofstream installed(
+                    packageConsumer / "z+_packages" / "semantic-lib" /
+                        "src" / "main.zh",
+                    std::ios::trunc);
+                installed << "tampered\n";
+            }
+            (void)zbuild::installPackages(packageConsumer, "1.2.0", true);
+            {
+                std::ifstream restored(
+                    packageConsumer / "z+_packages" / "semantic-lib" /
+                        "src" / "main.zh");
+                const std::string contents(
+                    (std::istreambuf_iterator<char>(restored)),
+                    std::istreambuf_iterator<char>());
+                require(contents.find("tampered") == std::string::npos,
+                    "locked install should restore a modified package from the cache");
+            }
+            (void)zbuild::installPackages(packageConsumer, "1.2.0");
+
+            const auto sharedV1 = temporary / "shared-v1";
+            const auto sharedV2 = temporary / "shared-v2";
+            const auto parent = temporary / "parent";
+            writePackage(sharedV1, "shared-lib", "1.0.0");
+            writePackage(sharedV2, "shared-lib", "2.0.0");
+            writePackage(parent, "parent-lib", "1.0.0",
+                "{\"shared-lib\":\"^2.0.0\"}");
+            zbuild::cachePackage(sharedV1);
+            zbuild::cachePackage(sharedV2);
+            zbuild::cachePackage(parent);
+            {
+                std::ofstream manifest(packageConsumer / "zpm.json", std::ios::trunc);
+                manifest << "{\"name\":\"package-consumer\",\"version\":\"0.1.0\","
+                    "\"main\":\"src/main.zh\",\"compiler\":\">=1.2.0\","
+                    "\"dependencies\":{\"parent-lib\":\"^1.0.0\","
+                    "\"shared-lib\":\"^1.0.0\"}}";
+            }
+            requireThrows(
+                [&] { (void)zbuild::installPackages(packageConsumer, "1.2.0"); },
+                "dependency version conflict");
+            {
+                std::ofstream manifest(packageConsumer / "zpm.json", std::ios::trunc);
+                manifest << "{\"name\":\"package-consumer\",\"version\":\"0.1.0\","
+                    "\"main\":\"src/main.zh\",\"compiler\":\">=1.3.0\","
+                    "\"dependencies\":{}}";
+            }
+            requireThrows(
+                [&] { (void)zbuild::installPackages(packageConsumer, "1.2.0"); },
+                "requires Z+ compiler");
+
+            const auto traversalArchive = temporary / "traversal.zpm";
+            const auto traversalDestination = temporary / "traversal-extracted";
+            {
+                std::ofstream archive(traversalArchive, std::ios::binary);
+                archive.write("ZPM1", 4);
+                writeU32(archive, 1);
+                writeU32(archive, 7);
+                writeU64(archive, 0);
+                archive.write("../../x", 7);
+            }
+            requireThrows(
+                [&] {
+                    zbuild::installPackageArchive(
+                        traversalArchive, traversalDestination);
+                },
+                "traversal paths");
+            require(!std::filesystem::exists(traversalDestination),
+                "archive traversal rejection must not create its destination");
+            const auto unmanagedCache = packageCache / "unmanaged-user-data";
+            std::filesystem::create_directories(unmanagedCache);
+            {
+                std::ofstream keep(unmanagedCache / "keep.txt");
+                keep << "preserve";
+            }
+            {
+                std::ofstream keep(packageCache / "user-file.txt");
+                keep << "preserve";
+            }
+            require(zbuild::cleanPackageCache() >= 5,
+                "cache clean should remove the managed versioned packages");
+            require(std::filesystem::exists(unmanagedCache / "keep.txt") &&
+                    std::filesystem::exists(packageCache / "user-file.txt"),
+                "cache clean must preserve unmarked user data");
 
             bool refusedOverwrite = false;
             try {

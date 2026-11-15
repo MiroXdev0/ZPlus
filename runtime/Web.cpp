@@ -831,8 +831,8 @@ std::string response(
     if (status < 200 || status > 599) {
         throw std::invalid_argument("HTTP response status must be between 200 and 599");
     }
-    if ((status == 204 || status == 304) && !body.empty()) {
-        throw std::invalid_argument("204 and 304 HTTP responses cannot include a body");
+    if ((status == 204 || status == 205 || status == 304) && !body.empty()) {
+        throw std::invalid_argument("204, 205, and 304 HTTP responses cannot include a body");
     }
     const auto headers = json::parse(headersJson);
     const auto& values = requireObject(headers, "response headers");

@@ -24,7 +24,7 @@ interpreter on every host and compares interpreter/native output on Windows x64.
 The compiler executable is `build\Release\zp.exe` on Windows Visual Studio builds and `build\zp` on Linux.
 Every successful Release build also synchronizes that executable to `bin\zp.exe` on Windows or `bin/zp` on Linux. Debug builds skip the copy. The synchronization runs after the compiler target succeeds and replaces the destination only with the Release artifact.
 
-The standalone Z+ project build system is ZPBuild 0.3.0, invoked as `zpbuild` (`zpbuild.exe` on Windows); `zbuild` remains available as a compatibility alias. It supports compiler-resolved dependency tracking, incremental target builds, bounded parallel execution, build planning, and persistent cache inspection. A successful Release build installs both beside `zp` in `bin/`. See [ZBUILD.md](./docs/ZBUILD.md) for its project format, commands, cache behavior, and current compiler integration limits.
+The standalone Z+ project build system is ZPBuild 0.3.0, invoked as `zpbuild` (`zpbuild.exe` on Windows); `zbuild` remains available as a compatibility alias. It supports compiler-resolved dependency tracking, incremental target builds, bounded parallel execution, build planning, and persistent cache inspection. ZPM 0.1.0 adds local package management and is copied alongside the compiler and build tools on Release builds. See [ZBUILD.md](./docs/ZBUILD.md) for project builds and [ZPM.md](./docs/ZPM.md) for the local package workflow and online-registry limitations.
 
 ## Use the compiler
 

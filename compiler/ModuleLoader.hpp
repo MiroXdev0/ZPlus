@@ -50,6 +50,7 @@ private:
     );
 
     std::filesystem::path entryPath_;
+    std::vector<std::filesystem::path> packageRoots_;
     LoadedProgram result_;
     std::vector<std::vector<ast::Stmt>> moduleStatements_;
     std::unordered_set<std::string> loadedPaths_;

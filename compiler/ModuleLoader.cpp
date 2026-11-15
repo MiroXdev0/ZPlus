@@ -2,6 +2,7 @@
 
 #include "lexer/Lexer.hpp"
 #include "parser/Parser.hpp"
+#include "../runtime/Json.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -84,6 +85,95 @@ std::filesystem::path standardLibraryDirectory() {
 #endif
 }
 
+const json::Value* objectField(const json::Value& value, std::string_view name) {
+    const auto* object = std::get_if<json::Value::Object>(&value.data);
+    if (!object) return nullptr;
+    for (const auto& [key, item] : *object) {
+        if (key == name) return &item;
+    }
+    return nullptr;
+}
+
+std::string stringField(const json::Value& value, std::string_view name) {
+    const auto* field = objectField(value, name);
+    const auto* text = field
+        ? std::get_if<std::string>(&field->data)
+        : nullptr;
+    if (!text) return {};
+    return *text;
+}
+
+std::filesystem::path packageEntry(
+    const std::filesystem::path& packageRoot,
+    const std::string& moduleName
+) {
+    if (moduleName.empty() ||
+        !std::all_of(moduleName.begin(), moduleName.end(), [](unsigned char ch) {
+            return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+                (ch >= '0' && ch <= '9') || ch == '-';
+        })) {
+        return {};
+    }
+    const auto packageDirectory = packageRoot / pathFromUtf8(moduleName);
+    std::error_code error;
+    const auto canonicalPackage = std::filesystem::canonical(packageDirectory, error);
+    if (error || !std::filesystem::is_directory(canonicalPackage)) return {};
+    const auto canonicalRoot = std::filesystem::canonical(packageRoot, error);
+    if (error) return {};
+    const auto relativePackage = canonicalPackage.lexically_relative(canonicalRoot);
+    if (relativePackage.empty() || relativePackage.is_absolute() ||
+        *relativePackage.begin() == "..") return {};
+    std::ifstream manifestFile(canonicalPackage / "zpm.json", std::ios::binary);
+    if (!manifestFile) return {};
+    std::string contents;
+    contents.resize(1024 * 1024 + 1);
+    manifestFile.read(contents.data(), static_cast<std::streamsize>(contents.size()));
+    const auto read = manifestFile.gcount();
+    if (read < 0 || static_cast<std::size_t>(read) > 1024 * 1024) {
+        throw std::runtime_error(
+            "package manifest exceeds the 1 MiB limit: '" +
+            pathToUtf8(canonicalPackage / "zpm.json") + "'");
+    }
+    contents.resize(static_cast<std::size_t>(read));
+    const auto manifest = json::parse(contents);
+    if (stringField(manifest, "name") != moduleName) {
+        throw std::runtime_error(
+            "installed package directory name does not match package manifest: '" +
+            pathToUtf8(canonicalPackage) + "'");
+    }
+    const std::string main = stringField(manifest, "main");
+    if (main.empty()) {
+        throw std::runtime_error(
+            "installed package manifest has no main module: '" +
+            pathToUtf8(canonicalPackage / "zpm.json") + "'");
+    }
+    const auto relativeMain = pathFromUtf8(main);
+    if (relativeMain.empty() || relativeMain.is_absolute() ||
+        relativeMain.has_root_name()) {
+        throw std::runtime_error(
+            "installed package main module must be a relative path");
+    }
+    const auto normalizedMain = relativeMain.lexically_normal();
+    if (normalizedMain.empty() || *normalizedMain.begin() == "..") {
+        throw std::runtime_error(
+            "installed package main module escapes its package directory");
+    }
+    const auto entry = std::filesystem::canonical(
+        canonicalPackage / normalizedMain, error);
+    if (error || entry.extension() != ".zh" ||
+        !std::filesystem::is_regular_file(entry)) {
+        throw std::runtime_error(
+            "installed package main module is not an existing .zh file");
+    }
+    const auto relativeEntry = entry.lexically_relative(canonicalPackage);
+    if (relativeEntry.empty() || relativeEntry.is_absolute() ||
+        *relativeEntry.begin() == "..") {
+        throw std::runtime_error(
+            "installed package main module resolves outside its package directory");
+    }
+    return entry;
+}
+
 std::string pathKey(const std::filesystem::path& path) {
     const auto encoded = path.generic_u8string();
     std::string key(
@@ -139,6 +229,7 @@ LoadedProgram ModuleLoader::load(
     loadedPaths_.clear();
     moduleNamesByPath_.clear();
     modulePathsByName_.clear();
+    packageRoots_.clear();
 
     std::error_code error;
     entryPath_ = entrySource
@@ -158,6 +249,19 @@ LoadedProgram ModuleLoader::load(
             pathToUtf8(entryPath_)
         );
         return std::move(result_);
+    }
+    for (auto current = entryPath_.parent_path(); !current.empty();) {
+        const auto packages = current / "z+_packages";
+        error.clear();
+        if (std::filesystem::is_directory(packages, error) && !error) {
+            std::error_code canonicalError;
+            const auto canonicalPackages =
+                std::filesystem::canonical(packages, canonicalError);
+            if (!canonicalError) packageRoots_.push_back(canonicalPackages);
+        }
+        const auto parent = current.parent_path();
+        if (parent == current) break;
+        current = parent;
     }
     std::string entryExtension = entryPath_.extension().string();
     std::transform(entryExtension.begin(), entryExtension.end(), entryExtension.begin(), [](unsigned char ch) {
@@ -358,6 +462,17 @@ bool ModuleLoader::loadModule(
             existenceError.clear();
             if (std::filesystem::exists(standardModule, existenceError) && !existenceError) {
                 resolvedPath = standardModule;
+            }
+        }
+        existenceError.clear();
+        if (!std::filesystem::exists(resolvedPath, existenceError) &&
+            standardModuleName && modulePath.find('.') == std::string::npos) {
+            for (const auto& packageRoot : packageRoots_) {
+                const auto packagePath = packageEntry(packageRoot, modulePath);
+                if (!packagePath.empty()) {
+                    resolvedPath = packagePath;
+                    break;
+                }
             }
         }
         existenceError.clear();

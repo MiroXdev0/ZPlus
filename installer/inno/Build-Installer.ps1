@@ -179,6 +179,7 @@ try {
         'zp.exe',
         'zbuild.exe',
         'zpbuild.exe',
+        'zpm.exe',
         'zgraphics_runtime.dll',
         'zaudio_runtime.dll',
         'zphysics_runtime.dll',
@@ -204,6 +205,11 @@ try {
     if ($LASTEXITCODE -ne 0 -or $zpbuildVersion -ne $zbuildVersion) {
         throw "The local ZPBuild alias failed its version check: '$zpbuildVersion'."
     }
+    $zpmVersion = (& (Join-Path $binaryDirectory 'zpm.exe') --version 2>&1 | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or $zpmVersion -notmatch '^ZPM (?<version>\d+\.\d+\.\d+)$') {
+        throw "The local ZPM executable failed its version check: '$zpmVersion'."
+    }
+    $zpmSemanticVersion = $Matches.version
 
     $logoPath = Join-Path $repositoryRoot 'logo\Z+ Emblem - for ligth theme.png'
     foreach ($sourcePath in @(
@@ -235,6 +241,11 @@ try {
     if ($LASTEXITCODE -ne 0 -or $stagedZpbuildVersion -ne $zbuildVersion) {
         throw "The staged ZPBuild alias failed its version check: '$stagedZpbuildVersion'."
     }
+    $stagedZpm = Join-Path $stagedBinaryDirectory 'zpm.exe'
+    $stagedZpmVersion = (& $stagedZpm --version 2>&1 | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or $stagedZpmVersion -ne $zpmVersion) {
+        throw "The staged ZPM executable failed its version check: '$stagedZpmVersion'."
+    }
     foreach ($relativePath in @(
         'zp.exe',
         'zgraphics_runtime.dll',
@@ -257,6 +268,11 @@ try {
             throw "Staged '$relativePath' does not contain ZPBuild $zbuildSemanticVersion version metadata."
         }
     }
+    $stagedZpmVersionInfo = (Get-Item -LiteralPath $stagedZpm).VersionInfo
+    if ($stagedZpmVersionInfo.FileVersion.Trim() -ne $zpmSemanticVersion -or
+        $stagedZpmVersionInfo.ProductVersion.Trim() -ne $zpmSemanticVersion) {
+        throw "Staged 'zpm.exe' does not contain ZPM $zpmSemanticVersion version metadata."
+    }
     Copy-DirectoryContents -SourceDirectory (Join-Path $repositoryRoot 'docs') -DestinationDirectory (Join-Path $stageDirectory 'docs')
     Copy-DirectoryContents -SourceDirectory (Join-Path $repositoryRoot 'examples') -DestinationDirectory (Join-Path $stageDirectory 'examples')
     $documentationLogoDirectory = Join-Path $stageDirectory 'docs\logo'
@@ -268,6 +284,7 @@ try {
         @{ Source = 'SYNTAX.md'; Destination = 'LANGUAGE-SYNTAX.md' },
         @{ Source = 'MODULES.md'; Destination = 'MODULES.md' },
         @{ Source = 'NATIVE_BACKEND.md'; Destination = 'NATIVE_BACKEND.md' }
+        @{ Source = 'docs\ZPM.md'; Destination = 'ZPM.md' }
     )) {
         Copy-Item -LiteralPath (Join-Path $repositoryRoot $document.Source) `
             -Destination (Join-Path $stageDirectory "docs\$($document.Destination)")
@@ -299,7 +316,7 @@ try {
         $installerVersionInfo.ProductVersion.Trim() -ne $version) {
         throw "The generated installer does not contain Z+ $version Windows version metadata."
     }
-    Write-Host "Built Z+ $version installer with ZPBuild $zbuildVersion from '$binaryDirectory': $installerPath"
+    Write-Host "Built Z+ $version installer with ZPBuild $zbuildVersion and $zpmVersion from '$binaryDirectory': $installerPath"
 }
 catch {
     [Console]::Error.WriteLine("Installer build failed: $($_.Exception.Message)")

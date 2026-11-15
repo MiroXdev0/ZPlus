@@ -7,6 +7,7 @@ project(ZPlus
 )
 
 set(ZBUILD_VERSION "0.3.0")
+set(ZPM_VERSION "0.1.0")
 
 include(CTest)
 
@@ -51,7 +52,10 @@ add_library(zbuild_engine STATIC
     zbuild/Dependencies.cpp
     zbuild/Filesystem.cpp
     zbuild/Hash.cpp
+    zbuild/Packages.cpp
     zbuild/Process.cpp
+    zbuild/RegistryClient.cpp
+    zbuild/RegistryPackages.cpp
     zbuild/Template.cpp
     runtime/Json.cpp
 )
@@ -59,6 +63,12 @@ target_compile_definitions(zbuild_engine PRIVATE "ZBUILD_VERSION=\"${ZBUILD_VERS
 target_include_directories(zbuild_engine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/zbuild
 )
+if(WIN32)
+    target_link_libraries(zbuild_engine PUBLIC winhttp crypt32)
+else()
+    find_package(CURL REQUIRED)
+    target_link_libraries(zbuild_engine PUBLIC CURL::libcurl)
+endif()
 add_executable(zbuild zbuild/main.cpp)
 target_link_libraries(zbuild PRIVATE zbuild_engine)
 target_compile_definitions(zbuild PRIVATE "ZBUILD_VERSION=\"${ZBUILD_VERSION}\"")
@@ -106,6 +116,18 @@ add_custom_command(TARGET zpbuild POST_BUILD
         -P "${CMAKE_SOURCE_DIR}/cmake/CopyReleaseZBuild.cmake"
     VERBATIM
     COMMENT "Installing the Release ZPBuild CLI into bin/"
+)
+add_executable(zpm zpm/main.cpp)
+target_link_libraries(zpm PRIVATE zbuild_engine)
+target_compile_definitions(zpm PRIVATE "ZPM_VERSION=\"${ZPM_VERSION}\"")
+add_custom_command(TARGET zpm POST_BUILD
+    COMMAND ${CMAKE_COMMAND}
+        "-DCONFIG=$<CONFIG>"
+        "-DSOURCE_FILE=$<TARGET_FILE:zpm>"
+        "-DDESTINATION_DIR=${ZPLUS_RELEASE_BIN_DIR}"
+        -P "${CMAKE_SOURCE_DIR}/cmake/CopyReleaseTool.cmake"
+    VERBATIM
+    COMMENT "Installing the Release ZPM executable into bin/"
 )
 
 add_executable(zp
@@ -174,6 +196,8 @@ if(WIN32)
         set(ZPLUS_FILE_TYPE "${filetype}")
         if(target STREQUAL "zbuild" OR target STREQUAL "zpbuild")
             set(ZPLUS_PRODUCT_NAME "ZPBuild")
+        elseif(target STREQUAL "zpm")
+            set(ZPLUS_PRODUCT_NAME "ZPM")
         else()
             set(ZPLUS_PRODUCT_NAME "Z+ Programming Language")
         endif()
@@ -192,6 +216,7 @@ if(WIN32)
     zplus_add_version_resource(
         zbuild "ZPBuild Compatibility CLI" "zbuild.exe" VFT_APP "${ZBUILD_VERSION}")
     zplus_add_version_resource(zpbuild "ZPBuild CLI" "zpbuild.exe" VFT_APP "${ZBUILD_VERSION}")
+    zplus_add_version_resource(zpm "ZPM CLI" "zpm.exe" VFT_APP "${ZPM_VERSION}")
     target_sources(zplus_graphics PRIVATE
         ZGraphics/Platform/WindowsWindow.cpp
     )
@@ -442,6 +467,7 @@ if(MSVC)
     target_compile_options(zbuild_engine PRIVATE /W4)
     target_compile_options(zbuild PRIVATE /W4)
     target_compile_options(zpbuild PRIVATE /W4)
+    target_compile_options(zpm PRIVATE /W4)
     target_compile_options(zplus_graphics PRIVATE /W4)
     target_compile_options(zp_native_backend PRIVATE /W4)
     if(WIN32)
@@ -452,6 +478,7 @@ else()
     target_compile_options(zbuild_engine PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(zbuild PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(zpbuild PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(zpm PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(zplus_graphics PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(zp_native_backend PRIVATE -Wall -Wextra -Wpedantic)
 endif()
@@ -488,11 +515,24 @@ if(BUILD_TESTING)
     set_tests_properties(zbuild_compatibility_version PROPERTIES
         PASS_REGULAR_EXPRESSION "ZPBuild 0\\.3\\.0"
     )
+    add_test(NAME zpm_version COMMAND zpm --version)
+    set_tests_properties(zpm_version PROPERTIES
+        PASS_REGULAR_EXPRESSION "ZPM 0\\.1\\.0"
+    )
     add_executable(zbuild_unit_tests
         tests/zbuild/unit_tests.cpp
     )
     target_link_libraries(zbuild_unit_tests PRIVATE zbuild_engine)
     add_test(NAME zbuild_unit COMMAND zbuild_unit_tests)
+    add_test(
+        NAME zpm_local_package_integration
+        COMMAND ${CMAKE_COMMAND}
+            "-DZPM=$<TARGET_FILE:zpm>"
+            "-DZBUILD=$<TARGET_FILE:zpbuild>"
+            "-DZP=$<TARGET_FILE:zp>"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/zpm-test-output"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/zpm/run_local_package.cmake"
+    )
     add_test(
         NAME resource_copy_incremental
         COMMAND ${CMAKE_COMMAND}

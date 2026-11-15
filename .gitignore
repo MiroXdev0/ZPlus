@@ -5,3 +5,14 @@ build-zbuild/
 *.dll
 
 !bin/ZPlus/*.dll
+node_modules/
+
+# Local Neon project links and credentials.
+.neon
+**/.neon
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example

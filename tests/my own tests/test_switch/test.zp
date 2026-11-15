@@ -1,0 +1,162 @@
+
+use zmath as math
+use zstring as text
+use zcollections as collections
+use zrandom as random
+use zfile as file
+use zpath as path
+use ztime as time
+use zenv as env
+use zargs as args
+use zlog as log
+
+start {
+    fn options() {
+        printz("1. Add task\n")
+        printz("2. View tasks\n")
+        printz("3. Delete task\n")
+        printz("4. Search tasks\n")
+        printz("5. Clear all tasks\n")
+        printz("6. Exit\n")
+    } end fn
+    fn addtask() {
+        say("Enter task: ")
+        let newtask: string = read()
+        if newtask != "" {
+            try {
+                file.append("tasks.txt", newtask + "\n")
+                say("Task saved successfully.\n")
+                say("Press any key to continue...")
+                read()
+            } catch error {
+                say("Error: " + error.message)
+            } end try
+        } else {
+            say("Task cannot be empty.\n")
+            say("Press any key to continue...")
+            read()
+        } end if
+    } end fn
+    fn viewtasks() {
+        try {
+            let tasks: string[] = file.readLines("tasks.txt")
+            if length(tasks) == 0 {
+                say("No tasks found.\n")
+                say("Press any key to continue...")
+                read()
+            } else {
+                say("Your tasks:")
+                for (let i = 0; i < length(tasks); i++) {
+                    say(to_string(i + 1) + ". " + tasks[i])
+                } end for
+            } end if
+        } catch error {
+            say("Error: " + error.message)
+        } end try
+    } end fn
+    fn deletetask() {
+        try {
+            let tasks: string[] = file.readLines("tasks.txt")
+            if length(tasks) == 0 {
+                say("No tasks to delete.\n")
+                say("Press any key to continue...")
+                read()
+            } else {
+                for (let i = 0; i < length(tasks); i++) {
+                    say(to_string(i + 1) + ". " + tasks[i])
+                } end for
+                say("Enter task number to delete: ")
+                let choice: number = read_integer()
+                if choice >= 1 && choice <= length(tasks) {
+                    file.write("tasks.txt", "")
+                    for (let i = 0; i < length(tasks); i++) {
+                        if i != choice - 1 {
+                            file.append("tasks.txt", tasks[i] + "\n")
+                        } end if
+                    } end for
+                    say("Task deleted successfully.\n")
+                    say("Press any key to continue...")
+                    read()
+                } else {
+                    say("Invalid task number.\n")
+                    say("Press any key to continue...")
+                    read()                 
+                } end if
+            } end if
+        } catch error {
+            say("Error: " + error.message)
+        } end try
+    } end fn
+    fn searchtasks() {
+        try {
+            let tasks: string[] = file.readLines("tasks.txt")
+            say("Enter task to search for: ")
+            let query: string = read()
+            let found: number = 0
+            for (let i = 0; i < length(tasks); i++) {
+                if tasks[i] == query {
+                    say(to_string(i + 1) + ". " + tasks[i])
+                    found = found + 1
+                } end if
+            } end for
+            if found == 0 {
+                say("No matching tasks found.\n")
+                say("Press any key to continue...")
+                read()
+            } end if
+        } catch error {
+            say("Error: " + error.message)
+        } end try
+    } end fn
+    fn cleartasks() {
+        try {
+            file.write("tasks.txt", "")
+            say("All tasks deleted.\n")
+            say("Press any key to continue...")
+            read()
+        } catch error {
+            say("Error: " + error.message)
+        } end try
+    } end fn
+    printz("Hello, wanna save some tasks? y/n\n")
+    let choice: string = read()
+    if choice == "y" {
+        printz("Great! Let's save some tasks.\n")
+        while true {
+            say("Choose an option:")
+            options()
+            let choice: string = read()
+            switch choice {
+                case "1" {
+                    printz("Adding task...\n")
+                    addtask()
+                }
+                case "2" {
+                    printz("Viewing tasks...\n")
+                    viewtasks()
+                }
+                case "3" {
+                    printz("Deleting task...\n")
+                    deletetask()
+                }
+                case "4" {
+                    printz("Searching tasks...\n")
+                    searchtasks()
+                }
+                case "5" {
+                    printz("Clearing tasks...\n")
+                    cleartasks()
+                }
+                case "6" {
+                    printz("Exiting...\n")
+                    break
+                }
+                default {
+                    printz("Invalid option.\n")
+                }
+            } end switch
+        } end while
+    } else {
+        printz("Okay, maybe next time.\n")
+    } end if
+} stop

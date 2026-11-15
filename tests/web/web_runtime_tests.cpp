@@ -113,6 +113,8 @@ int main() {
         "response helpers generated invalid status, headers, or body");
     requireThrows([] { web::response(204, "{}", "unexpected"); },
         "204 response helper accepted a body");
+    requireThrows([] { web::response(205, "{}", "unexpected"); },
+        "205 response helper accepted a body");
     requireThrows([] { web::response(101, "{}", ""); },
         "informational response status was accepted as a final response");
     require(web::parseJsonBody(
@@ -154,8 +156,8 @@ int main() {
     }, "malformed validation rules were ignored for a missing field");
     requireThrows([&] {
         (void)web::validateForm(R"({"age":"1"})",
-            R"([{"name":"age","minimum":9223372036854775808}])");
-    }, "out-of-range numeric validation bound was accepted");
+            R"([{"name":"age","minLength":9223372036854775808}])");
+    }, "out-of-range form length bound was accepted");
 
     const auto templateResult = web::renderTemplate(
         "Hello {{user.name}} {{#if active}}active{{/if}} "

@@ -1,0 +1,402 @@
+start {
+pub fn serverCreate(address: string, port: number): number {
+    return __zhttp_serverCreate(address, port)
+} end fn
+
+pub fn serverStart(server: number): boolean {
+    return __zhttp_serverStart(server)
+} end fn
+
+pub fn serverRunning(server: number): boolean {
+    return __zhttp_serverRunning(server)
+} end fn
+
+pub fn serverPort(server: number): number {
+    return __zhttp_serverPort(server)
+} end fn
+
+pub fn serverNext(server: number, timeoutMilliseconds: number): string {
+    return __zhttp_serverNext(server, timeoutMilliseconds)
+} end fn
+
+pub fn serverRespond(server: number, requestId: number, status: number, headersJson: string, body: string): boolean {
+    return __zhttp_serverRespond(server, requestId, status, headersJson, body)
+} end fn
+
+pub fn serverRespondBinary(server: number, requestId: number, status: number, headersJson: string, bodyBase64: string): boolean {
+    return __zhttp_serverRespondBinary(server, requestId, status, headersJson, bodyBase64)
+} end fn
+
+pub fn serverStop(server: number) {
+    __zhttp_serverStop(server)
+} end fn
+
+pub fn serverConfigure(server: number, maximumBodyBytes: number, timeoutMilliseconds: number) {
+    __zhttp_serverConfigure(server, maximumBodyBytes, timeoutMilliseconds)
+} end fn
+
+pub fn configureCors(server: number, origin: string, methods: string, headers: string) {
+    __zhttp_configureCors(server, origin, methods, headers)
+} end fn
+
+pub fn routeParams(path: string, pattern: string): string {
+    return __zhttp_routeParams(path, pattern)
+} end fn
+
+pub fn queryValue(query: string, name: string): string {
+    return __zhttp_queryValue(query, name)
+} end fn
+
+pub fn requestHeader(requestJson: string, name: string): string {
+    return __zhttp_requestHeader(requestJson, name)
+} end fn
+
+pub fn request(method: string, url: string, headersJson: string, body: string, timeoutMilliseconds: number): string {
+    return __zhttp_clientRequest(method, url, headersJson, body, timeoutMilliseconds)
+} end fn
+
+pub fn get(url: string, headersJson: string, timeoutMilliseconds: number): string {
+    return request("GET", url, headersJson, "", timeoutMilliseconds)
+} end fn
+
+pub fn head(url: string, headersJson: string, timeoutMilliseconds: number): string {
+    return request("HEAD", url, headersJson, "", timeoutMilliseconds)
+} end fn
+
+pub fn post(url: string, headersJson: string, body: string, timeoutMilliseconds: number): string {
+    return request("POST", url, headersJson, body, timeoutMilliseconds)
+} end fn
+
+pub fn put(url: string, headersJson: string, body: string, timeoutMilliseconds: number): string {
+    return request("PUT", url, headersJson, body, timeoutMilliseconds)
+} end fn
+
+pub fn patch(url: string, headersJson: string, body: string, timeoutMilliseconds: number): string {
+    return request("PATCH", url, headersJson, body, timeoutMilliseconds)
+} end fn
+
+pub fn deleteRequest(url: string, headersJson: string, body: string, timeoutMilliseconds: number): string {
+    return request("DELETE", url, headersJson, body, timeoutMilliseconds)
+} end fn
+
+pub fn options(url: string, headersJson: string, timeoutMilliseconds: number): string {
+    return request("OPTIONS", url, headersJson, "", timeoutMilliseconds)
+} end fn
+
+pub fn requestBinary(method: string, url: string, headersJson: string, bodyBase64: string, timeoutMilliseconds: number): string {
+    return __zhttp_clientRequestBinary(method, url, headersJson, bodyBase64, timeoutMilliseconds)
+} end fn
+
+pub fn urlEncode(value: string): string {
+    return __zweb_urlEncode(value)
+} end fn
+
+pub fn urlDecode(value: string): string {
+    return __zweb_urlDecode(value)
+} end fn
+
+pub fn parseUrl(value: string): string {
+    return __zweb_parseUrl(value)
+} end fn
+
+pub fn buildUrl(scheme: string, host: string, port: string, path: string, query: string, fragment: string): string {
+    return __zweb_buildUrl(scheme, host, port, path, query, fragment)
+} end fn
+
+pub fn parseForm(value: string): string {
+    return __zweb_parseForm(value)
+} end fn
+
+pub fn parseCookies(value: string): string {
+    return __zweb_parseCookies(value)
+} end fn
+
+pub fn cookieHeader(name: string, value: string, maxAge: number, path: string, domain: string, secure: boolean, httpOnly: boolean, sameSite: string): string {
+    return __zweb_cookieHeader(name, value, maxAge, path, domain, secure, httpOnly, sameSite)
+} end fn
+
+pub fn cookieHeaderExpires(name: string, value: string, maxAge: number, expires: string, path: string, domain: string, secure: boolean, httpOnly: boolean, sameSite: string): string {
+    return __zweb_cookieHeaderExpires(name, value, maxAge, expires, path, domain, secure, httpOnly, sameSite)
+} end fn
+
+pub fn securityHeaders(headersJson: string): string {
+    return __zweb_securityHeaders(headersJson)
+} end fn
+
+pub fn routeAdd(routesJson: string, method: string, pattern: string, handler: string): string {
+    return __zweb_routeAdd(routesJson, method, pattern, handler)
+} end fn
+
+pub fn routeAddConfigured(routesJson: string, method: string, pattern: string, handler: string, name: string, configurationJson: string): string {
+    return __zweb_routeAddConfigured(routesJson, method, pattern, handler, name, configurationJson)
+} end fn
+
+pub fn routeGroup(prefix: string, routesJson: string): string {
+    return __zweb_routeGroup(prefix, routesJson)
+} end fn
+
+pub fn routeMatch(routesJson: string, method: string, path: string): string {
+    return __zweb_routeMatch(routesJson, method, path)
+} end fn
+
+pub fn routeUrl(routesJson: string, name: string, parametersJson: string): string {
+    return __zweb_routeUrl(routesJson, name, parametersJson)
+} end fn
+
+pub fn response(status: number, headersJson: string, body: string): string {
+    return __zweb_response(status, headersJson, body)
+} end fn
+
+pub fn jsonResponse(status: number, headersJson: string, bodyJson: string): string {
+    return __zweb_jsonResponse(status, headersJson, bodyJson)
+} end fn
+
+pub fn notFoundResponse(body: string): string {
+    return __zweb_notFoundResponse(body)
+} end fn
+
+pub fn methodNotAllowedResponse(allow: string, body: string): string {
+    return __zweb_methodNotAllowedResponse(allow, body)
+} end fn
+
+pub fn mimeType(path: string): string {
+    return __zweb_mimeType(path)
+} end fn
+
+pub fn staticFile(root: string, path: string, maximumBytes: number): string {
+    return __zweb_staticFile(root, path, maximumBytes)
+} end fn
+
+pub fn serverRespondFile(server: number, requestId: number, status: number, headersJson: string, root: string, path: string, maximumBytes: number): boolean {
+    return __zweb_respondFile(server, requestId, status, headersJson, root, path, maximumBytes)
+} end fn
+
+pub fn serverRespondStatic(server: number, requestId: number, status: number, headersJson: string, root: string, path: string, indexFile: string, maximumBytes: number, cacheControl: string): boolean {
+    return __zweb_respondStatic(server, requestId, status, headersJson, root, path, indexFile, maximumBytes, cacheControl)
+} end fn
+
+pub fn parseMultipart(requestJson: string, maximumBytes: number): string {
+    return __zweb_parseMultipart(requestJson, maximumBytes)
+} end fn
+
+pub fn saveUpload(multipartJson: string, index: number, root: string, destination: string, maximumBytes: number): string {
+    return __zweb_saveUpload(multipartJson, index, root, destination, maximumBytes)
+} end fn
+
+pub fn uploadCount(multipartJson: string): number {
+    return jsonArrayLength(multipartJson, "/files")
+} end fn
+
+pub fn uploadedFile(multipartJson: string, index: number): string {
+    return jsonArrayGet(multipartJson, "/files", index)
+} end fn
+
+pub fn uploadDataBase64(multipartJson: string, index: number): string {
+    return jsonGetString(uploadedFile(multipartJson, index), "/dataBase64")
+} end fn
+
+pub fn validateForm(formJson: string, rulesJson: string): string {
+    return __zweb_validateForm(formJson, rulesJson)
+} end fn
+
+pub fn formHas(formJson: string, name: string): boolean {
+    return __zweb_formHas(formJson, name)
+} end fn
+
+pub fn formNumber(formJson: string, name: string): number {
+    return __zweb_formNumber(formJson, name)
+} end fn
+
+pub fn loadTemplate(root: string, path: string, maximumBytes: number): string {
+    return __zweb_loadTemplate(root, path, maximumBytes)
+} end fn
+
+pub fn renderTemplate(source: string, contextJson: string): string {
+    return __zweb_renderTemplate(source, contextJson)
+} end fn
+
+pub fn middlewareUse(pipelineJson: string, name: string, optionsJson: string): string {
+    return __zweb_middlewareUse(pipelineJson, name, optionsJson)
+} end fn
+
+pub fn middlewareBefore(pipelineJson: string, requestJson: string): string {
+    return __zweb_middlewareBefore(pipelineJson, requestJson)
+} end fn
+
+pub fn middlewareAfter(pipelineJson: string, requestJson: string, responseJson: string): string {
+    return __zweb_middlewareAfter(pipelineJson, requestJson, responseJson)
+} end fn
+
+pub fn sessionStoreCreate(): number {
+    return __zweb_sessionStoreCreate()
+} end fn
+
+pub fn sessionStoreClose(store: number) {
+    __zweb_sessionStoreClose(store)
+} end fn
+
+pub fn sessionCreate(store: number, lifetimeSeconds: number): string {
+    return __zweb_sessionCreate(store, lifetimeSeconds)
+} end fn
+
+pub fn sessionSet(store: number, sessionId: string, key: string, value: string): boolean {
+    return __zweb_sessionSet(store, sessionId, key, value)
+} end fn
+
+pub fn sessionGet(store: number, sessionId: string, key: string): string {
+    return __zweb_sessionGet(store, sessionId, key)
+} end fn
+
+pub fn sessionHas(store: number, sessionId: string, key: string): boolean {
+    return __zweb_sessionHas(store, sessionId, key)
+} end fn
+
+pub fn sessionInvalidate(store: number, sessionId: string): boolean {
+    return __zweb_sessionInvalidate(store, sessionId)
+} end fn
+
+pub fn sessionRotate(store: number, sessionId: string, lifetimeSeconds: number): string {
+    return __zweb_sessionRotate(store, sessionId, lifetimeSeconds)
+} end fn
+
+pub fn sessionCsrfToken(store: number, sessionId: string): string {
+    return __zweb_sessionCsrfToken(store, sessionId)
+} end fn
+
+pub fn sessionValidateCsrf(store: number, sessionId: string, token: string): boolean {
+    return __zweb_sessionValidateCsrf(store, sessionId, token)
+} end fn
+
+pub fn sessionCookie(name: string, sessionId: string, lifetimeSeconds: number, secure: boolean, sameSite: string): string {
+    return __zweb_sessionCookie(name, sessionId, lifetimeSeconds, secure, sameSite)
+} end fn
+
+pub fn jsonValid(source: string): boolean {
+    return __zjson_valid(source)
+} end fn
+
+pub fn jsonCompact(source: string): string {
+    return __zjson_compact(source)
+} end fn
+
+pub fn jsonQuote(value: string): string {
+    return __zjson_quote(value)
+} end fn
+
+pub fn jsonGet(source: string, pointer: string): string {
+    return __zjson_get(source, pointer)
+} end fn
+
+pub fn jsonGetString(source: string, pointer: string): string {
+    return __zjson_getString(source, pointer)
+} end fn
+
+pub fn jsonGetNumber(source: string, pointer: string): number {
+    return __zjson_getNumber(source, pointer)
+} end fn
+
+pub fn jsonGetBoolean(source: string, pointer: string): boolean {
+    return __zjson_getBoolean(source, pointer)
+} end fn
+
+pub fn jsonArrayLength(source: string, pointer: string): number {
+    return __zjson_arrayLength(source, pointer)
+} end fn
+
+pub fn jsonArrayGet(source: string, pointer: string, index: number): string {
+    return __zjson_arrayGet(source, pointer, index)
+} end fn
+
+pub fn jsonKind(source: string, pointer: string): string {
+    return __zjson_kind(source, pointer)
+} end fn
+
+pub fn requestMethod(requestJson: string): string {
+    return __zjson_getString(requestJson, "/method")
+} end fn
+
+pub fn requestPath(requestJson: string): string {
+    return __zjson_getString(requestJson, "/path")
+} end fn
+
+pub fn requestQuery(requestJson: string): string {
+    return __zjson_getString(requestJson, "/query")
+} end fn
+
+pub fn requestBody(requestJson: string): string {
+    return __zjson_getString(requestJson, "/body")
+} end fn
+
+pub fn requestBodyEncoding(requestJson: string): string {
+    return __zjson_getString(requestJson, "/bodyEncoding")
+} end fn
+
+pub fn requestBodyBase64(requestJson: string): string {
+    return __zjson_getString(requestJson, "/bodyBase64")
+} end fn
+
+pub fn parseJsonBody(requestJson: string): string {
+    return __zweb_parseJsonBody(requestJson)
+} end fn
+
+pub fn requestNumber(requestJson: string): number {
+    return __zjson_getNumber(requestJson, "/id")
+} end fn
+
+pub fn formValue(formJson: string, name: string): string {
+    let escapedName = __zstdlib_string_replace(name, "~", "~0")
+    escapedName = __zstdlib_string_replace(escapedName, "/", "~1")
+    let pointer = "/" + escapedName
+    if __zjson_kind(formJson, pointer) == "array" {
+        if __zjson_arrayLength(formJson, pointer) == 0 {
+            return ""
+        } end if
+        let first = __zjson_arrayGet(formJson, pointer, 0)
+        return __zjson_getString(first, "")
+    } end if
+    return __zjson_getString(formJson, pointer)
+} end fn
+
+pub fn multipartFieldValue(multipartJson: string, name: string): string {
+    let escapedName = __zstdlib_string_replace(name, "~", "~0")
+    escapedName = __zstdlib_string_replace(escapedName, "/", "~1")
+    let pointer = "/fields/" + escapedName
+    if __zjson_kind(multipartJson, pointer) == "array" {
+        if __zjson_arrayLength(multipartJson, pointer) == 0 {
+            return ""
+        } end if
+        let first = __zjson_arrayGet(multipartJson, pointer, 0)
+        return __zjson_getString(first, "")
+    } end if
+    return __zjson_getString(multipartJson, pointer)
+} end fn
+
+pub fn cookieValue(cookiesJson: string, name: string): string {
+    let escapedName = __zstdlib_string_replace(name, "~", "~0")
+    escapedName = __zstdlib_string_replace(escapedName, "/", "~1")
+    return __zjson_getString(cookiesJson, "/" + escapedName)
+} end fn
+
+pub fn responseStatus(responseJson: string): number {
+    return __zjson_getNumber(responseJson, "/status")
+} end fn
+
+pub fn responseBody(responseJson: string): string {
+    return __zjson_getString(responseJson, "/body")
+} end fn
+
+pub fn responseBodyBase64(responseJson: string): string {
+    return __zjson_getString(responseJson, "/bodyBase64")
+} end fn
+
+pub fn responseBodyEncoding(responseJson: string): string {
+    return __zjson_getString(responseJson, "/bodyEncoding")
+} end fn
+
+pub fn serverRespondJson(server: number, requestId: number, status: number, headersJson: string, bodyJson: string): boolean {
+    let responseJson = jsonResponse(status, headersJson, bodyJson)
+    let responseHeaders = __zjson_get(responseJson, "/headers")
+    let responseText = __zjson_getString(responseJson, "/body")
+    return serverRespond(server, requestId, status, responseHeaders, responseText)
+} end fn
+} stop

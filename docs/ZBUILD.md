@@ -169,7 +169,9 @@ dependencies = ["game"]
 
 The current compiler can produce standalone executable outputs. ZPBuild therefore supports `executable` and `test` targets only for Z+ sources; static/shared libraries and application bundles are rejected rather than simulated. Custom targets can run an argv command without shell concatenation. Target dependencies form a validated DAG, are cycle-checked and traversed deterministically, are built before dependents, and participate in dependent cache signatures. They are build-order/artifact dependencies only: the current compiler has no object-file or library-link interface, so target outputs are not linked into one another. Share Z+ declarations through `.zh` modules and `use`.
 
-`[dependencies]` accepts local project paths, either as keys or `[dependencies.NAME].path`. `zbuild configure` validates each dependency manifest and writes `zproject.lock` with its version and manifest SHA-256. These entries are currently lock/validation metadata; they are not automatically imported, compiled, or linked into target programs. No registry, version solver, external downloads, or package scripts are implemented.
+ZPBuild also detects a project's `zpm.json` and resolves its local or cached package dependencies before build, check, and test operations. ZPM records the selected versions and source integrity in `zpm-lock.json`; `--locked` behavior is used automatically when that lockfile is present. Installed packages live under `z+_packages/<name>/` and can be imported by package name; the compiler resolves each import to the manifest's `.zh` entry. Native and interpreter compilation use the same module loader. Conflicting constraints fail rather than installing multiple versions under one package name. See [ZPM](ZPM.md) for the manifest, cache, and archive format.
+
+The legacy `[dependencies]` section in `zproject.toml` accepts local project paths, either as keys or `[dependencies.NAME].path`. `zbuild configure` validates each dependency manifest and writes `zproject.lock` with its version and manifest SHA-256. These entries remain lock/validation metadata; `zpm.json` is the package dependency format.
 
 The `Library` template demonstrates reusable source `.zh` modules and tests, not a separately linkable library artifact.
 
@@ -203,9 +205,9 @@ The repository's ZPBuild unit and integration tests run through CTest. The build
 - Cache use is enabled by default and has no project-level disable/directory setting yet; `--no-cache` is the per-invocation bypass. Cache records remain under the fixed profile-local `metadata/cache/` path.
 - Windows is the currently validated host for this release. Linux-specific process/file-lock code remains implemented, but Linux execution and benchmarking must be reported separately from Windows validation.
 - There are no compiler optimization/debug-symbol controls, so those requests are validated and rejected rather than silently ignored.
-- Local dependencies are locked and validated but are not consumed as source packages or linked artifacts.
+- Legacy `zproject.toml` local dependencies are lock/validation metadata only. ZPM package imports are source modules, not separately linked artifacts.
 - Asset configuration is project-wide; target-specific asset rules are not supported.
 - Native output is for the host platform. Cross-compilation and target-specific platform matrices are not implemented.
-- `configure` supports local manifests only; it does not access a package registry.
+- ZPM resolves local and cached sources only; it does not access a package registry.
 
 These are compiler/build-system integration limits, not claims of supported features. Existing `zp` commands and standalone source builds remain unchanged.

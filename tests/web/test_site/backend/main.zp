@@ -1,6 +1,6 @@
-use zweb as web
 use zstring as text
 use zfile as file
+use zweb as web
 
 start {
     fn validEmail(value: string): boolean {

@@ -46,7 +46,11 @@ function activate(context) {
         ["zplus.showCompilerVersion", showCompilerVersion],
         ["zplus.zbuildBuildProject", () => runZBuildProject("build")],
         ["zplus.zbuildRunProject", () => runZBuildProject("run")],
-        ["zplus.zbuildTestProject", () => runZBuildProject("test")]
+        ["zplus.zbuildTestProject", () => runZBuildProject("test")],
+        ["zplus.zpmInstall", () => runZpmCommand("install")],
+        ["zplus.zpmAdd", addZpmPackage],
+        ["zplus.zpmRemove", removeZpmPackage],
+        ["zplus.zpmList", () => runZpmCommand("list")]
     ];
     for (const [command, callback] of commands) {
         context.subscriptions.push(vscode.commands.registerCommand(command, callback));
@@ -360,7 +364,7 @@ async function showCompilerVersion() {
     else vscode.window.showInformationMessage(output);
 }
 
-async function findZBuildProjectRoot() {
+async function findProjectRoot(manifestName) {
     const starts = [];
     const editor = vscode.window.activeTextEditor;
     if (editor && editor.document.uri.fsPath) {
@@ -373,7 +377,7 @@ async function findZBuildProjectRoot() {
         let current = path.resolve(start);
         while (true) {
             try {
-                const stat = await fs.promises.stat(path.join(current, "zproject.toml"));
+                const stat = await fs.promises.stat(path.join(current, manifestName));
                 if (stat.isFile()) return current;
             } catch (error) {
                 if (error.code !== "ENOENT" && error.code !== "ENOTDIR") throw error;
@@ -384,6 +388,14 @@ async function findZBuildProjectRoot() {
         }
     }
     return undefined;
+}
+
+function findZBuildProjectRoot() {
+    return findProjectRoot("zproject.toml");
+}
+
+function findZpmProjectRoot() {
+    return findProjectRoot("zpm.json");
 }
 
 async function runZBuildProject(command) {
@@ -412,6 +424,49 @@ async function runZBuildProject(command) {
     } else {
         vscode.window.showInformationMessage(`ZBuild ${command} completed.`);
     }
+}
+
+async function runZpmCommand(command, args = []) {
+    const root = await findZpmProjectRoot();
+    if (!root) {
+        vscode.window.showWarningMessage("Z+: No zpm.json found in the active project.");
+        return;
+    }
+    const configured = vscode.workspace.getConfiguration("zplus").get("zpmPath", "");
+    const executable = resolveCompilerPath(
+        configured || (process.platform === "win32" ? "zpm.exe" : "zpm")
+    );
+    outputChannel.show(true);
+    outputChannel.appendLine(`---- ZPM ${command} ----`);
+    outputChannel.appendLine(`Project: ${root}`);
+    const result = await executeCompiler(executable, [command, ...args], { cwd: root });
+    const output = `${result.stdout}${result.stderr ? `\n${result.stderr}` : ""}`.trim();
+    if (output) outputChannel.appendLine(output);
+    if (result.error && result.error.code === "ENOENT") {
+        const message = `ZPM not found: ${executable}. Set zplus.zpmPath or add zpm to PATH.`;
+        outputChannel.appendLine(message);
+        vscode.window.showErrorMessage(message);
+    } else if (result.code !== 0) {
+        vscode.window.showErrorMessage(
+            output || `ZPM ${command} failed with exit code ${result.code}.`);
+    } else {
+        vscode.window.showInformationMessage(`ZPM ${command} completed.`);
+    }
+}
+
+async function addZpmPackage() {
+    const source = await vscode.window.showInputBox({
+        prompt: "Enter a local Z+ package directory or .zpm archive path",
+        placeHolder: "..\\my-package"
+    });
+    if (source) await runZpmCommand("add", [source]);
+}
+
+async function removeZpmPackage() {
+    const name = await vscode.window.showInputBox({
+        prompt: "Enter the package name to remove"
+    });
+    if (name) await runZpmCommand("remove", [name]);
 }
 
 function showCompilerMissing(compiler) {
@@ -750,5 +805,7 @@ module.exports = {
     provideSignatureHelp,
     publishDiagnostics,
     toVscodeDiagnostics,
-    findZBuildProjectRoot
+    findZBuildProjectRoot,
+    findZpmProjectRoot,
+    runZpmCommand
 };

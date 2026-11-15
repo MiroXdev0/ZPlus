@@ -112,7 +112,8 @@ at 2–8 workers.
 The server supports GET, POST, PUT, PATCH, DELETE, OPTIONS, and HEAD, parses
 Content-Length bodies, and supports persistent HTTP/1.0 and HTTP/1.1
 connections. Duplicate Content-Length values and request Transfer-Encoding
-are rejected; malformed requests receive an error response. `Expect:
+are rejected; malformed requests receive an error response. Responses with
+status 204, 205, or 304 cannot carry a body. `Expect:
 100-continue` currently receives 417. This bounded implementation is not
 claimed to satisfy every HTTP/1.1 requirement.
 
@@ -183,11 +184,13 @@ a base64 response body. Text response behavior is unchanged. Request headers
 are a JSON object of strings; the runtime manages Host, Content-Length, and
 Connection. The client supports `http://` URLs, custom headers, request
 bodies, Content-Length responses, chunked responses, and a 4 MiB response
-limit. Timeouts apply to connection establishment and socket I/O. `https://`
-is intentionally rejected: TLS is not implemented and the runtime does not
-pretend that plain HTTP is secure. No TLS library or platform TLS transport is
-currently configured in CMake. HTTPS support requires selecting and wiring a
-maintained TLS provider, certificate validation, and certificate/key
+limit. Client request headers are limited to 16 KiB and 100 fields, and request
+bodies to 16 MiB. Timeouts apply to connection establishment and socket I/O.
+Informational and protocol-upgrade responses are rejected.
+`https://` is intentionally rejected: TLS is not implemented, and the runtime
+does not pretend that plain HTTP is secure. No TLS library or platform TLS
+transport is currently configured in CMake. HTTPS support requires selecting
+and wiring a maintained TLS provider, certificate validation, and certificate/key
 configuration; until then, deployments should terminate TLS in a trusted
 reverse proxy.
 

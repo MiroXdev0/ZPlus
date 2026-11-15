@@ -39,10 +39,12 @@ traffic over the plain HTTP client; terminate TLS in a trusted reverse proxy.
 The server accepts and reads connections on worker threads, but Z+ application
 logic runs synchronously on the thread calling `serverNext`. Request headers
 are limited to 16 KiB and 100 fields; request bodies default to 1 MiB and can
-be configured from 1 byte to 16 MiB. Server response bodies are limited to 16 MiB.
-Client response headers are limited to 16 KiB and 100 fields, and response
-bodies to 4 MiB. Duplicate
-Content-Length values and Transfer-Encoding request bodies are rejected.
+be configured from 1 byte to 16 MiB. Server response bodies are limited to
+16 MiB.
+Client request and response headers are limited to 16 KiB and 100 fields;
+client request bodies are limited to 16 MiB and response bodies to 4 MiB.
+Duplicate Content-Length values and Transfer-Encoding request bodies are
+rejected.
 Chunked responses are accepted only with a single `chunked` transfer coding;
 trailers have the same 16 KiB/100-field bounds. These checks cover tested
 framing and bounds, not every HTTP/1.1 requirement.
@@ -94,8 +96,9 @@ The server supports GET, POST, PUT, PATCH, DELETE, HEAD, and OPTIONS. The
 client accepts the same methods and supports `http://` URLs only. Timeouts
 apply to connect and socket operations after DNS resolution; system name
 resolution itself is not bounded. HTTPS is rejected, not downgraded. Final
-responses must use status codes 200–599; 204 and 304 responses cannot carry a
-body.
+responses must use status codes 200–599; 204, 205, and 304 responses cannot
+carry a body. The client rejects informational (1xx) and protocol-upgrade
+responses rather than treating them as final responses.
 
 `configureCors(server, origin, methods, headers)` accepts one exact origin or
 `*`, plus comma-separated method and request-header token lists. Exact origins
