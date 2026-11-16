@@ -1,6 +1,6 @@
 # Z+ Windows installer (Inno Setup)
 
-`ZPlus.iss` builds a per-user Windows x64 installer from the verified distribution in this repository's `bin\` directory. The script reads the Z+ release version from `bin\zp.exe`, verifies both `bin\zpbuild.exe` and the legacy `bin\zbuild.exe` report the independent ZPBuild 0.3.0 version, and packages those binaries rather than rebuilding or substituting compiler outputs.
+`ZPlus.iss` builds a per-user Windows x64 installer from a verified distribution directory. By default it uses this repository's `bin\`; `-BinaryDirectory` can select an isolated Release staging directory. The script reads the Z+ release version from `zp.exe`, verifies `zpbuild.exe` and the legacy `zbuild.exe` report the same independent ZPBuild version, validates ZPM's version output, and packages the supplied binaries rather than rebuilding or substituting compiler outputs.
 
 ## Build
 
@@ -17,7 +17,7 @@
    .\installer\inno\Build-Installer.ps1 -IsccPath "C:\Program Files\Inno Setup 7\ISCC.exe"
    ```
 
-The installer preserves the `bin\` layout, including `zp.exe`, `zpbuild.exe`, the `zbuild.exe` compatibility CLI, runtime DLLs, standard-library modules, and ZPBuild templates. It also includes the repository documentation, examples, license, and third-party notices. The setup icon, Inno wizard image, and installed shortcuts are generated from the official light-surface logo in `logo\`; the original logo remains unchanged. Temporary staging files are removed after the build.
+The installer preserves the distribution layout, including `zp.exe`, `zpbuild.exe`, the `zbuild.exe` compatibility CLI, `zpm.exe`, runtime DLLs, standard-library modules, and ZPBuild templates. It also includes the repository documentation, examples, license, and third-party notices. The setup icon, Inno wizard image, and installed shortcuts are generated from the official light-surface logo in `logo\`; the original logo remains unchanged. Temporary staging files are removed after the build.
 
 On success, the installer is written to `installer\inno\output\ZPlus-<version>-Setup.exe`; the script prints its full path and verifies that the file exists. The script does not download release assets or require the GitHub Releases API.
 

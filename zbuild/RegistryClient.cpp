@@ -29,6 +29,10 @@
 #include <string_view>
 #include <vector>
 
+#ifndef ZPM_VERSION
+#define ZPM_VERSION "development"
+#endif
+
 namespace zbuild {
 namespace {
 
@@ -197,8 +201,9 @@ RegistryResponse platformRequest(
     if (components.dwExtraInfoLength) {
         resource.append(components.lpszExtraInfo, components.dwExtraInfoLength);
     }
+    const std::wstring userAgent = std::wstring(L"ZPM/") + toWide(ZPM_VERSION);
     WinHandle session{WinHttpOpen(
-        L"ZPM/0.1.0", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+        userAgent.c_str(), WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
         WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0)};
     if (!session.value) throw std::runtime_error("cannot initialize HTTPS transport");
     if (!WinHttpSetTimeouts(session.value, 10000, 10000, 10000, 120000)) {
@@ -389,7 +394,8 @@ RegistryResponse platformRequest(
     curl_easy_setopt(handle, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(handle, CURLOPT_SSL_VERIFYPEER, 1L);
     curl_easy_setopt(handle, CURLOPT_SSL_VERIFYHOST, 2L);
-    curl_easy_setopt(handle, CURLOPT_USERAGENT, "ZPM/0.1.0");
+    const std::string userAgent = std::string("ZPM/") + ZPM_VERSION;
+    curl_easy_setopt(handle, CURLOPT_USERAGENT, userAgent.c_str());
     if (method == "POST" || method == "PUT") {
         curl_easy_setopt(handle, CURLOPT_POSTFIELDS, body.data());
         curl_easy_setopt(handle, CURLOPT_POSTFIELDSIZE_LARGE,

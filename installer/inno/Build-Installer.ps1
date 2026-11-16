@@ -1,13 +1,17 @@
 [CmdletBinding()]
 param(
     [string]$OutputDirectory = (Join-Path $PSScriptRoot 'output'),
+    [string]$BinaryDirectory = (Join-Path $PSScriptRoot '..\..\bin'),
     [string]$IsccPath
 )
 
 $ErrorActionPreference = 'Stop'
 $requiredInnoVersion = '7.1.1'
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$binaryDirectory = Join-Path $repositoryRoot 'bin'
+if (-not (Test-Path -LiteralPath $BinaryDirectory -PathType Container)) {
+    throw "The compiler distribution directory does not exist: $BinaryDirectory"
+}
+$binaryDirectory = (Resolve-Path -LiteralPath $BinaryDirectory).Path
 $temporaryDirectory = Join-Path ([IO.Path]::GetTempPath()) ("zplus-inno-" + [guid]::NewGuid().ToString('N'))
 
 function Get-IsccCompiler {

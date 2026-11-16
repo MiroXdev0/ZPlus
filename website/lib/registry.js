@@ -750,6 +750,15 @@ async function publish(pool, storage, request, publicOrigin) {
   }
 }
 
+function packageTags(manifest) {
+  const values = manifest?.tags ?? manifest?.keywords ?? manifest?.categories;
+  if (!Array.isArray(values)) return [];
+  return [...new Set(values
+    .filter(value => typeof value === "string" && value.trim())
+    .map(value => value.trim().slice(0, 40)))]
+    .slice(0, 8);
+}
+
 async function searchPackages(pool, url) {
   const query = (url.searchParams.get("q") || "").trim();
   if (query.length > 100) fail(400, "invalid_query", "Search query is too long.");
@@ -784,21 +793,37 @@ async function searchPackages(pool, url) {
   const latest = new Map();
   for (const row of versions.rows) {
     const current = latest.get(row.package_name);
-    if (!current || compareVersions(row.version, current) > 0) {
-      latest.set(row.package_name, row.version);
+    if (!current || compareVersions(row.version, current.version) > 0) {
+      latest.set(row.package_name, { version: row.version });
     }
   }
+  const latestPackages = [...latest.entries()];
+  const latestManifests = latestPackages.length
+    ? await pool.query(
+      `SELECT package_name, manifest
+       FROM zpm_package_versions
+       WHERE publication_state = 'published' AND version !~ '-'
+         AND (${latestPackages.map((_, index) =>
+    `(package_name = $${index * 2 + 1} AND version = $${index * 2 + 2})`
+  ).join(" OR ")})`,
+      latestPackages.flatMap(([name, version]) => [name, version.version])
+    )
+    : { rows: [] };
+  const manifestsByName = new Map(
+    latestManifests.rows.map(row => [row.package_name, row.manifest])
+  );
   return jsonResponse(200, {
     packages: result.rows.map(row => ({
       name: row.name,
-      version: latest.get(row.name),
+      version: latest.get(row.name)?.version,
       description: row.description,
       author: row.author,
       owner: row.owner,
       license: row.license,
       repository: row.repository,
       homepage: row.homepage,
-      updatedAt: row.updated_at
+      updatedAt: row.updated_at,
+      tags: packageTags(manifestsByName.get(row.name))
     }))
   }, { "Cache-Control": "public, max-age=60, stale-while-revalidate=300" });
 }
@@ -1045,7 +1070,29 @@ export function createRegistryHandler({ pool, storage, publicOrigin } = {}) {
            ORDER BY p.name`,
           [user.id]
         );
-        return jsonResponse(200, { packages: packages.rows });
+        const recent = await pool.query(
+          `SELECT v.package_name, v.version, v.published_at, u.username AS publisher
+           FROM zpm_package_versions v
+           JOIN zpm_packages p ON p.name = v.package_name
+           JOIN zpm_users u ON u.id = v.published_by
+           WHERE v.publication_state = 'published'
+             AND (p.owner_id = $1 OR EXISTS (
+               SELECT 1 FROM zpm_package_maintainers m
+               WHERE m.package_name = p.name AND m.user_id = $1
+             ))
+           ORDER BY v.published_at DESC, v.package_name, v.version DESC
+           LIMIT 20`,
+          [user.id]
+        );
+        return jsonResponse(200, {
+          packages: packages.rows,
+          recentPublications: recent.rows.map(row => ({
+            name: row.package_name,
+            version: row.version,
+            publishedAt: row.published_at,
+            publisher: row.publisher
+          }))
+        });
       }
       if (segments[0] === "publish" && segments.length === 1 && method === "POST") {
         return await publish(pool, storage, request, origin);

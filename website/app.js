@@ -20,6 +20,7 @@
   let releaseRequest;
   let registrySearchTimer;
   let registrySearchSequence = 0;
+  let publishSelectionSequence = 0;
 
   const lessons = course.flatMap((module, moduleIndex) =>
     module.lessons.map((lesson, lessonIndex) => ({
@@ -36,7 +37,9 @@
     ...docs.map(item => ({ title: item.title, summary: item.summary, href: `/docs/${item.id}`, type: "Documentation" })),
     ...wiki.map(item => ({ title: item.title, summary: item.summary, href: `/wiki/${item.id}`, type: "Wiki" })),
     ...lessons.map(item => ({ title: item.title, summary: item.explain, href: `/learn/${item.id}`, type: `Lesson ${item.number}` })),
-    ...examples.map(item => ({ title: item.title, summary: item.summary, href: `/examples#${item.id}`, type: "Example" }))
+    ...examples.map(item => ({ title: item.title, summary: item.summary, href: `/examples#${item.id}`, type: "Example" })),
+    { title: "Package registry", summary: "Search and inspect published Z+ packages.", href: "/packages", type: "Registry" },
+    { title: "Publish a package", summary: "Publish a validated ZPM archive.", href: "/publish", type: "Developer tools" }
   ];
 
   function slug(value) {
@@ -120,6 +123,8 @@
         ${link("/learn", "Learn")}
         ${link("/docs", "Documentation")}
         ${link("/wiki", "Wiki")}
+        ${link("/packages", "Registry")}
+        ${link("/dashboard", "Developer account")}
         <a href="${releasesUrl}" target="_blank" rel="noreferrer">GitHub Releases ↗</a>
       </div>
       <small>Language details are grounded in the checked-in compiler documentation. Check the release page for current published builds.</small>
@@ -160,6 +165,10 @@
     <section class="section-block resource-strip">
       <div><p class="eyebrow">The reference shelf</p><h2>Learn the rules.<br>See what is implemented.</h2></div>
       <div class="resource-links">${link("/docs", "Technical documentation", "resource-link")} ${link("/wiki", "Wiki & practical guides", "resource-link")} ${link("/examples", "Runnable examples", "resource-link")}</div>
+    </section>
+    <section class="section-block registry-callout">
+      <div><p class="eyebrow">ZPM PACKAGE REGISTRY</p><h2>Find a package.<br>Share what you build.</h2><p>Search published Z+ packages, inspect their manifests and release history, or sign in to publish a verified archive.</p></div>
+      <div class="hero-actions">${buttonLink("/packages", "Explore packages")} ${buttonLink("/publish", "Publish a package", "button button-secondary")}</div>
     </section>`;
   }
 
@@ -477,7 +486,7 @@
   }
 
   function packagesPage() {
-    return `<section class="page-hero compact"><p class="eyebrow">The Z+ ecosystem</p><h1>Packages for Z+</h1><p>Discover source-backed Z+ packages, inspect their requirements, and publish releases from your developer account.</p></section>
+    return `<section class="page-hero compact"><p class="eyebrow">The Z+ ecosystem</p><h1>Packages for Z+</h1><p>Search real published packages, review release metadata, and install with ZPM.</p><div class="hero-actions">${buttonLink("/publish", "Publish a package")} ${buttonLink("/dashboard", "Developer dashboard", "button button-secondary")}</div></section>
       <section class="registry-layout">
         <div class="registry-main">
           <form id="registry-search-form" class="registry-search">
@@ -486,8 +495,36 @@
           </form>
           <div id="registry-results" class="registry-results" aria-live="polite"><p class="registry-message">Loading packages…</p></div>
         </div>
-        <aside id="registry-account" class="registry-account"><p class="registry-message">Checking developer account…</p></aside>
+        <aside id="registry-account" class="registry-account" aria-live="polite"><p class="registry-message">Checking developer account…</p></aside>
       </section>`;
+  }
+
+  function authPage(mode) {
+    const registering = mode === "register";
+    return `<section class="page-hero compact auth-page-heading"><p class="eyebrow">Z+ PACKAGE REGISTRY</p><h1>${registering ? "Create your developer account" : "Welcome back"}</h1><p>${registering ? "Publish and manage Z+ packages with your registry account." : "Sign in to manage your packages and releases."}</p></section>
+      <section class="auth-page">
+        <div class="registry-panel auth-panel">
+          <form data-registry-auth="${mode}" class="registry-auth-form">
+            ${registering ? `<label>Username<input name="username" type="text" autocomplete="username" minlength="3" maxlength="32" pattern="[A-Za-z0-9][A-Za-z0-9_\\-]{2,31}" required><small>3–32 letters, numbers, underscores, or hyphens; start with a letter or number.</small></label>` : ""}
+            <label>Email<input name="email" type="email" autocomplete="email" maxlength="254" required></label>
+            <label>Password<span class="password-control"><input name="password" type="password" aria-label="Password" autocomplete="${registering ? "new-password" : "current-password"}" minlength="${registering ? "12" : "1"}" maxlength="1024" ${registering ? `aria-describedby="password-requirement"` : ""} required><button type="button" class="password-toggle" data-password-toggle aria-label="Show password" aria-pressed="false">Show</button></span>${registering ? `<small id="password-requirement">At least 12 characters are required (12 UTF-8 bytes minimum).</small>` : ""}</label>
+            ${registering ? `<label>Confirm password<span class="password-control"><input name="passwordConfirmation" type="password" aria-label="Confirm password" autocomplete="new-password" minlength="12" maxlength="1024" data-confirm-password required><button type="button" class="password-toggle" data-password-toggle aria-label="Show password confirmation" aria-pressed="false">Show</button></span></label>` : ""}
+            <button class="button button-primary" type="submit">${registering ? "Create account" : "Sign in"}</button>
+          </form>
+          <p id="registry-auth-status" class="registry-message" role="status" aria-live="polite"></p>
+          <p class="auth-switch">${registering ? `Already registered? ${link("/login", "Sign in")}` : `New to the registry? ${link("/register", "Create an account")}`}</p>
+        </div>
+      </section>`;
+  }
+
+  function dashboardPage() {
+    return `<section class="page-hero compact"><p class="eyebrow">DEVELOPER AREA</p><h1>Your dashboard</h1><p>Manage your registry account, published packages, and release history.</p></section>
+      <section id="dashboard-content" class="dashboard-content" aria-live="polite">${loadingPanel("Loading developer account…")}</section>`;
+  }
+
+  function publishPage() {
+    return `<section class="page-hero compact"><p class="eyebrow">DEVELOPER AREA</p><h1>Publish a package</h1><p>Upload a ZPM1 <code>.zpm</code> archive. The registry validates the archive, stores it privately, verifies its checksum, and confirms publication before reporting success.</p></section>
+      <section id="publish-access" class="publish-content" aria-live="polite">${loadingPanel("Checking developer account…")}</section>`;
   }
 
   function packageDetailPage(name) {
@@ -527,9 +564,18 @@
       return `<p class="registry-message">No packages found. Try a different search.</p>`;
     }
     return `<div class="registry-package-list">${packages.map(item => `<article class="registry-package">
-      <div><h2>${link(`/packages/${encodeURIComponent(item.name)}`, escapeHtml(item.name))}</h2><p>${escapeHtml(item.description || "No description provided.")}</p></div>
+      <div><h2>${link(`/packages/${encodeURIComponent(item.name)}`, escapeHtml(item.name))}</h2><p>${escapeHtml(item.description || "No description provided.")}</p>${renderPackageTags(item.tags)}</div>
       <div class="registry-package-meta"><span>v${escapeHtml(item.version || "—")}</span><span>by ${escapeHtml(item.author || item.owner)}</span>${item.license ? `<span>${escapeHtml(item.license)}</span>` : ""}</div>
     </article>`).join("")}</div>`;
+  }
+
+  function renderPackageTags(tags) {
+    const safeTags = Array.isArray(tags)
+      ? [...new Set(tags.filter(tag => typeof tag === "string" && tag.trim()).map(tag => tag.trim().slice(0, 40)))].slice(0, 8)
+      : [];
+    return safeTags.length
+      ? `<ul class="package-tags" aria-label="Package tags">${safeTags.map(tag => `<li>${escapeHtml(tag)}</li>`).join("")}</ul>`
+      : "";
   }
 
   async function loadRegistryPackages(query = "") {
@@ -551,70 +597,51 @@
     }
   }
 
-  function authForms(message = "") {
-    return `<section class="registry-panel">
-      <p class="eyebrow">DEVELOPER ACCESS</p><h2>Sign in or create an account</h2>
-      <p>Accounts are used to manage package ownership and publish versions.</p>
-      <div class="registry-auth-grid">
-        <form data-registry-auth="login">
-          <h3>Sign in</h3>
-          <label>Email<input name="email" type="email" autocomplete="email" maxlength="254" required></label>
-          <label>Password<input name="password" type="password" autocomplete="current-password" maxlength="1024" required></label>
-          <button class="button button-secondary" type="submit">Sign in</button>
-        </form>
-        <form data-registry-auth="register">
-          <h3>Create account</h3>
-          <label>Username<input name="username" type="text" autocomplete="username" minlength="3" maxlength="32" pattern="[A-Za-z0-9][A-Za-z0-9_\\-]{2,31}" required></label>
-          <label>Email<input name="email" type="email" autocomplete="email" maxlength="254" required></label>
-          <label>Password<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="1024" required></label>
-          <button class="button button-primary" type="submit">Create account</button>
-        </form>
-      </div>
-      <p id="registry-auth-status" class="registry-message" role="status">${escapeHtml(message)}</p>
-    </section>`;
-  }
-
   function renderRegistryAccount(user, packages = []) {
     const target = document.querySelector("#registry-account");
     if (!target) return;
     if (!user) {
-      target.innerHTML = authForms();
+      target.innerHTML = `<section class="registry-panel">
+        <p class="eyebrow">DEVELOPER ACCESS</p><h2>Publish with ZPM</h2>
+        <p>Sign in to manage package ownership and publish validated <code>.zpm</code> releases.</p>
+        <div class="account-actions">${buttonLink("/login", "Sign in")} ${buttonLink("/register", "Create account", "button button-secondary")}</div>
+      </section>`;
       return;
     }
     target.innerHTML = `<section class="registry-panel">
       <p class="eyebrow">DEVELOPER ACCOUNT</p><h2>${escapeHtml(user.username)}</h2>
       <p>Signed in as ${escapeHtml(user.email)}.</p>
-      <button class="button button-secondary" type="button" data-registry-logout>Sign out</button>
-      <h3 class="registry-subheading">Publish a package</h3>
-      <p>Build with <code>zpbuild</code>, then upload a ZPM1 <code>.zpm</code> archive created with <code>zpm pack</code>. The registry validates the manifest, archive paths, and presence of Z+ source files without executing untrusted code.</p>
-      <form id="registry-publish-form" class="registry-publish-form">
-        <label>Package archive<input name="archive" type="file" accept=".zpm,application/vnd.zpm.archive" required></label>
-        <button class="button button-primary" type="submit">Publish release</button>
-      </form>
-      <p id="registry-publish-status" class="registry-message" role="status"></p>
-      <h3 class="registry-subheading">Packages you manage</h3>
+      <div class="account-actions">${buttonLink("/dashboard", "Open dashboard")} ${buttonLink("/publish", "Publish package", "button button-secondary")}</div>
+      <button class="button button-quiet" type="button" data-registry-logout>Sign out</button>
+      <p class="registry-subheading">Packages you manage</p>
       ${packages.length ? `<ul class="registry-managed-list">${packages.map(item => `<li>${link(`/packages/${encodeURIComponent(item.name)}`, escapeHtml(item.name))}${item.is_owner ? " · owner" : " · maintainer"}</li>`).join("")}</ul>` : `<p class="registry-message">No packages are associated with this account yet.</p>`}
     </section>`;
+  }
+
+  async function getRegistryAccount() {
+    const response = await fetch("/api/registry/auth/me", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" }
+    });
+    if (response.status === 401) return null;
+    const result = await registryJson(response, "Unable to load account.");
+    return result.user;
   }
 
   async function loadRegistryAccount() {
     const target = document.querySelector("#registry-account");
     if (!target) return;
     try {
-      const response = await fetch("/api/registry/auth/me", {
-        credentials: "same-origin",
-        headers: { Accept: "application/json" }
-      });
-      if (response.status === 401) {
+      const user = await getRegistryAccount();
+      if (!user) {
         renderRegistryAccount(null);
         return;
       }
-      const result = await registryJson(response, "Unable to load account.");
       const packageResult = await registryRequest("/api/registry/me/packages", {
         credentials: "same-origin",
         headers: { Accept: "application/json" }
       }, "Unable to load managed packages.");
-      renderRegistryAccount(result.user, packageResult.packages || []);
+      renderRegistryAccount(user, packageResult.packages || []);
     } catch (error) {
       if (target.isConnected) {
         target.innerHTML = `<section class="registry-panel"><p class="registry-message registry-error">${escapeHtml(error.message)}</p></section>`;
@@ -622,8 +649,72 @@
     }
   }
 
+  function dashboardMarkup(user, packageResult) {
+    const packages = packageResult.packages || [];
+    const recentPublications = packageResult.recentPublications || [];
+    return `<div class="dashboard-heading">
+        <div><p class="eyebrow">ACCOUNT</p><h2>${escapeHtml(user.username)}</h2><p>${escapeHtml(user.email)} · Session active</p></div>
+        <div class="dashboard-actions">${buttonLink("/publish", "Publish a package")}<button class="button button-secondary" type="button" data-registry-logout>Sign out</button></div>
+      </div>
+      <div class="dashboard-stats"><article><span>Managed packages</span><strong>${packages.length}</strong></article><article><span>Recent releases</span><strong>${recentPublications.length}</strong></article></div>
+      <div class="dashboard-grid">
+        <section class="dashboard-panel"><div class="dashboard-panel-heading"><div><p class="eyebrow">PACKAGE MANAGEMENT</p><h2>Published packages</h2></div><a class="text-link" href="/publish">Publish new →</a></div>
+          ${packages.length ? `<ul class="dashboard-package-list">${packages.map(item => `<li><div><strong>${link(`/packages/${encodeURIComponent(item.name)}`, escapeHtml(item.name))}</strong><span>${escapeHtml(item.description || "No description provided.")}</span></div><small>${item.is_owner ? "Owner" : "Maintainer"}</small></li>`).join("")}</ul>` : `<div class="empty-state"><h3>Your registry is ready</h3><p>You haven’t published or joined a package yet. Upload a ZPM archive to start sharing a package.</p>${buttonLink("/publish", "Publish your first package")}</div>`}
+        </section>
+        <section class="dashboard-panel"><div class="dashboard-panel-heading"><div><p class="eyebrow">PUBLICATION HISTORY</p><h2>Recent releases</h2></div></div>
+          ${recentPublications.length ? `<ol class="publication-list">${recentPublications.map(item => `<li><span class="publication-marker" aria-hidden="true"></span><div><strong>${link(`/packages/${encodeURIComponent(item.name)}`, escapeHtml(item.name))} <span>v${escapeHtml(item.version)}</span></strong><p>Published by ${escapeHtml(item.publisher)} · ${escapeHtml(new Date(item.publishedAt).toLocaleDateString())}</p></div></li>`).join("")}</ol>` : `<p class="registry-message">${packages.length ? "No published versions are available yet." : "Published releases will appear here after your first successful upload."}</p>`}
+        </section>
+      </div>`;
+  }
+
+  async function loadDeveloperDashboard() {
+    const target = document.querySelector("#dashboard-content");
+    if (!target) return;
+    try {
+      const user = await getRegistryAccount();
+      if (!target.isConnected) return;
+      if (!user) {
+        target.innerHTML = `<section class="state-panel"><div><h2>Sign in to continue</h2><p>The developer dashboard requires a registry account.</p><div class="account-actions">${buttonLink("/login", "Sign in")} ${buttonLink("/register", "Create account", "button button-secondary")}</div></div></section>`;
+        return;
+      }
+      const packageResult = await registryRequest("/api/registry/me/packages", {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" }
+      }, "Unable to load your packages.");
+      if (target.isConnected) target.innerHTML = dashboardMarkup(user, packageResult);
+    } catch (error) {
+      if (target.isConnected) target.innerHTML = `<section class="state-panel state-warning" role="alert"><div><h2>Dashboard unavailable</h2><p>${escapeHtml(error.message)}</p></div></section>`;
+    }
+  }
+
+  async function loadPublishAccess() {
+    const target = document.querySelector("#publish-access");
+    if (!target) return;
+    try {
+      const user = await getRegistryAccount();
+      if (!target.isConnected) return;
+      if (!user) {
+        target.innerHTML = `<section class="state-panel"><div><h2>Sign in to publish</h2><p>Publishing requires an authenticated developer account.</p><div class="account-actions">${buttonLink("/login", "Sign in")} ${buttonLink("/register", "Create account", "button button-secondary")}</div></div></section>`;
+        return;
+      }
+      target.innerHTML = `<div class="publish-account"><span class="live-dot" aria-hidden="true"></span><p>Publishing as <strong>${escapeHtml(user.username)}</strong> (${escapeHtml(user.email)})</p><a href="/dashboard">Dashboard</a></div>
+        <form id="registry-publish-form" class="registry-panel registry-publish-form">
+          <label for="package-archive">ZPM package archive</label>
+          <p class="form-help">Choose a <code>.zpm</code> file created with <code>zpm pack</code>. Maximum size: 4 MiB.</p>
+          <input id="package-archive" name="archive" type="file" accept=".zpm,application/vnd.zpm.archive" required>
+          <div id="publish-preview" class="publish-preview" aria-live="polite"><p>Select a package archive to inspect its manifest.</p></div>
+          <div class="upload-progress" id="upload-progress" hidden><label for="publish-progress">Upload progress</label><progress id="publish-progress" max="100" value="0">0%</progress><span id="publish-progress-label">0%</span></div>
+          <button id="publish-submit" class="button button-primary" type="submit" disabled>Publish package</button>
+          <p id="registry-publish-status" class="registry-message" role="status" aria-live="polite"></p>
+        </form>`;
+    } catch (error) {
+      if (target.isConnected) target.innerHTML = `<section class="state-panel state-warning" role="alert"><div><h2>Account check failed</h2><p>${escapeHtml(error.message)}</p><button class="button button-secondary" type="button" data-retry-publish-access>Try again</button></div></section>`;
+    }
+  }
+
   function packageDetailsMarkup(item, user) {
     const latest = item.versions[0];
+    const packageTags = latest?.manifest?.tags || latest?.manifest?.keywords || latest?.manifest?.categories;
     const metadataLinks = [
       safeExternalLink(item.repository, "Repository"),
       safeExternalLink(item.homepage, "Homepage")
@@ -650,6 +741,12 @@
         <span class="package-version-badge">v${escapeHtml(latest?.version || "—")}</span>
       </div>
       <div class="package-detail-meta"><span>Owner: ${escapeHtml(item.owner)}</span><span>Author: ${escapeHtml(item.author || item.owner)}</span>${item.license ? `<span>License: ${escapeHtml(item.license)}</span>` : ""}${metadataLinks.join("")}</div>
+      ${renderPackageTags(packageTags)}
+      <section class="package-metadata"><h2>Package metadata</h2><dl>
+        <div><dt>Entry module</dt><dd><code>${escapeHtml(latest?.main || "Not specified")}</code></dd></div>
+        <div><dt>Compiler</dt><dd>${escapeHtml(latest?.compiler || "Unspecified")}</dd></div>
+        <div><dt>Dependencies</dt><dd>${Object.keys(latest?.dependencies || {}).length ? Object.entries(latest.dependencies).map(([name, range]) => `${escapeHtml(name)} ${escapeHtml(range)}`).join(", ") : "None"}</dd></div>
+      </dl></section>
       <section><h2>Install</h2>${codeBlock(`zpm add ${item.name}`, "Terminal")}<p class="package-note">Then import the package's public module using its manifest entry point.</p></section>
       <section><h2>Release history</h2><div class="registry-version-list">${item.versions.map(version => `<article>
         <div><strong>v${escapeHtml(version.version)}</strong><small>Published ${escapeHtml(new Date(version.publishedAt).toLocaleDateString())} by ${escapeHtml(version.publisher)}</small></div>
@@ -686,6 +783,136 @@
     }
   }
 
+  async function inspectPackageArchive(file) {
+    if (file.size > 4 * 1024 * 1024) throw new Error("Registry packages are limited to 4 MiB.");
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (bytes.length < 8 || new TextDecoder().decode(bytes.subarray(0, 4)) !== "ZPM1") {
+      throw new Error("This file is not a supported ZPM1 package archive.");
+    }
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const count = view.getUint32(4, true);
+    if (!count || count > 10000) throw new Error("The package archive has an invalid entry count.");
+    let offset = 8;
+    const paths = new Set();
+    let manifestBytes;
+    let hasZPlusSource = false;
+    for (let index = 0; index < count; index++) {
+      if (offset + 12 > bytes.length) throw new Error("The package archive is truncated.");
+      const pathLength = view.getUint32(offset, true);
+      const size = view.getBigUint64(offset + 4, true);
+      offset += 12;
+      if (!pathLength || pathLength > 4096 || size > BigInt(4 * 1024 * 1024) ||
+          BigInt(offset) + BigInt(pathLength) + size > BigInt(bytes.length)) {
+        throw new Error("The package archive contains an invalid or truncated entry.");
+      }
+      const pathEnd = offset + pathLength;
+      let name;
+      try {
+        name = new TextDecoder("utf-8", { fatal: true }).decode(bytes.subarray(offset, pathEnd));
+      } catch {
+        throw new Error("The package archive contains a file path that is not valid UTF-8.");
+      }
+      const components = name.split("/");
+      if (!name || name.startsWith("/") || name.includes("\\") ||
+          components.some(component => !component || component === "." || component === "..")) {
+        throw new Error("The package archive contains an unsafe file path.");
+      }
+      const normalizedName = name.toLowerCase();
+      if (paths.has(normalizedName)) throw new Error("The package archive contains duplicate file paths.");
+      paths.add(normalizedName);
+      offset = pathEnd;
+      const sizeNumber = Number(size);
+      if (name === "zpm.json") {
+        if (sizeNumber > 1024 * 1024) throw new Error("The package manifest exceeds the 1 MiB limit.");
+        manifestBytes = bytes.slice(offset, offset + sizeNumber);
+      }
+      if (/\.(zh|zp)$/i.test(name)) hasZPlusSource = true;
+      offset += sizeNumber;
+    }
+    if (offset !== bytes.length) throw new Error("The package archive contains trailing data.");
+    if (!manifestBytes) throw new Error("The archive must contain a root zpm.json manifest.");
+    let manifest;
+    try {
+      manifest = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(manifestBytes));
+    } catch {
+      throw new Error("The package manifest is not valid UTF-8 JSON.");
+    }
+    if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
+      throw new Error("The package manifest must be a JSON object.");
+    }
+    if (!/^[a-z](?:[a-z0-9-]{0,62}[a-z0-9])?$/.test(manifest.name || "")) {
+      throw new Error("The package manifest has an invalid package name.");
+    }
+    if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:[-+][0-9A-Za-z.-]+)?$/.test(manifest.version || "")) {
+      throw new Error("The package manifest has an invalid semantic version.");
+    }
+    if (typeof manifest.main !== "string" || !manifest.main.endsWith(".zh") || !paths.has(manifest.main.toLowerCase())) {
+      throw new Error("The package manifest main field must name an included .zh module.");
+    }
+    if (!hasZPlusSource) throw new Error("The archive must contain at least one Z+ source file.");
+    return { manifest, entryCount: count };
+  }
+
+  async function inspectSelectedArchive(input) {
+    const sequence = ++publishSelectionSequence;
+    const file = input.files?.[0];
+    const preview = document.querySelector("#publish-preview");
+    const submit = document.querySelector("#publish-submit");
+    const status = document.querySelector("#registry-publish-status");
+    if (!preview || !submit) return;
+    submit.disabled = true;
+    if (!file) {
+      preview.innerHTML = "<p>Select a package archive to inspect its manifest.</p>";
+      if (status) status.textContent = "";
+      return;
+    }
+    preview.innerHTML = `<p class="registry-message">Inspecting ${escapeHtml(file.name)}…</p>`;
+    if (status) status.textContent = "";
+    try {
+      const { manifest, entryCount } = await inspectPackageArchive(file);
+      if (sequence !== publishSelectionSequence || !preview.isConnected) return;
+      const size = `${(file.size / 1024).toFixed(1)} KiB`;
+      preview.innerHTML = `<div class="publish-validation"><span class="validation-mark" aria-hidden="true">✓</span><div><strong>Archive structure recognized</strong><p>${escapeHtml(file.name)} · ${size} · ${entryCount} files</p><dl><div><dt>Package</dt><dd>${escapeHtml(manifest.name)}</dd></div><div><dt>Version</dt><dd>${escapeHtml(manifest.version)}</dd></div><div><dt>Description</dt><dd>${escapeHtml(manifest.description || "No description provided.")}</dd></div></dl><p class="form-help">The registry performs authoritative metadata, path, duplicate-version, storage, and checksum validation before confirming publication.</p></div></div>`;
+      submit.disabled = false;
+    } catch (error) {
+      if (sequence !== publishSelectionSequence || !preview.isConnected) return;
+      preview.innerHTML = `<p class="registry-message registry-error" role="alert">${escapeHtml(error.message)}</p>`;
+      if (status) status.textContent = "Choose a valid ZPM package archive to continue.";
+    }
+  }
+
+  function uploadArchiveWithProgress(file, onProgress) {
+    return new Promise((resolve, reject) => {
+      const request = new XMLHttpRequest();
+      request.open("POST", "/api/registry/publish");
+      request.withCredentials = true;
+      request.timeout = 120000;
+      request.setRequestHeader("Accept", "application/json");
+      request.setRequestHeader("Content-Type", "application/vnd.zpm.archive");
+      request.upload.addEventListener("progress", event => {
+        onProgress(event.lengthComputable ? Math.round(event.loaded / event.total * 100) : null);
+      });
+      request.addEventListener("load", () => {
+        let result;
+        try {
+          result = JSON.parse(request.responseText);
+        } catch {
+          reject(new Error("The package registry did not return JSON. It may be unavailable."));
+          return;
+        }
+        if (request.status < 200 || request.status >= 300) {
+          reject(new Error(result.error?.message || "Package publishing failed."));
+          return;
+        }
+        resolve(result);
+      });
+      request.addEventListener("error", () => reject(new Error("The upload could not reach the package registry. Check your connection and retry.")));
+      request.addEventListener("timeout", () => reject(new Error("The package upload timed out. You can safely retry.")));
+      request.addEventListener("abort", () => reject(new Error("The package upload was cancelled.")));
+      request.send(file);
+    });
+  }
+
   function notFound() {
     return `<section class="page-hero compact"><p class="eyebrow">404 · NOT FOUND</p><h1>This page isn't in the guide.</h1><p>The requested Z+ route may have moved. Start from the course, reference, or homepage.</p><div class="hero-actions">${buttonLink("/", "Go home")} ${buttonLink("/learn", "Browse lessons", "button button-secondary")}</div></section>`;
   }
@@ -695,7 +922,8 @@
     document.querySelectorAll(".primary-nav a").forEach(anchor => {
       const active = route === anchor.pathname || (anchor.pathname === "/learn" && route.startsWith("/learn/")) ||
         (anchor.pathname === "/docs" && route.startsWith("/docs/")) || (anchor.pathname === "/wiki" && route.startsWith("/wiki/")) ||
-        (anchor.pathname === "/packages" && route.startsWith("/packages"));
+        (anchor.pathname === "/packages" && route.startsWith("/packages")) ||
+        (anchor.pathname === "/dashboard" && ["/dashboard", "/publish", "/login", "/register"].includes(route));
       anchor.classList.toggle("nav-active", active);
       if (active) anchor.setAttribute("aria-current", "page");
       else anchor.removeAttribute("aria-current");
@@ -733,6 +961,18 @@
     } else if (route === "/examples") {
       main.innerHTML = examplesPage();
       document.title = "Examples — Z+";
+    } else if (route === "/login" || route === "/register") {
+      const mode = route.slice(1);
+      main.innerHTML = authPage(mode);
+      document.title = mode === "login" ? "Sign in — Z+ Registry" : "Create account — Z+ Registry";
+    } else if (route === "/dashboard") {
+      main.innerHTML = dashboardPage();
+      document.title = "Developer dashboard — Z+ Registry";
+      void loadDeveloperDashboard();
+    } else if (route === "/publish") {
+      main.innerHTML = publishPage();
+      document.title = "Publish a package — Z+ Registry";
+      void loadPublishAccess();
     } else if (route === "/packages") {
       main.innerHTML = packagesPage();
       document.title = "Packages — Z+";
@@ -761,6 +1001,10 @@
       : route === "/docs" ? "Technical reference for Z+ syntax, modules, tools, and runtime support."
       : route === "/wiki" ? "Guides to Z+ architecture, modules, projects, and contributing."
       : route === "/examples" ? "Real Z+ source examples for functions, files, modules, and collections."
+      : route === "/login" ? "Sign in to your Z+ package registry account."
+      : route === "/register" ? "Create a Z+ package registry developer account."
+      : route === "/dashboard" ? "Manage your Z+ packages and view publication history."
+      : route === "/publish" ? "Publish a validated ZPM package archive to the Z+ registry."
       : route.startsWith("/packages") ? "Browse, install, and publish source-backed Z+ packages."
       : "Find Z+ language documentation, examples, and learning resources.";
     document.querySelector('meta[name="description"]').setAttribute("content", description);
@@ -794,10 +1038,22 @@
     const status = document.querySelector("#registry-auth-status");
     const button = form.querySelector('button[type="submit"]');
     const mode = form.dataset.registryAuth;
+    const values = Object.fromEntries(new FormData(form));
+    if (mode === "register" && values.password !== values.passwordConfirmation) {
+      if (status) status.textContent = "Passwords do not match.";
+      form.elements.passwordConfirmation.focus();
+      return;
+    }
+    if (mode === "register") {
+      const passwordBytes = new TextEncoder().encode(String(values.password)).length;
+      if (passwordBytes < 12 || passwordBytes > 1024) {
+        if (status) status.textContent = "Use a password between 12 and 1024 UTF-8 bytes.";
+        return;
+      }
+    }
+    delete values.passwordConfirmation;
     button.disabled = true;
-    if (status) status.textContent = mode === "register"
-      ? "Creating account…"
-      : "Signing in…";
+    if (status) status.textContent = mode === "register" ? "Creating account…" : "Signing in…";
     try {
       await registryRequest(`/api/registry/auth/${mode}`, {
         method: "POST",
@@ -806,13 +1062,13 @@
           Accept: "application/json",
           "Content-Type": "application/json"
         },
-        body: JSON.stringify(Object.fromEntries(new FormData(form)))
+        body: JSON.stringify(values)
       }, mode === "register" ? "Registration failed." : "Sign-in failed.");
-      await loadRegistryAccount();
+      navigate("/dashboard");
     } catch (error) {
       if (status?.isConnected) status.textContent = error.message;
     } finally {
-      button.disabled = false;
+      if (button.isConnected) button.disabled = false;
     }
   }
 
@@ -821,31 +1077,60 @@
     const button = form.querySelector('button[type="submit"]');
     const file = form.elements.archive.files[0];
     if (!file) return;
-    if (file.size > 4 * 1024 * 1024) {
-      status.textContent = "Registry packages are limited to 4 MiB.";
-      return;
-    }
+    let succeeded = false;
     button.disabled = true;
-    status.textContent = "Validating and publishing package…";
+    status.textContent = "Validating package archive…";
+    const progressPanel = document.querySelector("#upload-progress");
+    const progress = document.querySelector("#publish-progress");
+    const progressLabel = document.querySelector("#publish-progress-label");
+    if (progressPanel) progressPanel.hidden = true;
     try {
-      const result = await registryRequest("/api/registry/publish", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/vnd.zpm.archive"
-        },
-        body: file
-      }, "Package publishing failed.");
-      const message = `Published ${result.name} ${result.version}.`;
+      await inspectPackageArchive(file);
+      if (progressPanel) progressPanel.hidden = false;
+      if (progress) {
+        progress.value = 0;
+        progress.setAttribute("value", "0");
+        progress.textContent = "0%";
+        progress.setAttribute("aria-valuetext", "0% uploaded");
+      }
+      if (status) status.textContent = "Uploading archive…";
+      const result = await uploadArchiveWithProgress(file, percent => {
+        if (progress) {
+          if (percent === null) {
+            progress.removeAttribute("value");
+            progress.removeAttribute("aria-valuetext");
+            progress.textContent = "Uploading…";
+          } else {
+            progress.value = percent;
+            progress.setAttribute("value", String(percent));
+            progress.textContent = `${percent}%`;
+            progress.setAttribute("aria-valuetext", `${percent}% uploaded`);
+          }
+        }
+        if (progressLabel) progressLabel.textContent = percent === null ? "Uploading…" : `${percent}% uploaded`;
+      });
+      succeeded = true;
+      if (progress) {
+        progress.value = 100;
+        progress.setAttribute("value", "100");
+        progress.textContent = "100%";
+        progress.setAttribute("aria-valuetext", "Upload complete, 100 percent");
+      }
+      if (progressLabel) progressLabel.textContent = "Upload complete";
+      const packageHref = `/packages/${encodeURIComponent(result.name)}`;
+      if (status) {
+        status.innerHTML = `Published ${escapeHtml(result.name)} ${escapeHtml(result.version)} successfully. ${link(packageHref, "View package", "text-link")}${result.integrity ? `<span class="publish-integrity">SHA-256 ${escapeHtml(result.integrity)}</span>` : ""}`;
+      }
       form.reset();
-      await Promise.all([loadRegistryPackages(), loadRegistryAccount()]);
-      const updatedStatus = document.querySelector("#registry-publish-status");
-      if (updatedStatus) updatedStatus.textContent = message;
+      const preview = document.querySelector("#publish-preview");
+      if (preview) preview.innerHTML = `<p>Publication confirmed by the registry. ${link(packageHref, "Open package details →", "text-link")}</p>`;
+      button.disabled = true;
+      if (document.querySelector("#registry-results")) void loadRegistryPackages();
     } catch (error) {
       if (status?.isConnected) status.textContent = error.message;
     } finally {
-      button.disabled = false;
+      if (button.isConnected && !succeeded) button.disabled = false;
+      if (progressPanel?.isConnected && !succeeded) progressPanel.hidden = true;
     }
   }
 
@@ -886,6 +1171,7 @@
     const packageName = button.dataset.maintainerRemove;
     const username = button.dataset.username;
     const status = document.querySelector("[data-package-admin-status]");
+    if (!window.confirm(`Remove ${username} as a maintainer of ${packageName}?`)) return;
     button.disabled = true;
     try {
       await registryRequest(
@@ -932,7 +1218,10 @@
         },
         body: "{}"
       }, "Sign-out failed.").then(
-        () => loadRegistryAccount(),
+        () => {
+          if (path() === "/dashboard" || path() === "/publish") navigate("/login");
+          else loadRegistryAccount();
+        },
         error => {
           const target = document.querySelector("#registry-account");
           if (target?.isConnected) {
@@ -943,6 +1232,17 @@
         }
       );
     }
+    const passwordToggle = event.target.closest("[data-password-toggle]");
+    if (passwordToggle) {
+      const input = passwordToggle.parentElement.querySelector("input");
+      const showing = input.type === "password";
+      input.type = showing ? "text" : "password";
+      passwordToggle.textContent = showing ? "Hide" : "Show";
+      passwordToggle.setAttribute("aria-label", `${showing ? "Hide" : "Show"} ${input.name === "passwordConfirmation" ? "password confirmation" : "password"}`);
+      passwordToggle.setAttribute("aria-pressed", String(showing));
+    }
+    const retryPublishAccess = event.target.closest("[data-retry-publish-access]");
+    if (retryPublishAccess) void loadPublishAccess();
     const removeMaintainer = event.target.closest("[data-maintainer-remove]");
     if (removeMaintainer) void removePackageMaintainer(removeMaintainer);
   });
@@ -966,6 +1266,11 @@
   });
 
   document.addEventListener("input", event => {
+    if (event.target.matches("[data-confirm-password]")) {
+      const password = event.target.form.elements.password.value;
+      event.target.setCustomValidity(event.target.value === password ? "" : "Passwords do not match.");
+      return;
+    }
     if (event.target.id !== "registry-query") return;
     clearTimeout(registrySearchTimer);
     registrySearchTimer = setTimeout(
@@ -975,6 +1280,10 @@
   });
 
   document.addEventListener("change", event => {
+    if (event.target.id === "package-archive") {
+      void inspectSelectedArchive(event.target);
+      return;
+    }
     if (event.target.id !== "lesson-complete") return;
     const id = path().slice("/learn/".length);
     const progress = getProgress();

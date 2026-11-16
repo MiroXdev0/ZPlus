@@ -2,12 +2,12 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(ZPlus
-    VERSION 1.2.0
+    VERSION 1.3.0
     LANGUAGES CXX
 )
 
 set(ZBUILD_VERSION "0.3.0")
-set(ZPM_VERSION "0.1.0")
+set(ZPM_VERSION "0.3.0")
 
 include(CTest)
 
@@ -60,6 +60,7 @@ add_library(zbuild_engine STATIC
     runtime/Json.cpp
 )
 target_compile_definitions(zbuild_engine PRIVATE "ZBUILD_VERSION=\"${ZBUILD_VERSION}\"")
+target_compile_definitions(zbuild_engine PRIVATE "ZPM_VERSION=\"${ZPM_VERSION}\"")
 target_include_directories(zbuild_engine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/zbuild
 )
@@ -517,7 +518,7 @@ if(BUILD_TESTING)
     )
     add_test(NAME zpm_version COMMAND zpm --version)
     set_tests_properties(zpm_version PROPERTIES
-        PASS_REGULAR_EXPRESSION "ZPM 0\\.1\\.0"
+        PASS_REGULAR_EXPRESSION "ZPM 0\\.3\\.0"
     )
     add_executable(zbuild_unit_tests
         tests/zbuild/unit_tests.cpp

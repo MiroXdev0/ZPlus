@@ -29,6 +29,8 @@ three-part semantic versions. The package entry must be an existing `.zh`
 file within the package. Packages must contain Z+ source and cannot include
 foreign-language implementation files or symbolic links. Build outputs and
 installed dependencies are not included when packing.
+An optional `tags` array of short strings is displayed by the browser registry;
+it does not affect dependency resolution.
 
 Project imports use the package name as the module path:
 

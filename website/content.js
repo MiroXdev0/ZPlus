@@ -479,14 +479,14 @@ start {
 start {
     say(text.trim(" ready "))
 } stop`, "Standard library calls should be grounded in documented, implemented functions."),
-      l("Creating and sharing packages", "The Z+ package ecosystem is not yet a published package registry. Today, share source modules and project instructions directly, and do not assume a `zbuild add` registry command exists.", `use "utilities.zh" as utilities
+      l("Creating and sharing packages", "The Z+ package registry is live. Use ZPM to search for packages, install dependencies, and publish versioned ZPM archives; see the package documentation for supported workflows.", `use "utilities.zh" as utilities
 start {
     say(utilities.describe())
 } stop`, "A shared module can be imported from a relative source path.", "Prepare a small reusable `.zh` module, document its public functions, and share it with its project configuration.", `start {
     pub fn describe(): string {
         return "A documented reusable module"
     } end fn
-} stop`, "Until a registry is released, share packages as documented source projects with explicit dependencies."),
+} stop`, "The registry accepts ZPM archives; package metadata and source files are checked before publication."),
     ]},
   ];
 
@@ -528,7 +528,7 @@ start {
       ["Commands", "`zbuild init [name]` creates a project; `templates` and `template info NAME` inspect templates; `configure` validates a project; `build`, `run`, `test`, `clean`, `rebuild`, `info`, `targets`, `graph`, and `package` manage targets and outputs. `--debug` / `--release`, `--target`, `--jobs`, `--verbose`, and `--clean-first` apply where supported."],
       ["Configuration", "The root `zproject.toml` supports `[project]`, `[build]`, `[compiler]`, `[platform]`, `[assets]`, `[tests]`, and `[[target]]`. Use executable or test targets with `.zp` entry points; use `.zh` modules for source reuse. The parser accepts a constrained TOML subset, not arbitrary TOML."],
       ["Build behavior", "Incremental signatures include compiler version/hash, target settings, source and reachable module contents, dependency outputs, and assets. Outputs are under `build/<debug|release>/`; package files go in that selected profile."],
-      ["Boundaries", "Targets are standalone executables or tests; the compiler has no object, archive, or library-link interface. Local dependencies are locked and validated but are not automatically imported or linked. Optimization settings and registry downloads are not available."]
+      ["Boundaries", "Targets are standalone executables or tests; the compiler has no object, archive, or library-link interface. Local dependencies are locked and validated but are not automatically imported or linked. Use ZPM for package discovery and installation; platform and native-link support remain target-specific."]
     ]},
     { id: "native", title: "Native backend", section: "Runtime", summary: "Supported subset and platform-specific behavior.", body: [
       ["Host targets", "The compiler has x86-64 native backends. Runtime integrations and supported constructs differ between Windows and Linux."],
@@ -558,8 +558,8 @@ start {
     { id: "modules", title: "How modules work", summary: "Resolution, visibility, initialization, and cycles.", body: "A relative `.zh` import is resolved from its importer, not the current terminal directory. Modules are loaded depth-first and deduplicated by canonical path. Public declarations require `pub`; circular dependencies fail with a dependency-chain diagnostic." },
     { id: "contributing", title: "Contributing to Z+", summary: "Build, test, and report changes against the compiler repository.", body: "Read the language and backend references before changing behavior. Configure with CMake, build the target configuration, run the focused tests, and then run the wider CTest suite. Include a small Z+ regression program for language-visible changes and describe platform limitations." },
     { id: "troubleshooting", title: "Troubleshooting", summary: "Diagnose common installation and compiler problems.", body: "Open a new terminal after a PATH change. Confirm `zp --version` and `zbuild --version`, then run `zp check` before execution. For native failures, check the documented target subset and required runtime DLLs. Include the exact command, compiler version, OS, and diagnostic when reporting a bug." },
-    { id: "faq", title: "Frequently asked questions", summary: "Straight answers about the current Z+ implementation.", body: "Does Z+ have maps and sets? No, not currently. Are all standard modules available natively? No; support varies by platform and function. Is the package registry live? Not yet. Does `zp build` fall back to the interpreter? No. Use the docs to verify a feature before depending on it." },
-    { id: "packages", title: "Sharing packages today", summary: "A practical approach before a central registry exists.", body: "The package ecosystem is planned but no public registry is available yet. You can share a ZBuild project containing `.zh` modules, its `zproject.toml`, license, and usage examples. Keep imports relative and document the compiler version and backend support." },
+    { id: "faq", title: "Frequently asked questions", summary: "Straight answers about the current Z+ implementation.", body: "Does Z+ have maps and sets? No, not currently. Are all standard modules available natively? No; support varies by platform and function. Is the package registry live? Yes; use ZPM to search, install, and publish packages. Does `zp build` fall back to the interpreter? No. Use the docs to verify a feature before depending on it." },
+    { id: "packages", title: "Publishing Z+ packages", summary: "Build, publish, and install packages with ZPM.", body: "The Z+ registry accepts versioned ZPM archives. Use `zpm init` to create a package, `zpm pack` to produce an archive, and `zpm publish` or the website's Publish page to publish it. Registry archives are limited to 4 MiB; the server validates metadata and archive contents before publication. Use `zpm search` and `zpm add` to discover and install published dependencies." },
   ];
 
   const examples = [

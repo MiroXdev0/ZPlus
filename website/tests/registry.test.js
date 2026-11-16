@@ -225,6 +225,34 @@ test("registration stores a password hash and rejects cross-site requests", asyn
   assert.equal(stored.rows[0].password_hash.includes("correct-horse"), false);
 });
 
+test("browser login rejects invalid credentials, authenticates valid sessions, and reports duplicates", async () => {
+  const registered = await register("account-owner", "account@example.com");
+  assert.equal(registered.status, 201);
+
+  const duplicate = await register("account-owner", "another@example.com");
+  assert.equal(duplicate.status, 409);
+  assert.equal((await duplicate.json()).error.code, "account_exists");
+
+  const login = (password) => handler(request("/auth/login", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      origin: publicOrigin,
+      "x-real-ip": "203.0.113.41"
+    },
+    body: JSON.stringify({ email: "account@example.com", password })
+  }));
+  const invalid = await login("incorrect-password");
+  assert.equal(invalid.status, 401);
+
+  const valid = await login("correct-horse-battery-staple");
+  assert.equal(valid.status, 200);
+  const cookie = valid.headers.get("set-cookie").split(";")[0];
+  const account = await handler(request("/auth/me", { headers: { cookie } }));
+  assert.equal(account.status, 200);
+  assert.equal((await account.json()).user.username, "account-owner");
+});
+
 test("publishes once, exposes searchable immutable metadata, and serves the archive", async () => {
   await register("package-owner", "owner@example.com");
   const token = await cliToken("owner@example.com");
@@ -453,6 +481,36 @@ test("supports owner-managed maintainers and records ownership changes", async (
     "SELECT action FROM zpm_registry_audit ORDER BY id"
   );
   assert.deepEqual(audit.rows.map(row => row.action), ["publish", "add_maintainer", "publish"]);
+});
+
+test("returns real package tags and account-scoped publication history", async () => {
+  await register("package-owner", "owner@example.com");
+  await register("other-developer", "other@example.com");
+  const ownerToken = await cliToken("owner@example.com");
+  const otherToken = await cliToken("other@example.com");
+  const firstManifest = { ...manifest(), tags: ["utilities", "z+"] };
+  const latestManifest = {
+    ...manifest("registry-fixture", "1.1.0"),
+    tags: ["utilities", "collections"]
+  };
+  assert.equal((await publish(ownerToken, archiveFor(firstManifest))).status, 201);
+  assert.equal((await publish(ownerToken, archiveFor(latestManifest))).status, 201);
+
+  const search = await handler(request("/search?q=registry-fixture"));
+  assert.deepEqual((await search.json()).packages[0].tags, ["utilities", "collections"]);
+
+  const account = await handler(request("/me/packages", {
+    headers: { authorization: `Bearer ${ownerToken}` }
+  }));
+  const accountResult = await account.json();
+  assert.deepEqual(accountResult.packages.map(item => item.name), ["registry-fixture"]);
+  assert.deepEqual(accountResult.recentPublications.map(item => item.version), ["1.1.0", "1.0.0"]);
+  assert.equal(accountResult.recentPublications[0].publisher, "package-owner");
+
+  const otherAccount = await handler(request("/me/packages", {
+    headers: { authorization: `Bearer ${otherToken}` }
+  }));
+  assert.deepEqual((await otherAccount.json()).recentPublications, []);
 });
 
 test("returns a service error when required storage is not configured", async () => {
