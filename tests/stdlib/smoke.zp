@@ -60,6 +60,17 @@ start {
     let emptyNumbers: number[] = []
     say(collections.isEmpty(emptyNumbers) ? "empty-ok" : "empty-fail")
 
+    let collectionSet = Set<string>([])
+    collectionSet.add("stable")
+    collectionSet.add("stable")
+    say(collectionSet.size() == 1 and collectionSet.contains("stable") ? "set-unique-ok" : "set-unique-fail")
+    say(collectionSet.remove("stable") and collectionSet.size() == 0 ? "set-remove-ok" : "set-remove-fail")
+
+    let collectionMap = Map<string, number>([], [])
+    collectionMap.set("answer", 41)
+    collectionMap.set("answer", 42)
+    say(collectionMap.size() == 1 and collectionMap.get("answer").unwrap() == 42 ? "map-update-ok" : "map-update-fail")
+
     random.seed(7)
     say(random.integer(1, 1) == 1 ? "random-ok" : "random-fail")
     random.seed(123)

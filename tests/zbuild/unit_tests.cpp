@@ -342,6 +342,62 @@ int main(int, char** argv) {
             requireThrows(
                 [&] { (void)zbuild::installPackages(packageConsumer, "1.2.0"); },
                 "dependency version conflict");
+
+            const auto compatibleConsumer = temporary / "compatible-consumer";
+            const auto resolverParent = temporary / "a-resolver-parent";
+            const auto resolverOld = temporary / "resolver-common-1.0.0";
+            const auto resolverCompatible = temporary / "resolver-common-1.4.0";
+            const auto resolverNewest = temporary / "resolver-common-1.9.0";
+            zbuild::initializePackage(compatibleConsumer, "compatible-consumer");
+            writePackage(resolverParent, "a-resolver-parent", "1.0.0",
+                "{\"z-resolver-common\":\">=1.0.0 <2.0.0\"}");
+            writePackage(resolverOld, "z-resolver-common", "1.0.0");
+            writePackage(resolverCompatible, "z-resolver-common", "1.4.0");
+            writePackage(resolverNewest, "z-resolver-common", "1.9.0");
+            zbuild::cachePackage(resolverParent);
+            zbuild::cachePackage(resolverOld);
+            zbuild::cachePackage(resolverCompatible);
+            zbuild::cachePackage(resolverNewest);
+            {
+                std::ofstream manifest(
+                    compatibleConsumer / "zpm.json", std::ios::trunc);
+                manifest << "{\"name\":\"compatible-consumer\",\"version\":\"0.1.0\","
+                    "\"main\":\"src/main.zh\",\"compiler\":\">=1.2.0\","
+                    "\"dependencies\":{\"a-resolver-parent\":\"^1.0.0\","
+                    "\"z-resolver-common\":\"<1.5.0\"}}";
+            }
+            const auto compatibleResolution =
+                zbuild::installPackages(compatibleConsumer, "1.2.0");
+            require(compatibleResolution.size() == 2 &&
+                    compatibleResolution.back().name == "z-resolver-common" &&
+                    compatibleResolution.back().version == "1.4.0",
+                "resolver must backtrack to the highest cached version that satisfies all constraints");
+
+            const auto cycleConsumer = temporary / "cycle-consumer";
+            const auto cycleHigh = temporary / "cycle-high";
+            const auto cycleLow = temporary / "cycle-low";
+            const auto cycleBridge = temporary / "cycle-bridge";
+            zbuild::initializePackage(cycleConsumer, "cycle-consumer");
+            writePackage(cycleHigh, "cycle-lib", "1.1.0",
+                "{\"cycle-bridge\":\"^1.0.0\"}");
+            writePackage(cycleLow, "cycle-lib", "1.0.0");
+            writePackage(cycleBridge, "cycle-bridge", "1.0.0",
+                "{\"cycle-lib\":\"^1.0.0\"}");
+            zbuild::cachePackage(cycleHigh);
+            zbuild::cachePackage(cycleLow);
+            zbuild::cachePackage(cycleBridge);
+            {
+                std::ofstream manifest(cycleConsumer / "zpm.json", std::ios::trunc);
+                manifest << "{\"name\":\"cycle-consumer\",\"version\":\"0.1.0\","
+                    "\"main\":\"src/main.zh\",\"compiler\":\">=1.2.0\","
+                    "\"dependencies\":{\"cycle-lib\":\"^1.0.0\"}}";
+            }
+            const auto cycleResolution = zbuild::installPackages(cycleConsumer, "1.2.0");
+            require(cycleResolution.size() == 1 &&
+                    cycleResolution.front().name == "cycle-lib" &&
+                    cycleResolution.front().version == "1.0.0",
+                "resolver must backtrack when the newest candidate introduces a dependency cycle");
+
             {
                 std::ofstream manifest(packageConsumer / "zpm.json", std::ios::trunc);
                 manifest << "{\"name\":\"package-consumer\",\"version\":\"0.1.0\","

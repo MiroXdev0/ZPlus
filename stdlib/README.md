@@ -104,10 +104,12 @@ Initialize array-backed collections with typed arrays, for example
 - `Queue<T>`: `size()`, `enqueue(value)`, and `dequeue()`; removing from an
   empty queue uses the underlying array bounds diagnostic.
 - `Set<T>`: `size()`, `contains(value)`, `add(value)`, and `remove(value)`.
-  Initial values must not contain duplicates.
+  Initial values must not contain duplicates; adding an existing value leaves
+  the set unchanged.
 - `Map<K, V>`: `size()`, `set(key, value)`, `get(key)`, and `remove(key)`.
-  `get` and `remove` return `Optional<V>`. Initial key/value arrays must have
-  equal lengths and unique keys; the class validates this before operations.
+  `get` and `remove` return `Optional<V>`. `set` replaces the value for an
+  existing key. Initial key/value arrays must have equal lengths and unique
+  keys; the class validates this before operations.
 - `Optional<T>`: construct with `[]` for none or `[value]` for some; use
   `isSome()`, `unwrap()`, and `unwrapOr(fallback)`. More than one initial value
   is rejected.

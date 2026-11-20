@@ -95,6 +95,15 @@ pub class Queue<T> {
 pub class Set<T: equatable> {
     items: T[]
 
+    fn indexOf(value: T) -> number {
+        for index in 0..length(this.items) {
+            if this.items[index] == value {
+                return index
+            } end if
+        } end for
+        return -1
+    } end fn
+
     fn validate() {
         for left in 0..length(this.items) {
             for right in left + 1..length(this.items) {
@@ -112,30 +121,24 @@ pub class Set<T: equatable> {
 
     fn contains(value: T) -> boolean {
         this.validate()
-        for index in 0..length(this.items) {
-            if this.items[index] == value {
-                return true
-            } end if
-        } end for
-        return false
+        return this.indexOf(value) >= 0
     } end fn
 
     fn add(value: T) {
         this.validate()
-        if this.contains(value) == false {
+        if this.indexOf(value) < 0 {
             push(this.items, value)
         } end if
     } end fn
 
     fn remove(value: T) -> boolean {
         this.validate()
-        for index in 0..length(this.items) {
-            if this.items[index] == value {
-                remove(this.items, index)
-                return true
-            } end if
-        } end for
-        return false
+        let index: number = this.indexOf(value)
+        if index < 0 {
+            return false
+        } end if
+        remove(this.items, index)
+        return true
     } end fn
 } end class
 
@@ -174,6 +177,15 @@ pub class Map<K: equatable, V> {
     keys: K[]
     values: V[]
 
+    fn indexOf(key: K) -> number {
+        for index in 0..length(this.keys) {
+            if this.keys[index] == key {
+                return index
+            } end if
+        } end for
+        return -1
+    } end fn
+
     fn validate() {
         if length(this.keys) != length(this.values) {
             throw "Map keys and values must have matching lengths"
@@ -194,36 +206,33 @@ pub class Map<K: equatable, V> {
 
     fn set(key: K, value: V) {
         this.validate()
-        for index in 0..length(this.keys) {
-            if this.keys[index] == key {
-                this.values[index] = value
-                return
-            } end if
-        } end for
+        let index: number = this.indexOf(key)
+        if index >= 0 {
+            this.values[index] = value
+            return
+        } end if
         push(this.keys, key)
         push(this.values, value)
     } end fn
 
     fn get(key: K) -> Optional<V> {
         this.validate()
-        for index in 0..length(this.keys) {
-            if this.keys[index] == key {
-                return Optional<V>([this.values[index]])
-            } end if
-        } end for
+        let index: number = this.indexOf(key)
+        if index >= 0 {
+            return Optional<V>([this.values[index]])
+        } end if
         return Optional<V>([])
     } end fn
 
     fn remove(key: K) -> Optional<V> {
         this.validate()
-        for index in 0..length(this.keys) {
-            if this.keys[index] == key {
-                let value = this.values[index]
-                remove(this.keys, index)
-                remove(this.values, index)
-                return Optional<V>([value])
-            } end if
-        } end for
+        let index: number = this.indexOf(key)
+        if index >= 0 {
+            let value = this.values[index]
+            remove(this.keys, index)
+            remove(this.values, index)
+            return Optional<V>([value])
+        } end if
         return Optional<V>([])
     } end fn
 } end class

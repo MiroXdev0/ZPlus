@@ -118,6 +118,19 @@ async function publishArchive(directory, name) {
   return archivePath;
 }
 
+async function publishPackageVersion(name, version, dependencies = {}) {
+  const directory = join(temporaryRoot, `${name}-${version}`);
+  await initializePackage(name, directory,
+    "start {\n    pub fn value(): number {\n        return 1\n    } end fn\n} stop\n",
+    dependencies);
+  const manifestPath = join(directory, "zpm.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  manifest.version = version;
+  manifest.dependencies = dependencies;
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  await publishArchive(directory, name);
+}
+
 let handler;
 let cliToken;
 let server;
@@ -212,6 +225,13 @@ try {
   );
   await publishArchive(fixtureDirectory, "registry-fixture");
 
+  await publishPackageVersion("a-resolver-parent", "1.0.0", {
+    "z-resolver-common": ">=1.0.0 <2.0.0"
+  });
+  await publishPackageVersion("z-resolver-common", "1.0.0");
+  await publishPackageVersion("z-resolver-common", "1.4.0");
+  await publishPackageVersion("z-resolver-common", "1.9.0");
+
   const clientDirectory = join(temporaryRoot, "consumer project");
   await mkdir(clientDirectory, { recursive: true });
   await run(zpm, ["init", "registry-consumer"], clientDirectory, bootstrapEnv);
@@ -242,6 +262,30 @@ try {
   assert.ok(await readFile(
     join(clientDirectory, "z+_packages", "registry-fixture", "src", "main.zh")
   ));
+
+  const resolverDirectory = join(temporaryRoot, "constraint resolver consumer");
+  await mkdir(resolverDirectory, { recursive: true });
+  await run(zpm, ["init", "constraint-resolver-consumer"], resolverDirectory, env);
+  const resolverManifestPath = join(resolverDirectory, "zpm.json");
+  const resolverManifest = JSON.parse(await readFile(resolverManifestPath, "utf8"));
+  resolverManifest.dependencies = {
+    "a-resolver-parent": "^1.0.0",
+    "z-resolver-common": "<1.5.0"
+  };
+  await writeFile(
+    resolverManifestPath,
+    `${JSON.stringify(resolverManifest, null, 2)}\n`
+  );
+  await run(zpm, ["install"], resolverDirectory, env);
+  const resolverLock = JSON.parse(await readFile(
+    join(resolverDirectory, "zpm-lock.json"), "utf8"
+  ));
+  assert.equal(
+    resolverLock.packages.find(item => item.name === "z-resolver-common")?.version,
+    "1.4.0",
+    "registry resolution should backtrack to a version satisfying transitive and direct constraints"
+  );
+  await run(zpbuild, ["build"], resolverDirectory, env);
 
   await run(zpbuild, ["build"], clientDirectory, env);
   assert.match(await run(zpbuild, ["run"], clientDirectory, env),

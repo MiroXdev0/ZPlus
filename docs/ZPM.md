@@ -69,8 +69,12 @@ package versions and content hashes. `zpm install --locked` refuses to change
 the lock, selects those exact versions, and restores modified managed
 installations only from the verified locked source. Dependency constraints support exact
 versions, `>`, `>=`, `<`, `<=`, caret, tilde, and whitespace-separated
-conjunctions. A package name resolves to one version in a project; incompatible
-transitive constraints fail instead of silently replacing a version.
+conjunctions. The resolver tries available cached or registry versions from
+highest to lowest and restarts resolution when a transitive constraint makes
+an earlier choice impossible.
+A package name resolves to one version in a project; incompatible constraints
+fail with a dependency conflict instead of silently replacing a version.
+`install --locked` uses only the lockfile's exact version and integrity value.
 
 `zpm pack [PACKAGE_DIRECTORY] [ARCHIVE.zpm]` creates a versioned, uncompressed
 ZPM1 archive. The archive has bounded entry count and file sizes; extraction

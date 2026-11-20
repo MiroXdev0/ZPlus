@@ -280,117 +280,197 @@ void prepareRegistryPackages(
     const PackageManifest project = loadPackageManifest(root);
     const auto lockedEntries = locked ? lockedPackages(root)
                                       : std::map<std::string, LockedPackage>{};
-    std::map<std::string, std::string> resolved;
-    std::set<std::string> active;
-
-    const auto resolve = [&](const auto& self,
-                             const std::filesystem::path& parent,
-                             const std::string& name,
-                             const PackageDependency& dependency,
-                             unsigned depth) -> void {
-        if (depth > 64) {
-            throw std::runtime_error("package dependency graph exceeds 64 levels");
-        }
-        if (active.contains(name)) {
-            throw std::runtime_error(
-                "circular package dependency involving '" + name + "'");
-        }
-        const auto prior = resolved.find(name);
-        if (prior != resolved.end()) {
-            if (!packageVersionSatisfies(prior->second, dependency.constraint)) {
-                throw std::runtime_error("dependency version conflict for '" + name +
-                    "': selected " + prior->second + " does not satisfy '" +
-                    dependency.constraint + "'");
-            }
-            return;
-        }
-
+    struct SelectedPackage {
+        PackageManifest manifest;
         std::filesystem::path source;
-        std::string selectedVersion;
-        if (dependency.localPath) {
-            std::error_code error;
-            source = std::filesystem::canonical(parent / dependency.path, error);
-            if (error) throw std::filesystem::filesystem_error(
-                "cannot resolve local package dependency", parent / dependency.path, error);
-            const PackageManifest local = loadPackageManifest(source);
-            if (local.name != name ||
-                !packageVersionSatisfies(local.version, dependency.constraint)) {
-                throw std::runtime_error(
-                    "local package source does not satisfy dependency '" + name + "'");
-            }
-            selectedVersion = local.version;
-        } else if (locked) {
-            const auto selection = lockedEntries.find(name);
-            if (selection == lockedEntries.end()) {
-                throw std::runtime_error(
-                    "package '" + name + "' is missing from zpm-lock.json");
-            }
-            selectedVersion = selection->second.version;
-            if (!packageVersionSatisfies(selectedVersion, dependency.constraint)) {
-                throw std::runtime_error(
-                    "locked package '" + name + "' does not satisfy '" +
-                    dependency.constraint + "'");
-            }
-            source = cachedPackageVersion(name, selectedVersion);
-            if (source.empty() ||
-                packageTreeIntegrity(source) != selection->second.integrity) {
-                source = downloadAndCache(root, name, selectedVersion, {}, 
-                    selection->second.integrity, compilerVersion);
-            }
-        } else {
-            if (!forceUpdate) source = cachedPackage(name, dependency.constraint);
-            if (!source.empty()) {
-                selectedVersion = loadPackageManifest(source).version;
-            } else {
-                const std::string encodedName = encodePathComponent(name);
-                const std::string encodedRange =
-                    encodePathComponent(dependency.constraint);
-                const JsonValue selection = responseJson(registryRequest(
-                    "GET", "/packages/" + encodedName + "/resolve?range=" +
-                        encodedRange),
-                    "resolve package '" + name + "'");
-                selectedVersion = stringField(
-                    selection, "version", "registry resolution");
-                const std::string archiveIntegrity = stringField(
-                    selection, "integrity", "registry resolution");
-                if (!packageVersionSatisfies(
-                        selectedVersion, dependency.constraint)) {
-                    throw std::runtime_error(
-                        "registry selected a version that does not satisfy '" +
-                        dependency.constraint + "'");
-                }
-                source = downloadAndCache(root, name, selectedVersion,
-                    archiveIntegrity, {}, compilerVersion);
-            }
+        bool local = false;
+    };
+    std::map<std::string, std::string> preferredVersions;
+
+    const auto resolveFromRegistry = [&](const std::string& name,
+                                         const std::string& constraint) {
+        if (constraint.size() > 512) {
+            throw std::runtime_error(
+                "combined dependency constraints exceed the registry's 512-character limit");
         }
-        if (selectedVersion.empty()) {
-            selectedVersion = loadPackageManifest(source).version;
+        const std::string encodedName = encodePathComponent(name);
+        const std::string encodedRange = encodePathComponent(constraint);
+        const JsonValue selection = responseJson(registryRequest(
+            "GET", "/packages/" + encodedName + "/resolve?range=" + encodedRange),
+            "resolve package '" + name + "'");
+        const std::string version = stringField(
+            selection, "version", "registry resolution");
+        const std::string archiveIntegrity = stringField(
+            selection, "integrity", "registry resolution");
+        if (!packageVersionSatisfies(version, constraint)) {
+            throw std::runtime_error(
+                "registry selected a version that does not satisfy '" + constraint + "'");
         }
-        if (!packageVersionSatisfies(selectedVersion, dependency.constraint)) {
-            throw std::runtime_error("package '" + name + "' version " +
-                selectedVersion + " does not satisfy '" + dependency.constraint + "'");
-        }
-        const PackageManifest manifest = loadPackageManifest(source);
-        if (manifest.name != name) {
-            throw std::runtime_error("package key '" + name +
-                "' does not match its manifest name '" + manifest.name + "'");
-        }
-        if (!manifest.compiler.empty() &&
-            !packageVersionSatisfies(compilerVersion, manifest.compiler)) {
-            throw std::runtime_error("package '" + name + "' requires Z+ compiler '" +
-                manifest.compiler + "', but the selected compiler is " + compilerVersion);
-        }
-        resolved.emplace(name, selectedVersion);
-        active.insert(name);
-        for (const auto& [childName, childDependency] : manifest.dependencies) {
-            self(self, source, childName, childDependency, depth + 1);
-        }
-        active.erase(name);
+        return std::pair{version, downloadAndCache(
+            root, name, version, archiveIntegrity, {}, compilerVersion)};
     };
 
-    for (const auto& [name, dependency] : project.dependencies) {
-        resolve(resolve, root, name, dependency, 0);
+    for (unsigned pass = 0; pass < 64; ++pass) {
+        std::map<std::string, SelectedPackage> selected;
+        std::map<std::string, std::vector<std::string>> constraints;
+        std::set<std::string> active;
+        bool restart = false;
+
+        const auto combinedConstraint = [&](const std::string& name,
+                                            const std::string& constraint) {
+            auto& terms = constraints[name];
+            terms.push_back(constraint);
+            std::string combined;
+            for (const std::string& term : terms) {
+                if (!combined.empty()) combined.push_back(' ');
+                combined += term;
+            }
+            if (combined.size() > 512) {
+                throw std::runtime_error(
+                    "combined dependency constraints for '" + name +
+                    "' exceed the registry's 512-character limit");
+            }
+            return combined;
+        };
+
+        const auto chooseSource = [&](const std::string& name,
+                                      const std::string& constraint) {
+            std::filesystem::path source;
+            std::string version;
+            if (locked) {
+                const auto selection = lockedEntries.find(name);
+                if (selection == lockedEntries.end()) {
+                    throw std::runtime_error(
+                        "package '" + name + "' is missing from zpm-lock.json");
+                }
+                version = selection->second.version;
+                if (!packageVersionSatisfies(version, constraint)) {
+                    throw std::runtime_error(
+                        "locked package '" + name + "' does not satisfy '" +
+                        constraint + "'");
+                }
+                source = cachedPackageVersion(name, version);
+                if (source.empty() ||
+                    packageTreeIntegrity(source) != selection->second.integrity) {
+                    source = downloadAndCache(root, name, version, {},
+                        selection->second.integrity, compilerVersion);
+                }
+            } else {
+                const auto preferred = preferredVersions.find(name);
+                if (preferred != preferredVersions.end() &&
+                    packageVersionSatisfies(preferred->second, constraint)) {
+                    source = cachedPackageVersion(name, preferred->second);
+                    if (!source.empty()) version = preferred->second;
+                }
+                if (source.empty() && !forceUpdate) {
+                    source = cachedPackage(name, constraint);
+                    if (!source.empty()) version = loadPackageManifest(source).version;
+                }
+                if (source.empty()) {
+                    auto registrySelection = resolveFromRegistry(name, constraint);
+                    version = std::move(registrySelection.first);
+                    source = std::move(registrySelection.second);
+                }
+            }
+            return std::pair{version, source};
+        };
+
+        const auto resolve = [&](const auto& self,
+                                 const std::filesystem::path& parent,
+                                 const std::string& name,
+                                 const PackageDependency& dependency,
+                                 unsigned depth) -> void {
+            if (depth > 64) {
+                throw std::runtime_error("package dependency graph exceeds 64 levels");
+            }
+            if (active.contains(name)) {
+                throw std::runtime_error(
+                    "circular package dependency involving '" + name + "'");
+            }
+
+            const std::string constraint =
+                combinedConstraint(name, dependency.constraint);
+            const auto prior = selected.find(name);
+            if (prior != selected.end()) {
+                if (dependency.localPath) {
+                    std::error_code error;
+                    const auto requested = std::filesystem::canonical(
+                        parent / dependency.path, error);
+                    if (error || requested != prior->second.source) {
+                        throw std::runtime_error(
+                            "conflicting local sources for dependency '" + name + "'");
+                    }
+                }
+                if (packageVersionSatisfies(
+                        prior->second.manifest.version, constraint)) {
+                    return;
+                }
+                if (locked || prior->second.local) {
+                    throw std::runtime_error("dependency version conflict for '" + name +
+                        "': selected " + prior->second.manifest.version +
+                        " does not satisfy '" + constraint + "'");
+                }
+                auto replacement = chooseSource(name, constraint);
+                const PackageManifest replacementManifest =
+                    loadPackageManifest(replacement.second);
+                if (replacementManifest.name != name ||
+                    !packageVersionSatisfies(replacementManifest.version, constraint)) {
+                    throw std::runtime_error(
+                        "replacement package does not satisfy the combined constraints for '" +
+                        name + "'");
+                }
+                preferredVersions[name] = replacementManifest.version;
+                restart = true;
+                return;
+            }
+
+            std::filesystem::path source;
+            std::string selectedVersion;
+            bool isLocal = dependency.localPath;
+            if (dependency.localPath) {
+                std::error_code error;
+                source = std::filesystem::canonical(parent / dependency.path, error);
+                if (error) throw std::filesystem::filesystem_error(
+                    "cannot resolve local package dependency",
+                    parent / dependency.path, error);
+                selectedVersion = loadPackageManifest(source).version;
+            } else {
+                auto chosen = chooseSource(name, constraint);
+                selectedVersion = std::move(chosen.first);
+                source = std::move(chosen.second);
+            }
+
+            if (!packageVersionSatisfies(selectedVersion, constraint)) {
+                throw std::runtime_error("package '" + name + "' version " +
+                    selectedVersion + " does not satisfy '" + constraint + "'");
+            }
+            const PackageManifest manifest = loadPackageManifest(source);
+            if (manifest.name != name) {
+                throw std::runtime_error("package key '" + name +
+                    "' does not match its manifest name '" + manifest.name + "'");
+            }
+            if (!manifest.compiler.empty() &&
+                !packageVersionSatisfies(compilerVersion, manifest.compiler)) {
+                throw std::runtime_error("package '" + name + "' requires Z+ compiler '" +
+                    manifest.compiler + "', but the selected compiler is " + compilerVersion);
+            }
+            selected.emplace(name, SelectedPackage{manifest, source, isLocal});
+            active.insert(name);
+            for (const auto& [childName, childDependency] : manifest.dependencies) {
+                if (restart) break;
+                self(self, source, childName, childDependency, depth + 1);
+            }
+            active.erase(name);
+        };
+
+        for (const auto& [name, dependency] : project.dependencies) {
+            if (restart) break;
+            resolve(resolve, root, name, dependency, 0);
+        }
+        if (!restart) return;
     }
+    throw std::runtime_error(
+        "package dependency resolution did not converge after 64 constraint updates");
 }
 
 } // namespace zbuild

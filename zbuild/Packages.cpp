@@ -13,6 +13,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <deque>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -557,20 +558,39 @@ void ensurePackageStore(const std::filesystem::path& projectRoot) {
     }
 }
 
-std::filesystem::path findCachedPackage(
-    const std::string& name,
-    const std::string& constraint
+std::vector<std::filesystem::path> cachedPackageVersions(
+    const std::string& name
 ) {
     const auto packageCache = packageCacheDirectory() / pathFromUtf8(name);
     std::error_code error;
-    if (!std::filesystem::is_directory(packageCache, error) || error) return {};
+    const auto cacheStatus = std::filesystem::symlink_status(packageCache, error);
+    if (error == std::errc::no_such_file_or_directory ||
+        (!error && !std::filesystem::is_directory(cacheStatus))) {
+        return {};
+    }
+    if (error) {
+        throw std::filesystem::filesystem_error(
+            "cannot inspect package cache", packageCache, error);
+    }
+    if (std::filesystem::is_symlink(cacheStatus)) {
+        throw std::runtime_error("package cache entry is a symlink: '" +
+            pathToUtf8(packageCache) + "'");
+    }
+
     std::vector<std::filesystem::path> candidates;
     for (const auto& entry : std::filesystem::directory_iterator(packageCache)) {
-        if (!entry.is_directory()) continue;
+        const auto status = entry.symlink_status(error);
+        if (error) {
+            throw std::filesystem::filesystem_error(
+                "cannot inspect package cache entry", entry.path(), error);
+        }
+        if (std::filesystem::is_symlink(status) ||
+            !std::filesystem::is_directory(status)) {
+            continue;
+        }
         try {
-            if (satisfiesVersion(pathToUtf8(entry.path().filename()), constraint)) {
-                candidates.push_back(entry.path());
-            }
+            (void)parseVersion(pathToUtf8(entry.path().filename()));
+            candidates.push_back(entry.path());
         } catch (const std::runtime_error&) {
         }
     }
@@ -579,7 +599,19 @@ std::filesystem::path findCachedPackage(
             return compareVersion(parseVersion(pathToUtf8(left.filename())),
                 parseVersion(pathToUtf8(right.filename()))) > 0;
         });
-    return candidates.empty() ? std::filesystem::path{} : candidates.front();
+    return candidates;
+}
+
+std::filesystem::path findCachedPackage(
+    const std::string& name,
+    const std::string& constraint
+) {
+    for (const auto& candidate : cachedPackageVersions(name)) {
+        if (satisfiesVersion(pathToUtf8(candidate.filename()), constraint)) {
+            return candidate;
+        }
+    }
+    return {};
 }
 
 std::filesystem::path findCachedPackageVersion(
@@ -650,9 +682,7 @@ std::vector<InstalledPackage> resolvePackages(
     bool locked,
     const std::string& compilerVersion
 ) {
-    std::map<std::string, PackageSource> resolved;
     std::map<std::string, std::pair<std::string, std::string>> lockedPackages;
-    std::set<std::string> active;
     const auto packagesRoot = projectRoot / "z+_packages";
     if (locked) {
         const auto lockPath = projectRoot / "zpm-lock.json";
@@ -684,135 +714,237 @@ std::vector<InstalledPackage> resolvePackages(
             }
         }
     }
-    const auto resolveDependency = [&](const auto& self,
-                                       const std::filesystem::path& parent,
-                                       const std::string& name,
-                                       const PackageDependency& dependency,
-                                       unsigned depth) -> void {
-        if (depth > 64) throw std::runtime_error(
-            "package dependency graph exceeds 64 levels");
-        validateName(name);
-        if (active.contains(name)) {
-            throw std::runtime_error(
-                "circular package dependency involving '" + name + "'");
-        }
-        const auto existing = resolved.find(name);
-        if (existing != resolved.end()) {
-            if (!satisfiesVersion(existing->second.manifest.version,
-                    dependency.constraint)) {
-                throw std::runtime_error("dependency version conflict for '" + name +
-                    "': selected " + existing->second.manifest.version +
-                    " does not satisfy '" + dependency.constraint + "'");
-            }
-            if (dependency.localPath) {
-                std::error_code error;
-                const auto requested = std::filesystem::canonical(
-                    parent / dependency.path, error);
-                if (error || requested != existing->second.directory) {
-                    throw std::runtime_error(
-                        "conflicting local sources for dependency '" + name + "'");
+    struct PendingDependency {
+        std::filesystem::path parent;
+        std::string name;
+        PackageDependency dependency;
+    };
+    using Resolution = std::map<std::string, PackageSource>;
+    std::deque<PendingDependency> pending;
+    for (const auto& [name, dependency] : project.dependencies) {
+        pending.push_back({projectRoot, name, dependency});
+    }
+
+    std::size_t candidateAttempts = 0;
+    std::string lastFailure;
+    Resolution resolved;
+    const auto solve = [&](const auto& self,
+                           std::deque<PendingDependency> remaining,
+                           Resolution selected,
+                           std::size_t depth) -> bool {
+        if (remaining.empty()) {
+            std::map<std::string, unsigned char> visitState;
+            const auto checkCycles = [&](const auto& self,
+                                         const std::string& name) -> bool {
+                const unsigned char state = visitState[name];
+                if (state == 1) {
+                    lastFailure = "circular package dependency involving '" + name + "'";
+                    return false;
                 }
+                if (state == 2) return true;
+                visitState[name] = 1;
+                const auto package = selected.find(name);
+                if (package != selected.end()) {
+                    for (const auto& [childName, dependency] :
+                         package->second.manifest.dependencies) {
+                        (void)dependency;
+                        if (!self(self, childName)) return false;
+                    }
+                }
+                visitState[name] = 2;
+                return true;
+            };
+            for (const auto& [name, dependency] : project.dependencies) {
+                (void)dependency;
+                if (!checkCycles(checkCycles, name)) return false;
             }
-            return;
+            resolved = std::move(selected);
+            return true;
+        }
+        if (depth > 1024 || selected.size() > 1024) {
+            lastFailure = "package dependency graph exceeds the 1024-package safety limit";
+            return false;
         }
 
-        std::filesystem::path sourceDirectory;
-        std::string sourceDescription;
-        if (dependency.localPath) {
-            sourceDirectory = std::filesystem::canonical(parent / dependency.path);
-            sourceDescription = pathToUtf8(dependency.path);
-        } else {
-            const auto lockedPackage = lockedPackages.find(name);
-            if (locked && lockedPackage == lockedPackages.end()) {
-                throw std::runtime_error(
-                    "package '" + name + "' is missing from zpm-lock.json");
+        PendingDependency current = std::move(remaining.front());
+        remaining.pop_front();
+        validateName(current.name);
+        const auto existing = selected.find(current.name);
+        if (existing != selected.end()) {
+            if (!satisfiesVersion(existing->second.manifest.version,
+                    current.dependency.constraint)) {
+                lastFailure = "dependency version conflict for '" + current.name +
+                    "': selected " + existing->second.manifest.version +
+                    " does not satisfy '" + current.dependency.constraint + "'";
+                return false;
             }
-            const auto installed = packagesRoot / pathFromUtf8(name);
-            std::string installedPackageProblem;
+            if (current.dependency.localPath) {
+                std::error_code error;
+                const auto requested = std::filesystem::canonical(
+                    current.parent / current.dependency.path, error);
+                if (error || requested != existing->second.directory) {
+                    lastFailure = "conflicting local sources for dependency '" +
+                        current.name + "'";
+                    return false;
+                }
+            }
+            return self(self, std::move(remaining), std::move(selected), depth + 1);
+        }
+
+        const auto lockedPackage = lockedPackages.find(current.name);
+        if (locked && lockedPackage == lockedPackages.end()) {
+            lastFailure = "package '" + current.name +
+                "' is missing from zpm-lock.json";
+            return false;
+        }
+
+        std::vector<std::pair<std::filesystem::path, std::string>> candidates;
+        std::string installedPackageProblem;
+        if (current.dependency.localPath) {
             std::error_code error;
-            if (std::filesystem::is_directory(installed, error) && !error &&
-                std::filesystem::is_regular_file(
-                    installed / ".zpm-installed.json")) {
+            const auto local = std::filesystem::canonical(
+                current.parent / current.dependency.path, error);
+            if (error) {
+                lastFailure = "cannot resolve local package '" + current.name +
+                    "' at '" + pathToUtf8(current.dependency.path) + "': " +
+                    error.message();
+                return false;
+            }
+            candidates.emplace_back(local, pathToUtf8(current.dependency.path));
+        } else {
+            const auto installed = packagesRoot / pathFromUtf8(current.name);
+            std::error_code error;
+            const auto installedStatus = std::filesystem::symlink_status(installed, error);
+            if (error != std::errc::no_such_file_or_directory && error) {
+                lastFailure = "cannot inspect installed package '" + current.name +
+                    "': " + error.message();
+                return false;
+            }
+            if (!error && std::filesystem::is_symlink(installedStatus)) {
+                installedPackageProblem = "installed package path is a symlink";
+            } else if (!error && std::filesystem::is_directory(installedStatus) &&
+                       std::filesystem::is_regular_file(
+                           installed / ".zpm-installed.json")) {
                 try {
                     const JsonValue marker = zplus::json::parse(readTextFile(
                         installed / ".zpm-installed.json", maximumManifestBytes));
-                    const std::string markerName =
-                        requiredString(marker, "name", "installed package marker");
-                    const std::string markerVersion =
-                        requiredString(marker, "version", "installed package marker");
-                    const std::string markerIntegrity =
-                        requiredString(marker, "integrity", "installed package marker");
+                    const std::string markerName = requiredString(
+                        marker, "name", "installed package marker");
+                    const std::string markerVersion = requiredString(
+                        marker, "version", "installed package marker");
+                    const std::string markerIntegrity = requiredString(
+                        marker, "integrity", "installed package marker");
                     const std::string installedIntegrity = packageIntegrity(installed);
-                    if (markerName == name && markerIntegrity == installedIntegrity) {
-                        const auto installedManifest = loadPackageManifest(installed);
-                        const bool matchesLock = !locked ||
-                            (markerVersion == installedManifest.version &&
-                             installedManifest.version == lockedPackage->second.first &&
-                             markerIntegrity == lockedPackage->second.second);
-                        if (matchesLock &&
-                            markerVersion == installedManifest.version &&
-                            satisfiesVersion(
-                                installedManifest.version, dependency.constraint)) {
-                            sourceDirectory = installed;
-                            sourceDescription = "installed:" + name;
-                        }
+                    const PackageManifest installedManifest = loadPackageManifest(installed);
+                    const bool markerValid = markerName == current.name &&
+                        markerVersion == installedManifest.version &&
+                        markerIntegrity == installedIntegrity;
+                    const bool lockValid = !locked ||
+                        (installedManifest.version == lockedPackage->second.first &&
+                         installedIntegrity == lockedPackage->second.second);
+                    if (markerValid && lockValid &&
+                        satisfiesVersion(installedManifest.version,
+                            current.dependency.constraint)) {
+                        candidates.emplace_back(installed, "installed:" + current.name);
+                    } else if (!markerValid) {
+                        installedPackageProblem = "installed package integrity is invalid";
                     }
                 } catch (const std::exception& validationError) {
                     installedPackageProblem = validationError.what();
                 }
             }
-            if (sourceDirectory.empty()) {
-                sourceDirectory = locked
-                    ? findCachedPackageVersion(name, lockedPackage->second.first)
-                    : findCachedPackage(name, dependency.constraint);
-                if (sourceDirectory.empty()) {
-                    if (locked) {
-                        throw std::runtime_error("locked package '" + name + " " +
-                            lockedPackage->second.first +
-                            "' is not installed or cached" +
-                            (installedPackageProblem.empty()
-                                ? std::string{}
-                                : "; installed copy is invalid: " +
-                                    installedPackageProblem));
-                    }
-                    throw std::runtime_error("package '" + name + "' satisfying '" +
-                        dependency.constraint + "' is not installed or cached; "
-                        "configure a registry or provide a local source" +
-                        (installedPackageProblem.empty()
-                            ? std::string{}
-                            : "; installed copy is invalid: " +
-                                installedPackageProblem));
+
+            if (locked) {
+                const auto cached = findCachedPackageVersion(
+                    current.name, lockedPackage->second.first);
+                if (!cached.empty()) {
+                    candidates.emplace_back(cached, "cache:" + current.name);
                 }
-                sourceDescription = "cache:" + name;
+            } else {
+                for (const auto& cached : cachedPackageVersions(current.name)) {
+                    if (satisfiesVersion(
+                            pathToUtf8(cached.filename()),
+                            current.dependency.constraint)) {
+                        candidates.emplace_back(cached, "cache:" + current.name);
+                    }
+                }
             }
         }
-        const PackageManifest manifest = loadPackageManifest(sourceDirectory);
-        if (manifest.name != name) {
-            throw std::runtime_error("dependency key '" + name +
-                "' does not match package name '" + manifest.name + "'");
+
+        if (candidates.empty()) {
+            if (locked) {
+                lastFailure = "locked package '" + current.name + " " +
+                    lockedPackage->second.first + "' is not installed or cached" +
+                    (installedPackageProblem.empty()
+                        ? std::string{} : "; installed copy is invalid: " +
+                            installedPackageProblem);
+            } else {
+                lastFailure = "package '" + current.name + "' satisfying '" +
+                    current.dependency.constraint +
+                    "' is not installed or cached; configure a registry or provide a local source" +
+                    (installedPackageProblem.empty()
+                        ? std::string{} : "; installed copy is invalid: " +
+                            installedPackageProblem);
+            }
+            return false;
         }
-        if (!manifest.compiler.empty() &&
-            !satisfiesVersion(compilerVersion, manifest.compiler)) {
-            throw std::runtime_error("package '" + name + "' requires Z+ compiler '" +
-                manifest.compiler + "', but the selected compiler is " +
-                compilerVersion);
+
+        std::set<std::filesystem::path> seenCandidates;
+        for (const auto& [sourceDirectory, sourceDescription] : candidates) {
+            if (++candidateAttempts > 4096) {
+                lastFailure = "package resolution exceeded its 4096-candidate search limit";
+                return false;
+            }
+            std::error_code canonicalError;
+            const auto canonicalSource = std::filesystem::canonical(
+                sourceDirectory, canonicalError);
+            if (canonicalError || !seenCandidates.insert(canonicalSource).second) {
+                continue;
+            }
+            try {
+                const PackageManifest manifest = loadPackageManifest(canonicalSource);
+                if (manifest.name != current.name) {
+                    throw std::runtime_error("dependency key '" + current.name +
+                        "' does not match package name '" + manifest.name + "'");
+                }
+                if (!satisfiesVersion(
+                        manifest.version, current.dependency.constraint)) {
+                    continue;
+                }
+                if (!manifest.compiler.empty() &&
+                    !satisfiesVersion(compilerVersion, manifest.compiler)) {
+                    throw std::runtime_error("package '" + current.name +
+                        "' requires Z+ compiler '" + manifest.compiler +
+                        "', but the selected compiler is " + compilerVersion);
+                }
+                const std::string integrity = packageIntegrity(canonicalSource);
+                if (locked && integrity != lockedPackage->second.second) {
+                    throw std::runtime_error("package '" + current.name +
+                        "' does not match the integrity recorded in zpm-lock.json");
+                }
+
+                Resolution nextSelected = selected;
+                nextSelected.emplace(current.name, PackageSource{
+                    manifest, canonicalSource, sourceDescription, integrity});
+                auto nextRemaining = remaining;
+                for (auto child = manifest.dependencies.rbegin();
+                     child != manifest.dependencies.rend(); ++child) {
+                    nextRemaining.push_front({canonicalSource, child->first, child->second});
+                }
+                if (self(self, std::move(nextRemaining),
+                        std::move(nextSelected), depth + 1)) {
+                    return true;
+                }
+            } catch (const std::exception& candidateError) {
+                lastFailure = candidateError.what();
+            }
         }
-        if (!satisfiesVersion(manifest.version, dependency.constraint)) {
-            throw std::runtime_error("package '" + name + "' version " +
-                manifest.version + " does not satisfy '" + dependency.constraint + "'");
-        }
-        const std::string integrity = packageIntegrity(sourceDirectory);
-        PackageSource package{manifest, sourceDirectory, sourceDescription, integrity};
-        resolved.emplace(name, package);
-        active.insert(name);
-        for (const auto& [childName, childDependency] : manifest.dependencies) {
-            self(self, sourceDirectory, childName, childDependency, depth + 1);
-        }
-        active.erase(name);
+        return false;
     };
 
-    for (const auto& [name, dependency] : project.dependencies) {
-        resolveDependency(resolveDependency, projectRoot, name, dependency, 0);
+    if (!solve(solve, std::move(pending), {}, 0)) {
+        throw std::runtime_error(lastFailure.empty()
+            ? "unable to resolve package dependencies" : lastFailure);
     }
 
     std::vector<InstalledPackage> result;
