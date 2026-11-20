@@ -623,7 +623,8 @@ std::vector<zplus::Diagnostic> verifyModule(const Module& module) {
                 verifyShape(function, instruction, diagnostics);
                 verifyInstructionTypes(module, instruction, diagnostics);
                 if (instruction.hasResult() &&
-                    instruction.resultType.kind == zplus::semantic::TypeKind::Unknown) {
+                    instruction.resultType.kind == zplus::semantic::TypeKind::Unknown &&
+                    !instruction.resultTypeIsResolved) {
                     report(diagnostics, instruction.location,
                            "result '" + instruction.result +
                                "' of instruction '" + instruction.opcode +

@@ -31,7 +31,7 @@
 namespace zplus {
 
 #ifndef ZPLUS_VERSION
-#define ZPLUS_VERSION "development"
+#define ZPLUS_VERSION "1.3.3"
 #endif
 
 constexpr const char* VERSION = ZPLUS_VERSION;
@@ -152,6 +152,7 @@ zplus::DiagnosticCategory diagnosticCategoryForCode(const std::string& code) {
     if (code == "E3001") return zplus::DiagnosticCategory::Module;
     if (code == "E4001") return zplus::DiagnosticCategory::IR;
     if (code == "E5001") return zplus::DiagnosticCategory::Backend;
+    if (code == "E6001") return zplus::DiagnosticCategory::Runtime;
     return zplus::DiagnosticCategory::General;
 }
 
@@ -727,7 +728,13 @@ int runCli(
             generator.writeExecutable(module, outputPath, windowsGui);
         }
         catch (const std::exception& error) {
-            printError(std::string("native compilation failed: ") + error.what());
+            printError(
+                std::string("native compilation failed: ") + error.what(),
+                0,
+                0,
+                {},
+                "E5001"
+            );
             return 1;
         }
 
@@ -770,7 +777,7 @@ int runCli(
                 0,
                 0,
                 {},
-                "E4001"
+                "E6001"
             );
 
             return 1;

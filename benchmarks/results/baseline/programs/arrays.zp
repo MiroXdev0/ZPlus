@@ -1,0 +1,19 @@
+use zmemory.management
+
+start {
+    let iterations: number = 10000 // BENCH_ITERATIONS
+    let expected: number = 29994 // BENCH_EXPECTED
+    let values: number[] = [0, 0, 0, 0, 0, 0, 0, 0]
+
+    for (let i: number = 0; i < iterations; i++) {
+        let index: number = i % 8
+        values[index] += i % 7
+    } end for
+
+    let checksum: number = values[0] + values[1] + values[2] + values[3] + values[4] + values[5] + values[6] + values[7]
+    if checksum == expected {
+        say("CHECKSUM arrays 29994")
+    } else {
+        say("CHECKSUM_ERROR arrays")
+    } end if
+} stop

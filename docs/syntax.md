@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This reference describes the language accepted by the Z+ 1.3.0 command-line compiler in this repository. It follows the lexer, parser, semantic analyzer, IR builder, and interpreter—not proposed or aspirational features.
+This reference describes the language accepted by the Z+ 1.3.3 command-line compiler in this repository. It follows the lexer, parser, semantic analyzer, IR builder, and interpreter—not proposed or aspirational features.
 
 The status labels used below mean:
 
@@ -26,7 +26,9 @@ construct. Diagnostic codes identify the compiler stage:
 | `E1001` | Parsing |
 | `E2001` | Semantic analysis |
 | `E3001` | Module loading and imports |
-| `E4001` | Runtime execution |
+| `E4001` | Intermediate representation |
+| `E5001` | Native backend |
+| `E6001` | Runtime execution |
 | `E0001` | Command-line and other compiler errors |
 
 Use `--diagnostics=json` to emit one JSON diagnostic per line for editor
@@ -137,7 +139,7 @@ let name [: type] [= expression]
 const name [: type] = expression
 ```
 
-`let` declares a mutable variable. An initializer's type is inferred when no annotation is supplied. A declaration with neither annotation nor initializer is accepted but has the semantic type `unknown`. A typed variable may omit its initializer. `const` requires an initializer, and assigning to a constant is a semantic error. Duplicate declarations in the same scope are rejected.
+`let` declares a mutable variable. An initializer's type is inferred when no annotation is supplied. A declaration with neither annotation nor initializer is accepted but has the semantic type `unknown`. Unknown values remain dynamically usable in the interpreter, but cannot be assigned, passed, or returned where a concrete type is promised. Operations whose result type depends on the unknown runtime value remain `unknown`. The native backend rejects unsupported operations on unknown values rather than treating them as integers. A typed variable may omit its initializer. `const` requires an initializer, and assigning to a constant is a semantic error. Duplicate declarations in the same scope are rejected.
 
 The analyzer creates nested scopes for the program, `start`, functions, branches, loops, switch cases, and namespaces. An inner scope can shadow an outer declaration, but same-scope duplicates are rejected. Direct top-level functions are predeclared (so they can be referenced before their definition); variable declarations are analyzed in order. Each variable and parameter reference is resolved to its declaration and given a unique IR binding identity. Consequently, shadowing creates a distinct runtime binding, assignments target the lexically resolved declaration, and a block-local name is no longer visible after leaving its scope. The interpreter may retain the inaccessible local slot until its function returns.
 
@@ -195,7 +197,7 @@ generation. `void` is a recognized annotation, not a value type.
 
 The lexer recognizes decimal integers and fractions, scientific notation, hexadecimal (`0x` / `0X`), and binary (`0b` / `0B`) number tokens. Signs are unary operators rather than part of a number token. Boolean literals are lowercase `true` and `false`; `null` and `nullptr` are null literals.
 
-Strings use double quotes and characters use single quotes. String escapes include `\n`, `\t`, `\r`, `\b`, `\f`, `\v`, `\a`, `\0`, `\\`, `\"`, and `\'`. Character literals must contain one character (or one recognized escape). Physical newlines are not allowed inside a quoted literal.
+Strings use double quotes and characters use single quotes. String escapes include `\n`, `\t`, `\r`, `\b`, `\f`, `\v`, `\a`, `\0`, `\\`, `\"`, and `\'`. Character literals must contain one Unicode scalar value (or one recognized escape). Physical newlines are not allowed inside a quoted literal.
 
 ```zp
 start {
@@ -231,6 +233,13 @@ start {
 Arithmetic, comparisons, logical operators, string concatenation, and conditional selection are executable. `+` concatenation is semantically accepted for two strings; mixed string/number addition is not. **Implemented** for these forms.
 
 Logical `and` / `or` and `&&` / `||` short-circuit: the right operand is evaluated only when needed.
+
+Bitwise operators convert numeric operands to signed 64-bit integers by
+truncating toward zero. Non-finite or out-of-range values convert to
+`-9223372036854775808`. Shift counts use their low six bits; left shifts wrap
+to 64 bits and right shifts are arithmetic. The interpreter retains dynamic
+behavior for unknown values; the native backend reports an error when it
+cannot determine a supported operation.
 
 ### Operators
 
@@ -651,7 +660,7 @@ start {
 
 Newlines generally separate statements; semicolons can also separate statements and are mandatory between `for` header clauses. A newline cannot generally continue an expression. Keep expressions, declarations, and headers on one line unless the grammar explicitly provides a block.
 
-The lexer records some diagnostics in an internal error list that the command-line pipeline does not inspect. Unknown-character tokens do fail compilation, but some malformed lexical details (for example an unknown string escape) can be silently accepted or altered. **Comments and ordinary formatting are implemented; diagnostic reporting has gaps.**
+The lexer reports malformed literals through source diagnostics. Character literals contain exactly one Unicode scalar value (or one recognized escape); source columns count UTF-16 code units for editor compatibility.
 
 ## 12. Keywords Reference
 

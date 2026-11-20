@@ -2,12 +2,12 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(ZPlus
-    VERSION 1.3.0
+    VERSION 1.3.3
     LANGUAGES CXX
 )
 
-set(ZBUILD_VERSION "0.3.0")
-set(ZPM_VERSION "0.3.0")
+set(ZBUILD_VERSION "1.0.0")
+set(ZPM_VERSION "1.0.0")
 
 include(CTest)
 
@@ -337,6 +337,8 @@ add_library(zp_native_backend STATIC
     compiler/backend/native/NativeCodeGenerator.cpp
     compiler/backend/native/PEWriter.cpp
     compiler/backend/native/ELFWriter.cpp
+    compiler/ir/IRAnalysis.cpp
+    compiler/ir/IROptimizer.cpp
     compiler/semantic/BuiltinRegistry.cpp
     compiler/semantic/Type.cpp
     compiler/ir/IRVerifier.cpp
@@ -498,6 +500,19 @@ if(BUILD_TESTING)
         compiler
     )
     add_test(NAME typed_ir_verifier COMMAND zp_ir_verifier_tests)
+    add_executable(zp_ir_optimization_tests
+        tests/compiler/ir_optimization.cpp
+        compiler/ir/IRAnalysis.cpp
+        compiler/ir/IROptimizer.cpp
+        compiler/ir/IRVerifier.cpp
+        compiler/semantic/BuiltinRegistry.cpp
+        compiler/semantic/Type.cpp
+    )
+    target_include_directories(zp_ir_optimization_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        compiler
+    )
+    add_test(NAME ir_optimization COMMAND zp_ir_optimization_tests)
     add_test(
         NAME generic_language
         COMMAND ${CMAKE_COMMAND}
@@ -508,17 +523,21 @@ if(BUILD_TESTING)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/compiler/run_generic_tests.cmake"
     )
 
-    add_test(NAME zpbuild_version COMMAND zpbuild --version)
+    add_test(NAME zp_version COMMAND zp version)
+    set_tests_properties(zp_version PROPERTIES
+        PASS_REGULAR_EXPRESSION "Z[+] Compiler 1\\.3\\.3"
+    )
+    add_test(NAME zpbuild_version COMMAND zpbuild version)
     set_tests_properties(zpbuild_version PROPERTIES
-        PASS_REGULAR_EXPRESSION "ZPBuild 0\\.3\\.0"
+        PASS_REGULAR_EXPRESSION "ZPBuild 1\\.0\\.0"
     )
     add_test(NAME zbuild_compatibility_version COMMAND zbuild --version)
     set_tests_properties(zbuild_compatibility_version PROPERTIES
-        PASS_REGULAR_EXPRESSION "ZPBuild 0\\.3\\.0"
+        PASS_REGULAR_EXPRESSION "ZPBuild 1\\.0\\.0"
     )
-    add_test(NAME zpm_version COMMAND zpm --version)
+    add_test(NAME zpm_version COMMAND zpm version)
     set_tests_properties(zpm_version PROPERTIES
-        PASS_REGULAR_EXPRESSION "ZPM 0\\.3\\.0"
+        PASS_REGULAR_EXPRESSION "ZPM 1\\.0\\.0"
     )
     add_executable(zbuild_unit_tests
         tests/zbuild/unit_tests.cpp
@@ -766,6 +785,19 @@ if(BUILD_TESTING)
     add_test(
         NAME native_unsupported_ir
         COMMAND zp_native_ir_tests ${CMAKE_CURRENT_BINARY_DIR}/format-test.elf
+    )
+    add_executable(zp_native_abi_metadata_tests
+        tests/native/abi_metadata.cpp
+    )
+    target_include_directories(zp_native_abi_metadata_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        compiler
+    )
+    target_link_libraries(zp_native_abi_metadata_tests PRIVATE zp_native_backend)
+    add_test(
+        NAME native_abi_metadata
+        COMMAND zp_native_abi_metadata_tests
+            ${CMAKE_CURRENT_BINARY_DIR}/native-abi-unwind.exe
     )
     add_test(
         NAME native_executable_integration

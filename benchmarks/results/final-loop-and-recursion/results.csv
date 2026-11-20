@@ -1,0 +1,197 @@
+workload,mode,run_type,run_index,duration_ns,status,checksum,expected_checksum,detail,stdout,stderr
+tight_loop,native,compile,1,42858800,success,,1499999500000,,"built: C:\Users\miros\OneDrive\Desktop\Projects\Z+ compiler\benchmarks\results\final-loop-and-recursion\native\tight_loop.exe
+",
+tight_loop,interpreter,preflight,0,3837165900,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,native,preflight,0,396846100,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,python,preflight,0,338823700,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,cpp_O2,preflight,0,66114800,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1512300
+",
+tight_loop,cpp_O3,preflight,0,69714200,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1624700
+",
+tight_loop,interpreter,warmup,1,3855928100,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,interpreter,warmup,2,3700155500,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,interpreter,measurement,1,3677525300,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,interpreter,measurement,2,3674588400,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,interpreter,measurement,3,3704679900,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,interpreter,measurement,4,3682699600,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,interpreter,measurement,5,3935660600,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,native,warmup,1,22876400,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,native,warmup,2,22153300,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,native,measurement,1,24995700,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,native,measurement,2,22888100,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,native,measurement,3,21692200,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,native,measurement,4,22649900,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,native,measurement,5,21660100,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,python,warmup,1,318353600,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,python,warmup,2,309981500,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,python,measurement,1,302642500,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,python,measurement,2,341811500,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,python,measurement,3,320588100,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,python,measurement,4,302178300,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,python,measurement,5,322760700,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,cpp_O2,warmup,1,29520800,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1532500
+",
+tight_loop,cpp_O2,warmup,2,28426700,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1487300
+",
+tight_loop,cpp_O2,measurement,1,26835600,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1494000
+",
+tight_loop,cpp_O2,measurement,2,26060200,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1449400
+",
+tight_loop,cpp_O2,measurement,3,29493300,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1512300
+",
+tight_loop,cpp_O2,measurement,4,28930400,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1487600
+",
+tight_loop,cpp_O2,measurement,5,26196200,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1512500
+",
+tight_loop,cpp_O3,warmup,1,29826500,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1634800
+",
+tight_loop,cpp_O3,warmup,2,26497300,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1545900
+",
+tight_loop,cpp_O3,measurement,1,29749800,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1513500
+",
+tight_loop,cpp_O3,measurement,2,26860000,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1628800
+",
+tight_loop,cpp_O3,measurement,3,26165700,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1565900
+",
+tight_loop,cpp_O3,measurement,4,28118400,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1454300
+",
+tight_loop,cpp_O3,measurement,5,26821400,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1455300
+",
+recursion,native,compile,1,56666700,success,,1191560,,"built: C:\Users\miros\OneDrive\Desktop\Projects\Z+ compiler\benchmarks\results\final-loop-and-recursion\native\recursion.exe
+",
+recursion,interpreter,preflight,0,1630811600,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,native,preflight,0,211179900,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,python,preflight,0,123112300,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,cpp_O2,preflight,0,165714300,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 1734100
+",
+recursion,cpp_O3,preflight,0,32330300,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 829800
+",
+recursion,interpreter,warmup,1,1375957800,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,interpreter,warmup,2,1485505200,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,interpreter,measurement,1,1409058900,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,interpreter,measurement,2,1413070400,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,interpreter,measurement,3,1448911300,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,interpreter,measurement,4,1372998400,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,interpreter,measurement,5,1501349400,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,native,warmup,1,61483800,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,native,warmup,2,37296400,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,native,measurement,1,38730600,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,native,measurement,2,31009500,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,native,measurement,3,30798800,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,native,measurement,4,33321200,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,native,measurement,5,34828500,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,python,warmup,1,132348900,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,python,warmup,2,114301700,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,python,measurement,1,99759600,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,python,measurement,2,108995300,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,python,measurement,3,116364900,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,python,measurement,4,101906100,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,python,measurement,5,110085600,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,cpp_O2,warmup,1,44733300,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 1701500
+",
+recursion,cpp_O2,warmup,2,25234200,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 1702000
+",
+recursion,cpp_O2,measurement,1,27569300,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 1694200
+",
+recursion,cpp_O2,measurement,2,24832500,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 1716900
+",
+recursion,cpp_O2,measurement,3,26966000,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 1733900
+",
+recursion,cpp_O2,measurement,4,36772000,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 2034900
+",
+recursion,cpp_O2,measurement,5,26234000,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 1739800
+",
+recursion,cpp_O3,warmup,1,31796600,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 829500
+",
+recursion,cpp_O3,warmup,2,32583000,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 897500
+",
+recursion,cpp_O3,measurement,1,28394300,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 836700
+",
+recursion,cpp_O3,measurement,2,30616600,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 841300
+",
+recursion,cpp_O3,measurement,3,27043300,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 841100
+",
+recursion,cpp_O3,measurement,4,27822700,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 838700
+",
+recursion,cpp_O3,measurement,5,25231800,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 839100
+",

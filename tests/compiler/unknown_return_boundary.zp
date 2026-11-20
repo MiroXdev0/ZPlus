@@ -1,0 +1,5 @@
+start {
+    fn addOne(value) -> number {
+        return value + 1
+    } end fn
+} stop

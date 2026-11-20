@@ -23,6 +23,18 @@ bool containsTypeParameter(const Type& type, const std::string& name) {
     return type.returnType && containsTypeParameter(*type.returnType, name);
 }
 
+bool containsUnknown(const Type& type) {
+    if (type.kind == TypeKind::Unknown) return true;
+    if (type.elementType && containsUnknown(*type.elementType)) return true;
+    for (const Type& argument : type.arguments) {
+        if (containsUnknown(argument)) return true;
+    }
+    for (const Type& parameter : type.parameters) {
+        if (containsUnknown(parameter)) return true;
+    }
+    return type.returnType && containsUnknown(*type.returnType);
+}
+
 Type substituteImpl(
     const Type& type,
     const TypeSubstitution& substitutions,
@@ -81,9 +93,8 @@ bool unifyImpl(
     TypeSubstitution& substitutions,
     std::unordered_set<std::string>& resolving
 ) {
-    if (pattern.kind == TypeKind::Unknown || actual.kind == TypeKind::Unknown) {
-        return true;
-    }
+    if (pattern.kind == TypeKind::Unknown) return true;
+    if (actual.kind == TypeKind::Unknown) return false;
     if (pattern.kind == TypeKind::TypeParameter) {
         for (const TypeConstraint constraint : pattern.constraints) {
             if (!satisfiesConstraint(actual, constraint)) return false;
@@ -291,9 +302,9 @@ bool typesEqual(const Type& left, const Type& right) {
 }
 
 bool isAssignable(const Type& target, const Type& value) {
-    return target.kind == TypeKind::Unknown ||
-        value.kind == TypeKind::Unknown ||
-        typesEqual(target, value) ||
+    if (target.kind == TypeKind::Unknown) return true;
+    if (containsUnknown(value)) return false;
+    return typesEqual(target, value) ||
         (value.kind == TypeKind::Null && target.kind == TypeKind::Pointer);
 }
 

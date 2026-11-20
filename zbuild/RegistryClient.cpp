@@ -30,7 +30,7 @@
 #include <vector>
 
 #ifndef ZPM_VERSION
-#define ZPM_VERSION "development"
+#define ZPM_VERSION "1.0.0"
 #endif
 
 namespace zbuild {

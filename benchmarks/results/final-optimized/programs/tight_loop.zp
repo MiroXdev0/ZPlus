@@ -1,0 +1,15 @@
+start {
+    let iterations: number = 1000000 // BENCH_ITERATIONS
+    let expected: number = 1499999500000 // BENCH_EXPECTED
+    let checksum: number = 0
+
+    for (let i: number = 0; i < iterations; i++) {
+        checksum += i * 3 + 1
+    } end for
+
+    if checksum == expected {
+        say("CHECKSUM tight_loop 1499999500000")
+    } else {
+        say("CHECKSUM_ERROR tight_loop")
+    } end if
+} stop

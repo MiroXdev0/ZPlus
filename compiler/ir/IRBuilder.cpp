@@ -3058,10 +3058,23 @@ Value IRBuilder::buildExpression(
         );
     }
 
-    std::unordered_map<const BasicBlock*, std::size_t> instructionCounts;
-    for (const auto& block : function.blocks) {
-        instructionCounts.emplace(&block, block.instructions.size());
-    }
+    const std::size_t initialBlockCount = function.blocks.size();
+    BasicBlock* const initialBlock = currentBlock;
+    const std::size_t initialInstructionCount =
+        initialBlock->instructions.size();
+    const auto forEachNewInstruction = [&](auto&& callback) {
+        for (std::size_t index = initialInstructionCount;
+             index < initialBlock->instructions.size(); ++index) {
+            callback(initialBlock->instructions[index]);
+        }
+        for (std::size_t blockIndex = initialBlockCount;
+             blockIndex < function.blocks.size(); ++blockIndex) {
+            for (Instruction& instruction :
+                 function.blocks[blockIndex].instructions) {
+                callback(instruction);
+            }
+        }
+    };
 
     Value result;
     if (const auto* literal = as<zplus::ast::Literal>(&expression)) {
@@ -3092,37 +3105,25 @@ Value IRBuilder::buildExpression(
     }
 
     if (!expression.location.sourceFile.empty()) {
-        for (auto& block : function.blocks) {
-            const auto prior = instructionCounts.find(&block);
-            const std::size_t begin = prior == instructionCounts.end()
-                ? 0
-                : prior->second;
-            for (std::size_t i = begin; i < block.instructions.size(); ++i) {
-                if (block.instructions[i].location.sourceFile.empty()) {
-                    block.instructions[i].location = expression.location;
-                }
+        forEachNewInstruction([&](Instruction& instruction) {
+            if (instruction.location.sourceFile.empty()) {
+                instruction.location = expression.location;
             }
-        }
+        });
     }
     if (expression.resolvedType) {
         result.type = *expression.resolvedType;
-        for (auto& block : function.blocks) {
-            const auto prior = instructionCounts.find(&block);
-            const std::size_t begin = prior == instructionCounts.end()
-                ? 0
-                : prior->second;
-            for (std::size_t i = begin; i < block.instructions.size(); ++i) {
-                Instruction& instruction = block.instructions[i];
-                if (!result.name.empty() && instruction.result == result.name) {
-                    instruction.resultType = result.type;
-                }
-                if (instruction.opcode == "alloc" &&
-                    !instruction.operands.empty() &&
-                    instruction.operands[0].name == result.name) {
-                    instruction.operands[0].type = result.type;
-                }
+        forEachNewInstruction([&](Instruction& instruction) {
+            if (!result.name.empty() && instruction.result == result.name) {
+                instruction.resultType = result.type;
+                instruction.resultTypeIsResolved = true;
             }
-        }
+            if (instruction.opcode == "alloc" &&
+                !instruction.operands.empty() &&
+                instruction.operands[0].name == result.name) {
+                instruction.operands[0].type = result.type;
+            }
+        });
     }
     return result;
 }
@@ -3574,6 +3575,11 @@ Value IRBuilder::buildAssignment(
                 case zplus::TokenType::StarEqual: opcode = "mul"; break;
                 case zplus::TokenType::SlashEqual: opcode = "div"; break;
                 case zplus::TokenType::PercentEqual: opcode = "mod"; break;
+                case zplus::TokenType::AndEqual: opcode = "bitand"; break;
+                case zplus::TokenType::OrEqual: opcode = "bitor"; break;
+                case zplus::TokenType::XorEqual: opcode = "bitxor"; break;
+                case zplus::TokenType::LeftShiftEqual: opcode = "shl"; break;
+                case zplus::TokenType::RightShiftEqual: opcode = "shr"; break;
                 default:
                     throw std::runtime_error(
                         "unsupported compound member assignment operator");

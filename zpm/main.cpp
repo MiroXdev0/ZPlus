@@ -30,7 +30,7 @@
 #endif
 
 #ifndef ZPM_VERSION
-#define ZPM_VERSION "0.3.0"
+#define ZPM_VERSION "1.0.0"
 #endif
 
 namespace {

@@ -22,12 +22,21 @@ struct NativeImage {
         std::string library = "KERNEL32.dll";
     };
 
+    struct UnwindFunction {
+        std::size_t beginOffset = 0;
+        std::size_t endOffset = 0;
+        std::uint32_t stackAllocationSize = 0;
+        std::uint8_t prologueSize = 0;
+        bool framePointer = false;
+    };
+
     std::vector<std::uint8_t> code;
     std::vector<std::uint8_t> data;
     std::size_t entryOffset = 0;
     bool writableData = false;
     std::vector<RelativeFixup> dataFixups;
     std::vector<ImportFixup> importFixups;
+    std::vector<UnwindFunction> unwindFunctions;
 };
 
 class NativeCodeGenerator {

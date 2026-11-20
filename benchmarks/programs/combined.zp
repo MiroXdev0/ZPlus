@@ -1,8 +1,8 @@
-fn transform(value: number): number {
-    return (value * 7 + 11) % 103
-} end fn
-
 start {
+    fn transform(value: number): number {
+        return (value * 7 + 11) % 103
+    } end fn
+
     let iterations: number = 50000 // BENCH_ITERATIONS
     let expected: number = 3034241 // BENCH_EXPECTED
     let checksum: number = 0

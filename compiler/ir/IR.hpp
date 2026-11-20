@@ -68,6 +68,7 @@ struct Instruction {
 
     std::string result;
     zplus::semantic::Type resultType;
+    bool resultTypeIsResolved = false;
 
     std::vector<Value> operands;
 

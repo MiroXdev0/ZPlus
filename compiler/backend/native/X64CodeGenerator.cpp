@@ -1,6 +1,8 @@
 #include "X64CodeGenerator.hpp"
 
 #include "MachineCode.hpp"
+#include "../../ir/IRAnalysis.hpp"
+#include "../../ir/IROptimizer.hpp"
 #include "../../ir/IRVerifier.hpp"
 #include "../../NumericLiteral.hpp"
 
@@ -9,6 +11,7 @@
 #include <charconv>
 #include <cmath>
 #include <cstdint>
+#include <iterator>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -37,6 +40,8 @@ constexpr char kPendingExceptionGlobal[] = "__zplus_native_pending_exception";
 constexpr char kActiveHandlerSlot[] = "__zp_active_exception_handler";
 constexpr char kCleanupOriginalSlot[] = "__zp_cleanup_original_exception";
 constexpr char kCleanupFirstSlot[] = "__zp_cleanup_first_exception";
+constexpr char kRemainderLeftSlot[] = "__zp_remainder_left";
+constexpr char kRemainderRightSlot[] = "__zp_remainder_right";
 
 enum Reg : std::uint8_t {
     RAX = 0, RCX = 1, RDX = 2, RBX = 3,
@@ -52,6 +57,13 @@ struct BranchFixup {
 struct CallFixup {
     std::size_t offset;
     std::string target;
+};
+
+struct SystemVArgumentLocation {
+    bool floatingPoint = false;
+    bool onStack = false;
+    std::uint8_t registerIndex = 0;
+    std::size_t stackIndex = 0;
 };
 
 std::size_t alignTo(std::size_t value, std::size_t alignment) {
@@ -230,6 +242,14 @@ private:
         emit32(displacement);
     }
 
+    void xmmMove(std::uint8_t destination, std::uint8_t source) {
+        if (destination == source) return;
+        emit8(0xF2);
+        rex(false, destination, source);
+        emit8(0x0F); emit8(0x10);
+        modrm(3, destination, source);
+    }
+
     void xmmMoveFromGpr(std::uint8_t destination, std::uint8_t source) {
         emit8(0x66);
         rex(true, destination, source);
@@ -347,6 +367,11 @@ private:
             xmmMoveFromGpr(destination, RAX);
             return;
         }
+        if (const auto allocated = xmmRegisters_.find(value.name);
+            allocated != xmmRegisters_.end()) {
+            xmmMove(destination, allocated->second);
+            return;
+        }
         if (const auto found = slots_.find(value.name); found != slots_.end()) {
             xmmLoad(destination, found->second);
             return;
@@ -364,10 +389,106 @@ private:
         xmmMoveFromGpr(destination, RAX);
     }
 
+    std::uint8_t loadXmmOperand(
+        const Value& value,
+        std::uint8_t scratch
+    ) {
+        if (const auto allocated = xmmRegisters_.find(value.name);
+            allocated != xmmRegisters_.end()) {
+            return allocated->second;
+        }
+        loadXmmValue(value, scratch);
+        return scratch;
+    }
+
+    bool emitAllocatedXmmBinary(
+        const Instruction& instruction,
+        std::uint8_t opcode
+    ) {
+        const auto result = xmmRegisters_.find(instruction.result);
+        if (result == xmmRegisters_.end()) return false;
+
+        const std::uint8_t destination = result->second;
+        const std::uint8_t left = loadXmmOperand(
+            instruction.operands[0], destination);
+        if (left != destination) xmmMove(destination, left);
+
+        const std::uint8_t right = loadXmmOperand(
+            instruction.operands[1], 0);
+        xmmBinary(opcode, destination, right);
+        return true;
+    }
+
+    void emitFloatingRemainder(
+        const Instruction& instruction,
+        const std::string& functionName
+    ) {
+        requireOperands(instruction, 2);
+        const std::int32_t leftSlot = slot(kRemainderLeftSlot);
+        const std::int32_t rightSlot = slot(kRemainderRightSlot);
+
+        loadXmmValue(instruction.operands[0], 0);
+        xmmStore(leftSlot, 0);
+        loadXmmValue(instruction.operands[1], 0);
+        xmmStore(rightSlot, 0);
+
+        const std::string zeroLabel =
+            "__fprem_zero_" + std::to_string(uniqueLabel_++);
+        const std::string remainderLabel =
+            "__fprem_remainder_" + std::to_string(uniqueLabel_++);
+        xmmLoad(0, rightSlot);
+        movImm(RAX, 0);
+        xmmMoveFromGpr(1, RAX);
+        xmmCompare(0, 1);
+        emitJump(0x84, zeroLabel);
+        emitJump(0xFF, remainderLabel);
+        localLabels_[zeroLabel] = code_.size();
+        leaRip(RAX, addString("modulo by zero"));
+        storeGlobal(kPendingExceptionGlobal, RAX);
+        emitExceptionDispatch(functionName);
+        localLabels_[remainderLabel] = code_.size();
+
+        const std::string loopLabel =
+            "__fprem_loop_" + std::to_string(uniqueLabel_++);
+        emit8(0xDD);
+        modrm(2, 0, RBP);
+        emit32(rightSlot);
+        emit8(0xDD);
+        modrm(2, 0, RBP);
+        emit32(leftSlot);
+        localLabels_[loopLabel] = code_.size();
+        emit8(0xD9); emit8(0xF8);
+        emit8(0x9B); emit8(0xDF); emit8(0xE0);
+        emit8(0xF6); emit8(0xC4); emit8(0x04);
+        emitJump(0x85, loopLabel);
+        emit8(0xD9); emit8(0xD9);
+        emit8(0xDD);
+        modrm(2, 3, RBP);
+        emit32(leftSlot);
+
+        if (instruction.opcode == "mod_assign") {
+            xmmLoad(0, leftSlot);
+            storeXmmVariable(instruction.operands[0].name, 0);
+            return;
+        }
+
+        const auto allocated = xmmRegisters_.find(instruction.result);
+        const std::uint8_t destination = allocated == xmmRegisters_.end()
+            ? 0
+            : allocated->second;
+        xmmLoad(destination, leftSlot);
+        if (allocated == xmmRegisters_.end()) {
+            storeXmmResult(instruction, destination);
+        }
+    }
+
     void loadXmmVariable(const std::string& name, std::uint8_t destination) {
         if (globalOffsets_.contains(name)) {
             loadGlobal(name, RAX);
             xmmMoveFromGpr(destination, RAX);
+        } else if (const auto allocated = xmmRegisters_.find(name);
+                   allocated != xmmRegisters_.end()) {
+            xmmMove(destination, allocated->second);
         } else {
             xmmLoad(destination, slot(name));
         }
@@ -375,7 +496,12 @@ private:
 
     void storeXmmResult(const Instruction& instruction, std::uint8_t source) {
         if (!instruction.result.empty()) {
-            xmmStore(slot(instruction.result), source);
+            if (const auto allocated = xmmRegisters_.find(instruction.result);
+                allocated != xmmRegisters_.end()) {
+                xmmMove(allocated->second, source);
+            } else {
+                xmmStore(slot(instruction.result), source);
+            }
         }
     }
 
@@ -383,6 +509,9 @@ private:
         if (globalOffsets_.contains(name)) {
             gprMoveFromXmm(RAX, source);
             storeGlobal(name, RAX);
+        } else if (const auto allocated = xmmRegisters_.find(name);
+                   allocated != xmmRegisters_.end()) {
+            xmmMove(allocated->second, source);
         } else {
             xmmStore(slot(name), source);
         }
@@ -407,6 +536,10 @@ private:
     bool isNumeric(const Value& value) const {
         const std::string type = inferredType(value);
         return type == "number" || isEnumTypeName(type);
+    }
+
+    bool isNumericArgument(const Value& value) const {
+        return isType(value.type, TypeKind::Number) || isNumeric(value);
     }
 
     bool isNumericName(const std::string& value) const {
@@ -598,6 +731,11 @@ private:
             loadGlobal(value.name, destination);
             return;
         }
+        if (const auto allocated = xmmRegisters_.find(value.name);
+            allocated != xmmRegisters_.end()) {
+            gprMoveFromXmm(destination, allocated->second);
+            return;
+        }
         const auto found = slots_.find(value.name);
         if (found != slots_.end()) {
             movLoad(destination, found->second);
@@ -738,6 +876,45 @@ private:
         return windowsAbi_
             ? std::vector<std::uint8_t>{RCX, RDX, R8, R9}
             : std::vector<std::uint8_t>{RDI, RSI, RDX, RCX, R8, R9};
+    }
+
+    static std::vector<SystemVArgumentLocation> systemVArgumentLocations(
+        const std::vector<bool>& floatingPointArguments
+    ) {
+        std::vector<SystemVArgumentLocation> locations;
+        locations.reserve(floatingPointArguments.size());
+        std::size_t integerIndex = 0;
+        std::size_t floatIndex = 0;
+        std::size_t stackIndex = 0;
+        for (const bool floatingPoint : floatingPointArguments) {
+            SystemVArgumentLocation location;
+            location.floatingPoint = floatingPoint;
+            if (floatingPoint && floatIndex < 8) {
+                location.registerIndex = static_cast<std::uint8_t>(floatIndex++);
+            } else if (!floatingPoint && integerIndex < 6) {
+                location.registerIndex = static_cast<std::uint8_t>(integerIndex++);
+            } else {
+                location.onStack = true;
+                location.stackIndex = stackIndex++;
+            }
+            locations.push_back(location);
+        }
+        return locations;
+    }
+
+    bool callArgumentIsNumber(
+        const Instruction& instruction,
+        std::size_t argumentIndex
+    ) const {
+        if (!instruction.operands.empty()) {
+            if (const Function* target =
+                    module_.findFunction(instruction.operands[0].name);
+                target && argumentIndex < target->parameters.size()) {
+                return isType(target->parameters[argumentIndex].type, TypeKind::Number);
+            }
+        }
+        const Value& value = instruction.operands[argumentIndex + 1];
+        return isType(value.type, TypeKind::Number) || isNumeric(value);
     }
 
     bool emitWriteCall(
@@ -1105,23 +1282,36 @@ private:
             return;
         }
 
-        std::size_t integerIndex = 0;
-        std::size_t floatIndex = 0;
         const auto integerRegisters = argumentRegisters();
+        std::vector<bool> floatingPointArguments;
+        floatingPointArguments.reserve(count);
+        for (const Parameter& parameter : target.parameters) {
+            floatingPointArguments.push_back(
+                isType(parameter.type, TypeKind::Number));
+        }
+        const auto locations =
+            systemVArgumentLocations(floatingPointArguments);
         for (std::size_t i = 0; i < count; ++i) {
             const Value& value = instruction.operands[i + 1];
-            if (isType(target.parameters[i].type, TypeKind::Number)) {
-                if (floatIndex >= 8) {
+            const auto& location = locations[i];
+            if (location.onStack) {
+                const std::size_t displacement = location.stackIndex * sizeof(std::uint64_t);
+                if (displacement > static_cast<std::size_t>(
+                        std::numeric_limits<std::int32_t>::max())) {
                     throw std::runtime_error(
-                        "native backend: more than eight floating-point parameters are unsupported");
+                        "native backend: System V outgoing argument area is too large");
                 }
-                loadXmmValue(value, static_cast<std::uint8_t>(floatIndex++));
+                if (location.floatingPoint) {
+                    loadXmmValue(value, 15);
+                    gprMoveFromXmm(RAX, 15);
+                } else {
+                    loadValue(value, RAX);
+                }
+                movStoreRspDisp(static_cast<std::int32_t>(displacement), RAX);
+            } else if (location.floatingPoint) {
+                loadXmmValue(value, location.registerIndex);
             } else {
-                if (integerIndex >= integerRegisters.size()) {
-                    throw std::runtime_error(
-                        "native backend: more than six integer/pointer parameters are unsupported");
-                }
-                loadValue(value, integerRegisters[integerIndex++]);
+                loadValue(value, integerRegisters[location.registerIndex]);
             }
         }
     }
@@ -1130,9 +1320,11 @@ private:
         const Instruction& instruction,
         const std::string& opcode
     ) {
-        loadXmmValue(instruction.operands[0], 0);
-        loadXmmValue(instruction.operands[1], 1);
-        xmmCompare(0, 1);
+        const std::uint8_t left =
+            loadXmmOperand(instruction.operands[0], 0);
+        const std::uint8_t right =
+            loadXmmOperand(instruction.operands[1], 1);
+        xmmCompare(left, right);
         movImm(RAX, 0);
         movImm(R10, 0);
         if (opcode == "cmp_eq") {
@@ -1165,7 +1357,7 @@ private:
     void emitNativeCallArguments(const Instruction& instruction) {
         const std::size_t count = instruction.operands.size() - 1;
         const auto registers = argumentRegisters();
-        if (count > 32 || (!windowsAbi_ && count > registers.size())) {
+        if (windowsAbi_ && count > 32) {
             const std::string& callee = instruction.operands[0].name;
             throw std::runtime_error("native backend: too many arguments for native call '" +
                                      callee + "'");
@@ -1176,10 +1368,42 @@ private:
                 movStoreRspDisp(32 + static_cast<std::int32_t>(
                     (i - registers.size()) * sizeof(std::uint64_t)), RAX);
             }
-        }
-
-        for (std::size_t i = 0; i < std::min(count, registers.size()); ++i) {
-            loadValue(instruction.operands[i + 1], registers[i]);
+            for (std::size_t i = 0; i < std::min(count, registers.size()); ++i) {
+                loadValue(instruction.operands[i + 1], registers[i]);
+            }
+        } else {
+            std::vector<bool> floatingPointArguments;
+            floatingPointArguments.reserve(count);
+            for (std::size_t i = 0; i < count; ++i) {
+                floatingPointArguments.push_back(
+                    isNumericArgument(instruction.operands[i + 1]));
+            }
+            const auto locations =
+                systemVArgumentLocations(floatingPointArguments);
+            for (std::size_t i = 0; i < count; ++i) {
+                const Value& value = instruction.operands[i + 1];
+                const auto& location = locations[i];
+                if (location.onStack) {
+                    const std::size_t displacement =
+                        location.stackIndex * sizeof(std::uint64_t);
+                    if (displacement > static_cast<std::size_t>(
+                            std::numeric_limits<std::int32_t>::max())) {
+                        throw std::runtime_error(
+                            "native backend: System V outgoing argument area is too large");
+                    }
+                    if (location.floatingPoint) {
+                        loadXmmValue(value, 15);
+                        gprMoveFromXmm(RAX, 15);
+                    } else {
+                        loadValue(value, RAX);
+                    }
+                    movStoreRspDisp(static_cast<std::int32_t>(displacement), RAX);
+                } else if (location.floatingPoint) {
+                    loadXmmValue(value, location.registerIndex);
+                } else {
+                    loadValue(value, registers[location.registerIndex]);
+                }
+            }
         }
     }
 
@@ -1566,6 +1790,11 @@ private:
             op == "shl" || op == "shr" || op == "and" || op == "or" ||
             op.starts_with("cmp_")) {
             requireOperands(instruction, 2);
+            if (inferredType(instruction.operands[0]) == "unknown" ||
+                inferredType(instruction.operands[1]) == "unknown") {
+                throw std::runtime_error(
+                    "native backend: operations on unknown values are unsupported");
+            }
             if (op == "add" &&
                 (isStringValue(instruction.operands[0]) || isStringValue(instruction.operands[1]))) {
                 if (!windowsAbi_ || !isStringValue(instruction.operands[0]) ||
@@ -1620,10 +1849,12 @@ private:
                  op == "shl" || op == "shr") &&
                 isNumeric(instruction.operands[0]) &&
                 isNumeric(instruction.operands[1])) {
-                loadXmmValue(instruction.operands[0], 0);
-                loadXmmValue(instruction.operands[1], 1);
-                convertXmmToSignedInteger(RAX, 0);
-                convertXmmToSignedInteger(R10, 1);
+                const std::uint8_t left =
+                    loadXmmOperand(instruction.operands[0], 0);
+                const std::uint8_t right =
+                    loadXmmOperand(instruction.operands[1], 1);
+                convertXmmToSignedInteger(RAX, left);
+                convertXmmToSignedInteger(R10, right);
                 if (op == "bitand") binary(0x21, RAX, R10);
                 else if (op == "bitor") binary(0x09, RAX, R10);
                 else if (op == "bitxor") binary(0x31, RAX, R10);
@@ -1633,34 +1864,34 @@ private:
                     emit8(0xD3);
                     modrm(3, op == "shl" ? 4 : 7, RAX);
                 }
-                convertSignedIntegerToXmm(0, RAX);
-                storeXmmResult(instruction, 0);
+                const auto allocated =
+                    xmmRegisters_.find(instruction.result);
+                const std::uint8_t destination = allocated ==
+                        xmmRegisters_.end()
+                    ? 0
+                    : allocated->second;
+                convertSignedIntegerToXmm(destination, RAX);
+                if (allocated == xmmRegisters_.end()) {
+                    storeXmmResult(instruction, destination);
+                }
                 return;
             }
             if (isNumeric(instruction.operands[0]) &&
                 isNumeric(instruction.operands[1]) &&
                 (op == "add" || op == "sub" || op == "mul" || op == "div")) {
-                loadXmmValue(instruction.operands[0], 0);
-                loadXmmValue(instruction.operands[1], 1);
                 const std::uint8_t opcode =
                     op == "add" ? 0x58 : op == "sub" ? 0x5C :
                     op == "mul" ? 0x59 : 0x5E;
+                if (emitAllocatedXmmBinary(instruction, opcode)) return;
+                loadXmmValue(instruction.operands[0], 0);
+                loadXmmValue(instruction.operands[1], 1);
                 xmmBinary(opcode, 0, 1);
                 storeXmmResult(instruction, 0);
                 return;
             }
             if (op == "mod" && isNumeric(instruction.operands[0]) &&
                 isNumeric(instruction.operands[1])) {
-                if (!windowsAbi_) {
-                    throw std::runtime_error(
-                        "native floating-point remainder currently requires the Windows x64 runtime");
-                }
-                loadValue(instruction.operands[0], RCX);
-                loadValue(instruction.operands[1], RDX);
-                emitImportCall("zpg_numberRemainder", "zgraphics_runtime.dll");
-                usesZGraphicsRuntime_ = true;
-                storeResult(instruction);
-                emitExceptionDispatch(functionName);
+                emitFloatingRemainder(instruction, functionName);
                 return;
             }
             loadValue(instruction.operands[0], RAX);
@@ -1689,24 +1920,49 @@ private:
         }
         if (op == "pos" || op == "neg" || op == "not" || op == "bitnot") {
             requireOperands(instruction, 1);
+            if (inferredType(instruction.operands[0]) == "unknown") {
+                throw std::runtime_error(
+                    "native backend: operations on unknown values are unsupported");
+            }
             if ((op == "pos" || op == "neg") &&
                 isNumeric(instruction.operands[0])) {
-                loadXmmValue(instruction.operands[0], 0);
+                const auto allocated =
+                    xmmRegisters_.find(instruction.result);
+                const std::uint8_t destination = allocated ==
+                        xmmRegisters_.end()
+                    ? 0
+                    : allocated->second;
+                const std::uint8_t source =
+                    loadXmmOperand(instruction.operands[0], destination);
+                if (source != destination) {
+                    xmmMove(destination, source);
+                }
                 if (op == "neg") {
-                    gprMoveFromXmm(RAX, 0);
+                    gprMoveFromXmm(RAX, destination);
                     movImm(R10, 0x8000000000000000ULL);
                     binary(0x31, RAX, R10);
-                    xmmMoveFromGpr(0, RAX);
+                    xmmMoveFromGpr(destination, RAX);
                 }
-                storeXmmResult(instruction, 0);
+                if (allocated == xmmRegisters_.end()) {
+                    storeXmmResult(instruction, destination);
+                }
                 return;
             }
             if (op == "bitnot" && isNumeric(instruction.operands[0])) {
-                loadXmmValue(instruction.operands[0], 0);
-                convertXmmToSignedInteger(RAX, 0);
+                const std::uint8_t source =
+                    loadXmmOperand(instruction.operands[0], 0);
+                convertXmmToSignedInteger(RAX, source);
                 emit8(0x48); emit8(0xF7); emit8(0xD0);
-                convertSignedIntegerToXmm(0, RAX);
-                storeXmmResult(instruction, 0);
+                const auto allocated =
+                    xmmRegisters_.find(instruction.result);
+                const std::uint8_t destination = allocated ==
+                        xmmRegisters_.end()
+                    ? 0
+                    : allocated->second;
+                convertSignedIntegerToXmm(destination, RAX);
+                if (allocated == xmmRegisters_.end()) {
+                    storeXmmResult(instruction, destination);
+                }
                 return;
             }
             loadValue(instruction.operands[0], RAX);
@@ -1722,6 +1978,10 @@ private:
         }
         if (op == "pre_inc" || op == "post_inc" || op == "pre_dec" || op == "post_dec" || op == "dec") {
             requireOperands(instruction, 1);
+            if (inferredType(instruction.operands[0]) == "unknown") {
+                throw std::runtime_error(
+                    "native backend: operations on unknown values are unsupported");
+            }
             if (isNumeric(instruction.operands[0])) {
                 const bool post = op == "post_inc" || op == "post_dec";
                 const bool decrement = op == "pre_dec" || op == "post_dec" || op == "dec";
@@ -1746,6 +2006,11 @@ private:
         }
         if (op.ends_with("_assign")) {
             requireOperands(instruction, 2);
+            if (inferredType(instruction.operands[0]) == "unknown" ||
+                inferredType(instruction.operands[1]) == "unknown") {
+                throw std::runtime_error(
+                    "native backend: operations on unknown values are unsupported");
+            }
             if (op == "add_assign" &&
                 (isStringValue(instruction.operands[0]) ||
                  isStringValue(instruction.operands[1]))) {
@@ -1768,28 +2033,19 @@ private:
                 isNumeric(instruction.operands[0]) &&
                 isNumeric(instruction.operands[1])) {
                 loadXmmVariable(instruction.operands[0].name, 0);
-                loadXmmValue(instruction.operands[1], 1);
+                const std::uint8_t right =
+                    loadXmmOperand(instruction.operands[1], 1);
                 const std::uint8_t opcode =
                     op == "add_assign" ? 0x58 : op == "sub_assign" ? 0x5C :
                     op == "mul_assign" ? 0x59 : 0x5E;
-                xmmBinary(opcode, 0, 1);
+                xmmBinary(opcode, 0, right);
                 storeXmmVariable(instruction.operands[0].name, 0);
                 return;
             }
             if (op == "mod_assign" &&
                 isNumeric(instruction.operands[0]) &&
                 isNumeric(instruction.operands[1])) {
-                if (!windowsAbi_) {
-                    throw std::runtime_error(
-                        "native floating-point remainder currently requires the Windows x64 runtime");
-                }
-                loadXmmVariable(instruction.operands[0].name, 0);
-                gprMoveFromXmm(RCX, 0);
-                loadValue(instruction.operands[1], RDX);
-                emitImportCall("zpg_numberRemainder", "zgraphics_runtime.dll");
-                storeVariable(instruction.operands[0].name, RAX);
-                usesZGraphicsRuntime_ = true;
-                emitExceptionDispatch(functionName);
+                emitFloatingRemainder(instruction, functionName);
                 return;
             }
             if ((op == "and_assign" || op == "or_assign" ||
@@ -1980,6 +2236,7 @@ private:
 
     void prepareFunction(const Function& function) {
         slots_.clear();
+        xmmRegisters_.clear();
         stringSlots_.clear();
         valueTypes_.clear();
         temporaryUseCounts_.clear();
@@ -1991,13 +2248,15 @@ private:
         deferredByScope_.clear();
         scopeDepths_.clear();
         errorBindings_.clear();
+        dynamicValues_.clear();
         stackSize_ = 0;
-        std::size_t outgoingStackSize = 48;
+        std::size_t outgoingStackSize = windowsAbi_ ? 48 : 0;
         for (const auto& parameter : function.parameters) {
             allocateSlot(parameter.name);
-            if (parameter.type.kind != TypeKind::Unknown) {
-                valueTypes_[parameter.name] =
-                    zplus::semantic::typeName(parameter.type);
+            valueTypes_[parameter.name] =
+                zplus::semantic::typeName(parameter.type);
+            if (parameter.type.kind == TypeKind::Unknown) {
+                dynamicValues_.insert(parameter.name);
             }
             if (isType(parameter.type, TypeKind::String) ||
                 isType(parameter.type, TypeKind::Character)) {
@@ -2006,6 +2265,7 @@ private:
         }
         for (const auto& [name, type] : globalTypes_) {
             valueTypes_.try_emplace(name, type);
+            if (type == "unknown") dynamicValues_.insert(name);
         }
         for (const auto& block : function.blocks) {
             for (const auto& instruction : block.instructions) {
@@ -2017,13 +2277,35 @@ private:
                     if (!operand.name.empty() && operand.name.front() == '%') {
                         ++temporaryUseCounts_[operand.name];
                     }
+                    if (!operand.name.empty() &&
+                        operand.type.kind != TypeKind::Unknown) {
+                        valueTypes_.try_emplace(
+                            operand.name,
+                            zplus::semantic::typeName(operand.type));
+                    }
                 }
                 if (instruction.opcode == "alloc" && !instruction.operands.empty()) {
+                    if (instruction.operands[0].type.kind == TypeKind::Unknown) {
+                        valueTypes_.try_emplace(instruction.operands[0].name, "unknown");
+                        dynamicValues_.insert(instruction.operands[0].name);
+                    } else {
+                        valueTypes_.try_emplace(
+                            instruction.operands[0].name,
+                            zplus::semantic::typeName(instruction.operands[0].type));
+                    }
                     if (!globalOffsets_.contains(instruction.operands[0].name)) {
                         allocateSlot(instruction.operands[0].name);
                     }
                 }
-                if (!instruction.result.empty()) allocateSlot(instruction.result);
+                if (!instruction.result.empty()) {
+                    if (instruction.resultType.kind == TypeKind::Unknown) {
+                        valueTypes_.try_emplace(instruction.result, "unknown");
+                    } else {
+                        valueTypes_.insert_or_assign(
+                            instruction.result,
+                            zplus::semantic::typeName(instruction.resultType));
+                    }
+                }
                 if (windowsAbi_ && instruction.opcode == "struct_new") {
                     if (instruction.operands.size() > 1) {
                         const std::size_t fieldCount =
@@ -2040,7 +2322,9 @@ private:
                             32 + fieldCount * sizeof(std::uint64_t));
                     }
                 }
-                if (windowsAbi_ && instruction.opcode == "call" &&
+                if (windowsAbi_ &&
+                    (instruction.opcode == "call" ||
+                     instruction.opcode == "defer_push") &&
                     instruction.operands.size() > 5) {
                     const std::size_t argumentCount = instruction.operands.size() - 1;
                     if (argumentCount > 32) {
@@ -2049,6 +2333,40 @@ private:
                     outgoingStackSize = std::max(
                         outgoingStackSize,
                         32 + (argumentCount - 4) * sizeof(std::uint64_t));
+                }
+                if (!windowsAbi_ &&
+                    (instruction.opcode == "call" ||
+                     instruction.opcode == "defer_push")) {
+                    const std::size_t argumentCount =
+                        instruction.operands.empty()
+                            ? 0
+                            : instruction.operands.size() - 1;
+                    std::vector<bool> floatingPointArguments;
+                    floatingPointArguments.reserve(argumentCount);
+                    for (std::size_t argumentIndex = 0;
+                         argumentIndex < argumentCount;
+                         ++argumentIndex) {
+                        floatingPointArguments.push_back(
+                            callArgumentIsNumber(instruction, argumentIndex));
+                    }
+                    const auto locations =
+                        systemVArgumentLocations(floatingPointArguments);
+                    const std::size_t stackArgumentCount =
+                        static_cast<std::size_t>(std::count_if(
+                            locations.begin(), locations.end(),
+                            [](const auto& location) {
+                                return location.onStack;
+                            }));
+                    if (stackArgumentCount >
+                        (static_cast<std::size_t>(
+                             std::numeric_limits<std::int32_t>::max()) - 15) /
+                            sizeof(std::uint64_t)) {
+                        throw std::runtime_error(
+                            "native backend: System V outgoing argument area is too large");
+                    }
+                    outgoingStackSize = std::max(
+                        outgoingStackSize,
+                        alignTo(stackArgumentCount * sizeof(std::uint64_t), 16));
                 }
                 if (windowsAbi_ && instruction.opcode == "array") {
                     if (instruction.operands.size() >
@@ -2092,35 +2410,10 @@ private:
         for (const auto& block : function.blocks) {
             instructionCount += block.instructions.size();
         }
-        std::unordered_set<std::string> indexedValues;
-        for (const auto& block : function.blocks) {
-            for (const auto& instruction : block.instructions) {
-                if (instruction.opcode == "index" && !instruction.result.empty()) {
-                    indexedValues.insert(instruction.result);
-                }
-            }
-        }
         for (std::size_t pass = 0; pass <= instructionCount; ++pass) {
             bool inferred = false;
             for (const auto& block : function.blocks) {
                 for (const auto& instruction : block.instructions) {
-                    const bool numericBinary =
-                        instruction.opcode == "add" ||
-                        instruction.opcode == "sub" ||
-                        instruction.opcode == "mul" ||
-                        instruction.opcode == "div" ||
-                        instruction.opcode == "mod" ||
-                        instruction.opcode.starts_with("cmp_");
-                    if (numericBinary && instruction.operands.size() == 2) {
-                        for (std::size_t index = 0; index < 2; ++index) {
-                            const Value& candidate = instruction.operands[index];
-                            const Value& other = instruction.operands[1 - index];
-                            if (indexedValues.contains(candidate.name) &&
-                                inferredType(candidate).empty() && isNumeric(other)) {
-                                inferred |= setInferredType(candidate.name, "number");
-                            }
-                        }
-                    }
                     if (instruction.opcode == "array" && !instruction.result.empty() &&
                         !instruction.operands.empty()) {
                         std::string elementType;
@@ -2154,7 +2447,9 @@ private:
                                 instruction.opcode == "shr") &&
                                instruction.operands.size() == 2 &&
                                !isStringValue(instruction.operands[0]) &&
-                               !isStringValue(instruction.operands[1])) {
+                               !isStringValue(instruction.operands[1]) &&
+                               isNumeric(instruction.operands[0]) &&
+                               isNumeric(instruction.operands[1])) {
                         inferred |= setInferredType(instruction.result, "number");
                     } else if (!instruction.result.empty() &&
                                (instruction.opcode == "neg" ||
@@ -2225,7 +2520,9 @@ private:
                                instruction.operands.size() == 2) {
                         const std::string& target = instruction.operands[0].name;
                         const std::string type = inferredType(instruction.operands[1]);
-                        if (globalOffsets_.contains(target)) {
+                        if (dynamicValues_.contains(target)) {
+                            continue;
+                        } else if (globalOffsets_.contains(target)) {
                             auto& current = globalTypes_[target];
                             if (!type.empty() && current != type) {
                                 current = type;
@@ -2271,6 +2568,33 @@ private:
             if (type == "string" || type == "char" || type == "character") {
                 stringSlots_.insert(name);
             }
+        }
+        const zplus::ir::FunctionLiveness liveness =
+            zplus::ir::analyzeLiveness(function);
+        allocateTemporaryRegisters(function, liveness);
+        allocateNamedNumericRegisters(function, liveness);
+        allocateTemporaryStackSlots(function, liveness);
+        for (const BasicBlock& block : function.blocks) {
+            for (const Instruction& instruction : block.instructions) {
+                if (!instruction.result.empty() &&
+                    !xmmRegisters_.contains(instruction.result)) {
+                    allocateSlot(instruction.result);
+                }
+            }
+        }
+        const bool usesRemainder = std::any_of(
+            function.blocks.begin(), function.blocks.end(),
+            [](const BasicBlock& block) {
+                return std::any_of(
+                    block.instructions.begin(), block.instructions.end(),
+                    [](const Instruction& instruction) {
+                        return instruction.opcode == "mod" ||
+                            instruction.opcode == "mod_assign";
+                    });
+            });
+        if (usesRemainder) {
+            allocateSlot(kRemainderLeftSlot);
+            allocateSlot(kRemainderRightSlot);
         }
         allocateSlot(kActiveHandlerSlot);
         allocateSlot(kCleanupOriginalSlot);
@@ -2319,8 +2643,8 @@ private:
                 deferredSites_.push_back(std::move(site));
             }
         }
-        const std::size_t frameSize = static_cast<std::size_t>(stackSize_) +
-            (windowsAbi_ ? outgoingStackSize : 0);
+        const std::size_t frameSize =
+            static_cast<std::size_t>(stackSize_) + outgoingStackSize;
         if (frameSize > static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max() - 15)) {
             throw std::runtime_error("native backend: function stack frame is too large");
         }
@@ -2408,6 +2732,386 @@ private:
         emitImportCall("zpg_popRoots", "zgraphics_runtime.dll");
     }
 
+    bool mayClobberXmmTemporaries(
+        const Instruction& instruction
+    ) const {
+        const std::string& opcode = instruction.opcode;
+        if (opcode == "call" || opcode == "scope_pop" ||
+            opcode == "throw" || opcode == "mod" ||
+            opcode == "mod_assign" || opcode == "array" ||
+            opcode == "index" || opcode == "index_store" ||
+            opcode == "member" || opcode == "member_store" ||
+            opcode == "member_ptr" || opcode == "struct_new" ||
+            opcode == "is") {
+            return true;
+        }
+        if ((opcode == "add" || opcode.starts_with("cmp_")) &&
+            std::any_of(
+                instruction.operands.begin(), instruction.operands.end(),
+                [this](const Value& operand) {
+                    return isStringValue(operand);
+                })) {
+            return true;
+        }
+        return false;
+    }
+
+    bool isRegisterCandidate(const Instruction& instruction) const {
+        if (!instruction.hasResult() ||
+            instruction.resultType.kind != TypeKind::Number ||
+            !instruction.result.starts_with('%') ||
+            slots_.contains(instruction.result)) {
+            return false;
+        }
+        const auto resultType = valueTypes_.find(instruction.result);
+        if (resultType == valueTypes_.end() ||
+            resultType->second != "number") {
+            return false;
+        }
+        const std::string& opcode = instruction.opcode;
+        const bool binaryNumeric =
+            opcode == "add" || opcode == "sub" || opcode == "mul" ||
+            opcode == "div" || opcode == "bitand" || opcode == "bitor" ||
+            opcode == "bitxor" || opcode == "shl" || opcode == "shr";
+        if (binaryNumeric) {
+            return instruction.operands.size() == 2 &&
+                isNumeric(instruction.operands[0]) &&
+                isNumeric(instruction.operands[1]) &&
+                !isStringValue(instruction.operands[0]) &&
+                !isStringValue(instruction.operands[1]);
+        }
+        if (opcode == "neg" || opcode == "pos" ||
+            opcode == "bitnot") {
+            return instruction.operands.size() == 1 &&
+                isNumeric(instruction.operands.front());
+        }
+        if (opcode == "mov") {
+            return instruction.operands.size() == 1 &&
+                isNumeric(instruction.operands.front());
+        }
+        return false;
+    }
+
+    void allocateTemporaryRegisters(
+        const Function& function,
+        const zplus::ir::FunctionLiveness& liveness
+    ) {
+        struct Interval {
+            std::string name;
+            std::size_t start = 0;
+            std::size_t end = 0;
+        };
+        struct ActiveInterval {
+            std::size_t end = 0;
+            std::uint8_t reg = 0;
+        };
+
+        std::vector<Interval> intervals;
+        for (std::size_t blockIndex = 0;
+             blockIndex < function.blocks.size();
+             ++blockIndex) {
+            const BasicBlock& block = function.blocks[blockIndex];
+            const auto& blockLiveness = liveness.blocks[blockIndex];
+            for (std::size_t instructionIndex = 0;
+                 instructionIndex < block.instructions.size();
+                 ++instructionIndex) {
+                const Instruction& definition =
+                    block.instructions[instructionIndex];
+                if (!isRegisterCandidate(definition) ||
+                    blockLiveness.liveOut.contains(definition.result)) {
+                    continue;
+                }
+
+                std::size_t lastUse = instructionIndex;
+                bool hasUse = false;
+                bool localUsesOnly = true;
+                for (std::size_t otherBlock = 0;
+                     otherBlock < liveness.blocks.size();
+                     ++otherBlock) {
+                    const auto& other = liveness.blocks[otherBlock];
+                    if (otherBlock != blockIndex &&
+                        (other.liveIn.contains(definition.result) ||
+                         other.liveOut.contains(definition.result))) {
+                        localUsesOnly = false;
+                    }
+                    for (std::size_t useIndex = 0;
+                         useIndex < other.instructions.size();
+                         ++useIndex) {
+                        if (!other.instructions[useIndex].uses.contains(
+                                definition.result)) {
+                            continue;
+                        }
+                        if (otherBlock != blockIndex ||
+                            useIndex < instructionIndex ||
+                            mayClobberXmmTemporaries(
+                                block.instructions[useIndex])) {
+                            localUsesOnly = false;
+                            continue;
+                        }
+                        hasUse = true;
+                        lastUse = std::max(lastUse, useIndex);
+                    }
+                }
+                if (!localUsesOnly || !hasUse) continue;
+
+                for (std::size_t index = instructionIndex + 1;
+                     index <= lastUse;
+                     ++index) {
+                    if (mayClobberXmmTemporaries(block.instructions[index])) {
+                        localUsesOnly = false;
+                        break;
+                    }
+                }
+                if (localUsesOnly) {
+                    intervals.push_back({
+                        definition.result, instructionIndex, lastUse});
+                }
+            }
+        }
+
+        std::sort(
+            intervals.begin(), intervals.end(),
+            [](const Interval& left, const Interval& right) {
+                return left.start < right.start ||
+                    (left.start == right.start && left.end < right.end);
+            });
+        constexpr std::uint8_t registers[] = {2, 3, 4, 5};
+        std::vector<ActiveInterval> active;
+        std::vector<std::uint8_t> freeRegisters(
+            std::begin(registers), std::end(registers));
+        for (const Interval& interval : intervals) {
+            for (std::size_t index = active.size(); index-- > 0;) {
+                if (active[index].end < interval.start) {
+                    freeRegisters.push_back(active[index].reg);
+                    active.erase(active.begin() +
+                                 static_cast<std::ptrdiff_t>(index));
+                }
+            }
+            if (freeRegisters.empty()) continue;
+            const std::uint8_t reg = freeRegisters.back();
+            freeRegisters.pop_back();
+            xmmRegisters_.insert_or_assign(interval.name, reg);
+            active.push_back({interval.end, reg});
+        }
+    }
+
+    void allocateNamedNumericRegisters(
+        const Function& function,
+        const zplus::ir::FunctionLiveness& liveness
+    ) {
+        (void)liveness;
+        struct Interval {
+            std::string name;
+            std::size_t start = 0;
+            std::size_t end = 0;
+        };
+        struct ActiveInterval {
+            std::size_t end = 0;
+            std::uint8_t reg = 0;
+        };
+
+        std::unordered_set<std::string> candidates;
+        for (const BasicBlock& block : function.blocks) {
+            for (const Instruction& instruction : block.instructions) {
+                if (instruction.opcode != "alloc" ||
+                    instruction.operands.empty()) {
+                    continue;
+                }
+                const Value& name = instruction.operands.front();
+                if (isNumericName(name.name) &&
+                    !globalOffsets_.contains(name.name)) {
+                    candidates.insert(name.name);
+                }
+            }
+        }
+
+        std::vector<Interval> intervals;
+        for (const std::string& name : candidates) {
+            std::size_t first = std::numeric_limits<std::size_t>::max();
+            std::size_t last = 0;
+            std::size_t position = 0;
+            for (const BasicBlock& block : function.blocks) {
+                for (const Instruction& instruction : block.instructions) {
+                    bool usesName = false;
+                    for (const Value& operand : instruction.operands) {
+                        if (operand.name == name) {
+                            usesName = true;
+                            break;
+                        }
+                    }
+                    if ((instruction.hasResult() &&
+                         instruction.result == name) ||
+                        (instruction.opcode == "store" &&
+                         !instruction.operands.empty() &&
+                         instruction.operands.front().name == name)) {
+                        usesName = true;
+                    }
+                    if (usesName) {
+                        first = std::min(first, position);
+                        last = std::max(last, position);
+                    }
+                    ++position;
+                }
+            }
+            if (first == std::numeric_limits<std::size_t>::max()) {
+                continue;
+            }
+            std::size_t scanPosition = 0;
+            bool clobbered = false;
+            for (const BasicBlock& block : function.blocks) {
+                for (const Instruction& instruction : block.instructions) {
+                    if (scanPosition >= first &&
+                        scanPosition <= last &&
+                        mayClobberXmmTemporaries(instruction)) {
+                        clobbered = true;
+                        break;
+                    }
+                    ++scanPosition;
+                }
+                if (clobbered) break;
+            }
+            if (clobbered) continue;
+            intervals.push_back({name, first, last});
+        }
+
+        std::sort(
+            intervals.begin(), intervals.end(),
+            [](const Interval& left, const Interval& right) {
+                return left.start < right.start ||
+                    (left.start == right.start && left.end < right.end);
+            });
+        constexpr std::uint8_t registers[] = {6, 7, 8, 9, 10, 11};
+        std::vector<ActiveInterval> active;
+        std::vector<std::uint8_t> freeRegisters(
+            std::begin(registers), std::end(registers));
+        for (const Interval& interval : intervals) {
+            for (std::size_t index = active.size(); index-- > 0;) {
+                if (active[index].end < interval.start) {
+                    freeRegisters.push_back(active[index].reg);
+                    active.erase(active.begin() +
+                                 static_cast<std::ptrdiff_t>(index));
+                }
+            }
+            if (freeRegisters.empty()) continue;
+            const std::uint8_t reg = freeRegisters.back();
+            freeRegisters.pop_back();
+            xmmRegisters_.insert_or_assign(interval.name, reg);
+            active.push_back({interval.end, reg});
+        }
+    }
+
+    void allocateTemporaryStackSlots(
+        const Function& function,
+        const zplus::ir::FunctionLiveness& liveness
+    ) {
+        if (usesManagedMemory_) return;
+
+        struct Interval {
+            std::string name;
+            std::size_t start = 0;
+            std::size_t end = 0;
+        };
+        struct ActiveInterval {
+            std::size_t end = 0;
+            std::size_t slot = 0;
+        };
+        std::unordered_map<std::string, std::size_t> colors;
+        std::size_t maximumSlots = 0;
+
+        for (std::size_t blockIndex = 0;
+             blockIndex < function.blocks.size();
+             ++blockIndex) {
+            const BasicBlock& block = function.blocks[blockIndex];
+            const auto& blockLiveness = liveness.blocks[blockIndex];
+            std::vector<Interval> intervals;
+            for (std::size_t instructionIndex = 0;
+                 instructionIndex < block.instructions.size();
+                 ++instructionIndex) {
+                const Instruction& instruction =
+                    block.instructions[instructionIndex];
+                if (!instruction.hasResult() ||
+                    !instruction.result.starts_with('%') ||
+                    xmmRegisters_.contains(instruction.result) ||
+                    blockLiveness.liveOut.contains(instruction.result) ||
+                    (instruction.resultType.kind != TypeKind::Number &&
+                     instruction.resultType.kind != TypeKind::Boolean)) {
+                    continue;
+                }
+                const auto type = valueTypes_.find(instruction.result);
+                if (type == valueTypes_.end() ||
+                    (type->second != "number" && type->second != "bool")) {
+                    continue;
+                }
+                std::size_t lastUse = instructionIndex;
+                bool localUsesOnly = true;
+                for (std::size_t otherBlock = 0;
+                     otherBlock < liveness.blocks.size();
+                     ++otherBlock) {
+                    const auto& other = liveness.blocks[otherBlock];
+                    if (otherBlock != blockIndex &&
+                        (other.liveIn.contains(instruction.result) ||
+                         other.liveOut.contains(instruction.result))) {
+                        localUsesOnly = false;
+                    }
+                    for (std::size_t useIndex = 0;
+                         useIndex < other.instructions.size();
+                         ++useIndex) {
+                        if (!other.instructions[useIndex].uses.contains(
+                                instruction.result)) {
+                            continue;
+                        }
+                        if (otherBlock != blockIndex ||
+                            useIndex < instructionIndex) {
+                            localUsesOnly = false;
+                        } else {
+                            lastUse = std::max(lastUse, useIndex);
+                        }
+                    }
+                }
+                if (localUsesOnly) {
+                    intervals.push_back({
+                        instruction.result, instructionIndex, lastUse});
+                }
+            }
+
+            std::sort(
+                intervals.begin(), intervals.end(),
+                [](const Interval& left, const Interval& right) {
+                    return left.start < right.start ||
+                        (left.start == right.start && left.end < right.end);
+                });
+            std::vector<ActiveInterval> active;
+            std::vector<std::size_t> freeSlots;
+            std::size_t nextSlot = 0;
+            for (const Interval& interval : intervals) {
+                for (std::size_t index = active.size(); index-- > 0;) {
+                    if (active[index].end < interval.start) {
+                        freeSlots.push_back(active[index].slot);
+                        active.erase(active.begin() +
+                                     static_cast<std::ptrdiff_t>(index));
+                    }
+                }
+                const std::size_t slotIndex = freeSlots.empty()
+                    ? nextSlot++
+                    : freeSlots.back();
+                if (!freeSlots.empty()) freeSlots.pop_back();
+                colors.insert_or_assign(interval.name, slotIndex);
+                active.push_back({interval.end, slotIndex});
+            }
+            maximumSlots = std::max(maximumSlots, nextSlot);
+        }
+
+        std::vector<std::int32_t> displacements;
+        displacements.reserve(maximumSlots);
+        for (std::size_t index = 0; index < maximumSlots; ++index) {
+            stackSize_ += 8;
+            displacements.push_back(-stackSize_);
+        }
+        for (const auto& [name, color] : colors) {
+            slots_.emplace(name, displacements[color]);
+        }
+    }
+
     void allocateSlot(const std::string& name) {
         if (name.empty() || slots_.contains(name)) return;
         stackSize_ += 8;
@@ -2419,7 +3123,8 @@ private:
             throw std::runtime_error("native backend: function has no name or entry block");
         }
         prepareFunction(function);
-        functionOffsets_[function.name] = code_.size();
+        const std::size_t functionBegin = code_.size();
+        functionOffsets_[function.name] = functionBegin;
         emit8(0x55);
         emit8(0x48); emit8(0x89); emit8(0xE5);
         if (stackSize_ > 0) {
@@ -2433,6 +3138,17 @@ private:
         movStoreZero(slot(kActiveHandlerSlot));
         for (const DeferredSite& site : deferredSites_) {
             movStoreZero(slot(site.flagSlot));
+        }
+        std::vector<SystemVArgumentLocation> systemVLocations;
+        if (!windowsAbi_) {
+            std::vector<bool> floatingPointParameters;
+            floatingPointParameters.reserve(function.parameters.size());
+            for (const Parameter& candidate : function.parameters) {
+                floatingPointParameters.push_back(
+                    isType(candidate.type, TypeKind::Number));
+            }
+            systemVLocations =
+                systemVArgumentLocations(floatingPointParameters);
         }
         for (std::size_t i = 0; i < function.parameters.size(); ++i) {
             const Parameter& parameter = function.parameters[i];
@@ -2450,30 +3166,29 @@ private:
                 }
                 movLoad(RAX, static_cast<std::int32_t>(displacement));
                 movStore(slot(function.parameters[i].name), RAX);
-            } else if (isType(parameter.type, TypeKind::Number)) {
-                std::size_t floatIndex = 0;
-                for (std::size_t previous = 0; previous < i; ++previous) {
-                    if (isType(function.parameters[previous].type, TypeKind::Number)) {
-                        ++floatIndex;
-                    }
-                }
-                if (floatIndex >= 8) {
-                    throw std::runtime_error(
-                        "native backend: more than eight floating-point parameters are unsupported");
-                }
-                xmmStore(slot(parameter.name), static_cast<std::uint8_t>(floatIndex));
             } else {
-                std::size_t integerIndex = 0;
-                for (std::size_t previous = 0; previous < i; ++previous) {
-                    if (!isType(function.parameters[previous].type, TypeKind::Number)) {
-                        ++integerIndex;
+                const auto& location = systemVLocations[i];
+                if (location.onStack) {
+                    const std::size_t displacement = 16 +
+                        location.stackIndex * sizeof(std::uint64_t);
+                    if (displacement > static_cast<std::size_t>(
+                            std::numeric_limits<std::int32_t>::max())) {
+                        throw std::runtime_error(
+                            "native backend: System V parameter area is too large");
                     }
+                    movLoad(RAX, static_cast<std::int32_t>(displacement));
+                    if (location.floatingPoint) {
+                        xmmMoveFromGpr(15, RAX);
+                        xmmStore(slot(parameter.name), 15);
+                    } else {
+                        movStore(slot(parameter.name), RAX);
+                    }
+                } else if (location.floatingPoint) {
+                    xmmStore(slot(parameter.name), location.registerIndex);
+                } else {
+                    movStore(slot(parameter.name),
+                             argumentRegisters()[location.registerIndex]);
                 }
-                if (integerIndex >= argumentRegisters().size()) {
-                    throw std::runtime_error(
-                        "native backend: more than six integer/pointer parameters are unsupported");
-                }
-                movStore(slot(parameter.name), argumentRegisters()[integerIndex]);
             }
         }
         if (usesManagedMemory_) {
@@ -2512,6 +3227,15 @@ private:
             }
             patchRelative(fixup.offset, found->second);
         }
+        if (windowsAbi_) {
+            image_.unwindFunctions.push_back({
+                functionBegin,
+                code_.size(),
+                static_cast<std::uint32_t>(stackSize_),
+                11,
+                true
+            });
+        }
         branchFixups_.clear();
         localLabels_.clear();
     }
@@ -2531,7 +3255,8 @@ private:
             throw std::runtime_error("native entry function must return number, boolean, or void");
         }
 
-        entryOffset_ = code_.size();
+        const std::size_t entryStubBegin = code_.size();
+        entryOffset_ = entryStubBegin;
         const std::string uncaughtLabel = "__zp_uncaught_native_exception";
         const std::string entryDoneLabel = "__zp_entry_done";
         if (windowsAbi_) {
@@ -2595,8 +3320,24 @@ private:
             }
             emitImportCall("ExitProcess");
             emit8(0x0F); emit8(0x0B);
+            const std::size_t writeHelperBegin = code_.size();
+            image_.unwindFunctions.push_back({
+                entryStubBegin,
+                writeHelperBegin,
+                40,
+                4,
+                false
+            });
             functionOffsets_["__zp_write"] = code_.size();
+            const std::size_t helperStart = code_.size();
             emitWriteHelperWindows();
+            image_.unwindFunctions.push_back({
+                helperStart,
+                code_.size(),
+                64,
+                8,
+                true
+            });
         } else {
             if (usesInputRuntime_) {
                 leaRip(RDI, globalOffsets_.at(kPendingExceptionGlobal));
@@ -2759,7 +3500,9 @@ private:
     MachineCode data_;
     NativeImage image_;
     std::unordered_map<std::string, std::int32_t> slots_;
+    std::unordered_map<std::string, std::uint8_t> xmmRegisters_;
     std::unordered_set<std::string> stringSlots_;
+    std::unordered_set<std::string> dynamicValues_;
     std::unordered_map<std::string, std::string> valueTypes_;
     std::unordered_map<std::string, std::string> globalTypes_;
     std::unordered_map<std::string, std::size_t> temporaryUseCounts_;
@@ -2788,14 +3531,9 @@ private:
 } // namespace
 
 NativeImage generateX64(const zplus::ir::Module& module, bool windowsAbi) {
-    const auto diagnostics = zplus::ir::verifyModule(module);
-    if (!diagnostics.empty()) {
-        const auto& diagnostic = diagnostics.front();
-        throw std::runtime_error(
-            "native backend: invalid IR (" + diagnostic.code + "): " +
-            diagnostic.message);
-    }
-    return CodeGenerator(module, windowsAbi).generate();
+    Module optimizedModule = module;
+    zplus::ir::optimizeModule(optimizedModule);
+    return CodeGenerator(optimizedModule, windowsAbi).generate();
 }
 
 } // namespace zplus::backend::native

@@ -17,10 +17,12 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <exception>
+#include <cstdint>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -637,6 +639,35 @@ static double toNumber(
     }
 
     return 0.0;
+}
+
+static std::int64_t toBitwiseInteger(const RuntimeValue& value) {
+    const double number = toNumber(value);
+    constexpr double minimum =
+        static_cast<double>(std::numeric_limits<std::int64_t>::min());
+    constexpr double limit = -minimum;
+    if (!std::isfinite(number) || number < minimum || number >= limit) {
+        return std::numeric_limits<std::int64_t>::min();
+    }
+    return static_cast<std::int64_t>(number);
+}
+
+static std::int64_t applyBitwise(
+    const std::string& opcode,
+    std::int64_t left,
+    std::int64_t right
+) {
+    if (opcode == "bitand" || opcode == "and_assign") return left & right;
+    if (opcode == "bitor" || opcode == "or_assign") return left | right;
+    if (opcode == "bitxor" || opcode == "xor_assign") return left ^ right;
+
+    const unsigned shift =
+        static_cast<unsigned>(static_cast<std::uint64_t>(right) & 63U);
+    if (opcode == "shl" || opcode == "shl_assign") {
+        const std::uint64_t bits = std::bit_cast<std::uint64_t>(left) << shift;
+        return std::bit_cast<std::int64_t>(bits);
+    }
+    return left >> shift;
 }
 
 
@@ -3757,49 +3788,14 @@ static ExecutionResult executeFunction(
             op == "shr"
         ) {
 
-            const long long left =
-                static_cast<long long>(
-                    toNumber(
-                        resolveValue(
-                            instruction.operands.at(0),
-                            environment
-                        )
-                    )
-                );
-
-            const long long right =
-                static_cast<long long>(
-                    toNumber(
-                        resolveValue(
-                            instruction.operands.at(1),
-                            environment
-                        )
-                    )
-                );
-
-
-            long long value = 0;
-
-
-            if (op == "bitand")
-                value = left & right;
-
-            else if (op == "bitor")
-                value = left | right;
-
-            else if (op == "bitxor")
-                value = left ^ right;
-
-            else if (op == "shl")
-                value = left << right;
-
-            else
-                value = left >> right;
-
-
             storeResult(
                 instruction,
-                static_cast<double>(value),
+                static_cast<double>(applyBitwise(
+                    op,
+                    toBitwiseInteger(resolveValue(
+                        instruction.operands.at(0), environment)),
+                    toBitwiseInteger(resolveValue(
+                        instruction.operands.at(1), environment)))),
                 environment
             );
 
@@ -3880,21 +3876,12 @@ static ExecutionResult executeFunction(
 
         if (op == "bitnot") {
 
-            const long long value =
-                static_cast<long long>(
-                    toNumber(
-                        resolveValue(
-                            instruction.operands.at(0),
-                            environment
-                        )
-                    )
-                );
+            const std::int64_t value = toBitwiseInteger(resolveValue(
+                instruction.operands.at(0), environment));
 
             storeResult(
                 instruction,
-                static_cast<double>(
-                    ~value
-                ),
+                static_cast<double>(~value),
                 environment
             );
 
@@ -4117,50 +4104,15 @@ static ExecutionResult executeFunction(
             op == "shr_assign"
         ) {
 
-            const long long left =
-                static_cast<long long>(
-                    toNumber(
-                        resolveValue(
-                            instruction.operands.at(0),
-                            environment
-                        )
-                    )
-                );
-
-            const long long right =
-                static_cast<long long>(
-                    toNumber(
-                        resolveValue(
-                            instruction.operands.at(1),
-                            environment
-                        )
-                    )
-                );
-
-
-            long long value = 0;
-
-
-            if (op == "and_assign")
-                value = left & right;
-
-            else if (op == "or_assign")
-                value = left | right;
-
-            else if (op == "xor_assign")
-                value = left ^ right;
-
-            else if (op == "shl_assign")
-                value = left << right;
-
-            else
-                value = left >> right;
-
-
             storeVariable(
                 environment,
                 instruction.operands[0],
-                static_cast<double>(value)
+                static_cast<double>(applyBitwise(
+                    op,
+                    toBitwiseInteger(resolveValue(
+                        instruction.operands.at(0), environment)),
+                    toBitwiseInteger(resolveValue(
+                        instruction.operands.at(1), environment))))
             );
 
             ++ip;

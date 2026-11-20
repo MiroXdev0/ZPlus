@@ -1,0 +1,15 @@
+start {
+    fn remainder(left: number, right: number): number {
+        return left % right
+    } end fn
+
+    say(remainder(7.5, 2.0))
+    say(remainder(-7.5, 2.0))
+    say(remainder(7.5, -2.0))
+    say(remainder(-7.5, -2.0))
+    say(remainder(1e100, 3.0))
+
+    let assigned: number = -7.5
+    assigned %= 2.0
+    say(assigned)
+} stop

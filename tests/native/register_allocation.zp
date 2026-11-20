@@ -1,0 +1,23 @@
+start {
+    fn pressure(value: number): number {
+        return (value + 1) * (value + 2) + (value + 2) * (value + 3) + (value + 3) * (value + 4) + (value + 4) * (value + 5) + (value + 5) * (value + 6) + (value + 6) * (value + 7) + (value + 7) * (value + 8) + (value + 8) * (value + 9)
+    } end fn
+
+    fn recursive(value: number, depth: number): number {
+        if depth == 0 {
+            return pressure(value)
+        } end if
+        return recursive(value + 1, depth - 1) + pressure(value)
+    } end fn
+
+    let checksum: number = 0
+    for (let i: number = 0; i < 100; i++) {
+        checksum += recursive(i % 7, 3)
+    } end for
+
+    if checksum == 318720 {
+        say("CHECKSUM register_allocation 318720")
+    } else {
+        say("CHECKSUM_ERROR register_allocation")
+    } end if
+} stop

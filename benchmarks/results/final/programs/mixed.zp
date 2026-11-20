@@ -1,0 +1,16 @@
+start {
+    let iterations: number = 10000 // BENCH_ITERATIONS
+    let expected: number = 155000 // BENCH_EXPECTED
+    let checksum: number = 0
+
+    for (let i: number = 0; i < iterations; i++) {
+        let value: number = i % 10 + 0.5
+        checksum += (value * 1.5 + 0.25) * 2
+    } end for
+
+    if checksum == expected {
+        say("CHECKSUM mixed 155000")
+    } else {
+        say("CHECKSUM_ERROR mixed")
+    } end if
+} stop

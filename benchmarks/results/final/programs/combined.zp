@@ -1,0 +1,24 @@
+start {
+    fn transform(value: number): number {
+        return (value * 7 + 11) % 103
+    } end fn
+
+    let iterations: number = 50000 // BENCH_ITERATIONS
+    let expected: number = 3034241 // BENCH_EXPECTED
+    let checksum: number = 0
+
+    for (let i: number = 0; i < iterations; i++) {
+        let value: number = transform(i % 1000)
+        if i % 3 == 0 {
+            checksum += value * 2
+        } else {
+            checksum += (value + i % 17) % 89
+        } end if
+    } end for
+
+    if checksum == expected {
+        say("CHECKSUM combined 3034241")
+    } else {
+        say("CHECKSUM_ERROR combined")
+    } end if
+} stop

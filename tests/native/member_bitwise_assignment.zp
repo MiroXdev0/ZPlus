@@ -1,0 +1,12 @@
+start {
+    struct Flags {
+        value: number
+    } end struct
+
+    let flags = Flags(1)
+    flags.value |= 2
+    flags.value ^= 1
+    flags.value <<= 2
+    flags.value >>= 1
+    say(flags.value)
+} stop

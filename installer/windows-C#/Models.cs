@@ -83,7 +83,7 @@ internal sealed record ValidatedInstallLocation(
 internal static class PackageInfo
 {
     public const string Product = "Z+";
-    public const string Version = "1.1.2";
+    public const string Version = "1.3.3";
     public const string Attribution = "Build by Miroslav Aleksandrov";
     public const string ManifestFileName = "payload-manifest.json";
     public const string PayloadDirectoryName = "payload";

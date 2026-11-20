@@ -13,11 +13,11 @@ constexpr std::uint32_t kTextRva = 0x1000;
 constexpr std::uint32_t kFileAlignment = 0x200;
 constexpr std::uint32_t kSectionAlignment = 0x1000;
 constexpr std::uint64_t kImageBase = 0x140000000ULL;
-constexpr std::size_t kHeaderSize = 0x200;
 constexpr std::size_t kDosHeaderSize = 0x80;
 constexpr std::size_t kOptionalHeaderSize = 0xF0;
 constexpr std::size_t kSectionHeaderSize = 40;
 constexpr std::uint32_t kImportDirectoryIndex = 1;
+constexpr std::uint32_t kExceptionDirectoryIndex = 3;
 constexpr std::uint32_t kIatDirectoryIndex = 12;
 
 void put16(std::vector<std::uint8_t>& bytes, std::size_t offset, std::uint16_t value) {
@@ -101,6 +101,125 @@ void setSection(
     put16(output, offset + 32, 0);
     put16(output, offset + 34, 0);
     put32(output, offset + 36, characteristics);
+}
+
+void appendUnwindCode(
+    std::vector<std::uint8_t>& codes,
+    std::uint8_t codeOffset,
+    std::uint8_t operation,
+    std::uint8_t operationInfo
+) {
+    codes.push_back(codeOffset);
+    codes.push_back(static_cast<std::uint8_t>((operationInfo << 4) | operation));
+}
+
+std::vector<std::uint8_t> makeUnwindInfo(
+    const NativeImage::UnwindFunction& function
+) {
+    if (function.stackAllocationSize % 8 != 0) {
+        throw std::runtime_error(
+            "PE writer: unwind stack allocation must be a multiple of eight bytes");
+    }
+    if (function.framePointer && function.prologueSize < 4) {
+        throw std::runtime_error(
+            "PE writer: frame-pointer unwind data requires a complete frame-pointer prologue");
+    }
+
+    std::vector<std::uint8_t> codes;
+    if (function.stackAllocationSize != 0) {
+        if (function.stackAllocationSize <= 128) {
+            const auto operationInfo = static_cast<std::uint8_t>(
+                (function.stackAllocationSize - 8) / 8);
+            appendUnwindCode(codes, function.prologueSize, 2, operationInfo);
+        } else if (function.stackAllocationSize <= 0x7FFF8) {
+            appendUnwindCode(codes, function.prologueSize, 1, 0);
+            codes.push_back(static_cast<std::uint8_t>(
+                (function.stackAllocationSize / 8) & 0xFF));
+            codes.push_back(static_cast<std::uint8_t>(
+                (function.stackAllocationSize / 8) >> 8));
+        } else {
+            appendUnwindCode(codes, function.prologueSize, 1, 1);
+            for (unsigned shift : {0U, 16U}) {
+                codes.push_back(static_cast<std::uint8_t>(
+                    function.stackAllocationSize >> shift));
+                codes.push_back(static_cast<std::uint8_t>(
+                    function.stackAllocationSize >> (shift + 8)));
+            }
+        }
+    }
+    if (function.framePointer) {
+        appendUnwindCode(codes, 4, 3, 0); // UWOP_SET_FPREG (RBP)
+        appendUnwindCode(codes, 1, 0, 5); // UWOP_PUSH_NONVOL (RBP)
+    }
+
+    const std::size_t codeSlots = codes.size() / 2;
+    if (codeSlots > std::numeric_limits<std::uint8_t>::max()) {
+        throw std::runtime_error("PE writer: too many unwind codes");
+    }
+    std::vector<std::uint8_t> info{
+        1,
+        function.prologueSize,
+        static_cast<std::uint8_t>(codeSlots),
+        static_cast<std::uint8_t>(function.framePointer ? 5 : 0)
+    };
+    info.insert(info.end(), codes.begin(), codes.end());
+    if (codeSlots % 2 != 0) {
+        info.push_back(0);
+        info.push_back(0);
+    }
+    while (info.size() % 4 != 0) info.push_back(0);
+    return info;
+}
+
+struct UnwindSections {
+    std::vector<std::uint8_t> functionTable;
+    std::vector<std::uint8_t> unwindRecords;
+};
+
+UnwindSections makeUnwindSections(
+    const NativeImage& image,
+    std::uint32_t xdataRva
+) {
+    std::vector<NativeImage::UnwindFunction> functions = image.unwindFunctions;
+    std::sort(functions.begin(), functions.end(),
+              [](const auto& left, const auto& right) {
+                  return left.beginOffset < right.beginOffset;
+              });
+    if (functions.size() >
+        std::numeric_limits<std::uint32_t>::max() / 12) {
+        throw std::runtime_error("PE writer: too many unwind function entries");
+    }
+
+    UnwindSections sections;
+    sections.functionTable.resize(functions.size() * 12, 0);
+    std::size_t previousEnd = 0;
+    for (std::size_t index = 0; index < functions.size(); ++index) {
+        const auto& function = functions[index];
+        if (function.beginOffset >= function.endOffset ||
+            function.endOffset > image.code.size() ||
+            function.prologueSize > function.endOffset - function.beginOffset ||
+            (index != 0 && function.beginOffset < previousEnd)) {
+            throw std::runtime_error("PE writer: invalid or overlapping unwind function range");
+        }
+        previousEnd = function.endOffset;
+
+        const std::size_t beginRva =
+            static_cast<std::size_t>(kTextRva) + function.beginOffset;
+        const std::size_t endRva =
+            static_cast<std::size_t>(kTextRva) + function.endOffset;
+        const std::uint32_t unwindRva = checkedRva(
+            static_cast<std::size_t>(xdataRva) +
+            sections.unwindRecords.size());
+        const std::size_t entryOffset = index * 12;
+        put32(sections.functionTable, entryOffset, checkedRva(beginRva));
+        put32(sections.functionTable, entryOffset + 4, checkedRva(endRva));
+        put32(sections.functionTable, entryOffset + 8, unwindRva);
+
+        const auto info = makeUnwindInfo(function);
+        sections.unwindRecords.insert(
+            sections.unwindRecords.end(), info.begin(), info.end());
+    }
+    return sections;
 }
 
 } // namespace
@@ -203,16 +322,55 @@ std::vector<std::uint8_t> writePE(const NativeImage& image, bool windowsGui) {
         ++importIndex;
     }
 
+    const bool hasUnwindInfo = !image.unwindFunctions.empty();
+    const std::uint32_t pdataRva = hasUnwindInfo
+        ? checkedRva(alignTo(
+              static_cast<std::size_t>(dataRva) + data.size(), kSectionAlignment))
+        : 0;
+    const std::uint32_t xdataRva = hasUnwindInfo
+        ? checkedRva(alignTo(
+              static_cast<std::size_t>(pdataRva) +
+                  image.unwindFunctions.size() * 12,
+              kSectionAlignment))
+        : 0;
+    const UnwindSections unwindSections = hasUnwindInfo
+        ? makeUnwindSections(image, xdataRva)
+        : UnwindSections{};
+    const std::size_t sectionCount = hasUnwindInfo ? 4 : 2;
+    const std::size_t sectionTableOffset =
+        kDosHeaderSize + 4 + 20 + kOptionalHeaderSize;
+    const std::uint32_t headersSize = checkedRva(alignTo(
+        sectionTableOffset + sectionCount * kSectionHeaderSize,
+        kFileAlignment));
     const std::uint32_t textRawSize = checkedRva(alignTo(image.code.size(), kFileAlignment));
     const std::uint32_t dataRawSize = checkedRva(alignTo(data.size(), kFileAlignment));
-    const std::uint32_t dataRawOffset = checkedRva(kHeaderSize + textRawSize);
-    const std::uint32_t imageSize = checkedRva(alignTo(
-        static_cast<std::size_t>(dataRva) + data.size(), kSectionAlignment));
+    const std::uint32_t textRawOffset = headersSize;
+    const std::uint32_t dataRawOffset =
+        checkedRva(static_cast<std::size_t>(textRawOffset) + textRawSize);
+    const std::uint32_t pdataRawSize = hasUnwindInfo
+        ? checkedRva(alignTo(unwindSections.functionTable.size(), kFileAlignment))
+        : 0;
+    const std::uint32_t pdataRawOffset = checkedRva(
+        static_cast<std::size_t>(dataRawOffset) + dataRawSize);
+    const std::uint32_t xdataRawSize = hasUnwindInfo
+        ? checkedRva(alignTo(unwindSections.unwindRecords.size(), kFileAlignment))
+        : 0;
+    const std::uint32_t xdataRawOffset = checkedRva(
+        static_cast<std::size_t>(pdataRawOffset) + pdataRawSize);
+    const std::size_t imageEnd = hasUnwindInfo
+        ? static_cast<std::size_t>(xdataRva) +
+              unwindSections.unwindRecords.size()
+        : static_cast<std::size_t>(dataRva) + data.size();
+    const std::uint32_t imageSize =
+        checkedRva(alignTo(imageEnd, kSectionAlignment));
     if (image.entryOffset > std::numeric_limits<std::uint32_t>::max() - kTextRva) {
         throw std::runtime_error("PE writer: entry point is out of range");
     }
 
-    std::vector<std::uint8_t> output(static_cast<std::size_t>(dataRawOffset) + dataRawSize, 0);
+    const std::size_t outputSize = hasUnwindInfo
+        ? static_cast<std::size_t>(xdataRawOffset) + xdataRawSize
+        : static_cast<std::size_t>(dataRawOffset) + dataRawSize;
+    std::vector<std::uint8_t> output(outputSize, 0);
     output[0] = 'M';
     output[1] = 'Z';
     put32(output, 0x3C, static_cast<std::uint32_t>(kDosHeaderSize));
@@ -220,7 +378,7 @@ std::vector<std::uint8_t> writePE(const NativeImage& image, bool windowsGui) {
     output[kDosHeaderSize + 1] = 'E';
     const std::size_t coff = kDosHeaderSize + 4;
     put16(output, coff, 0x8664);
-    put16(output, coff + 2, 2);
+    put16(output, coff + 2, static_cast<std::uint16_t>(sectionCount));
     put32(output, coff + 4, 0);
     put32(output, coff + 8, 0);
     put32(output, coff + 12, 0);
@@ -231,7 +389,11 @@ std::vector<std::uint8_t> writePE(const NativeImage& image, bool windowsGui) {
     put16(output, optional, 0x20B);
     output[optional + 2] = 1;
     put32(output, optional + 4, textRawSize);
-    put32(output, optional + 8, dataRawSize);
+    put32(output, optional + 8, checkedRva(
+        static_cast<std::size_t>(dataRawSize) +
+        (hasUnwindInfo
+             ? static_cast<std::size_t>(pdataRawSize) + xdataRawSize
+             : 0)));
     put32(output, optional + 12, 0);
     put32(output, optional + 16, kTextRva + static_cast<std::uint32_t>(image.entryOffset));
     put32(output, optional + 20, kTextRva);
@@ -246,7 +408,7 @@ std::vector<std::uint8_t> writePE(const NativeImage& image, bool windowsGui) {
     put16(output, optional + 50, 0);
     put32(output, optional + 52, 0);
     put32(output, optional + 56, imageSize);
-    put32(output, optional + 60, static_cast<std::uint32_t>(kHeaderSize));
+    put32(output, optional + 60, headersSize);
     put32(output, optional + 64, 0);
     put16(output, optional + 68, windowsGui ? 2 : 3);
     put16(output, optional + 70, 0x8100);
@@ -267,15 +429,36 @@ std::vector<std::uint8_t> writePE(const NativeImage& image, bool windowsGui) {
     put32(output, directories + kIatDirectoryIndex * 8, iatRva);
     put32(output, directories + kIatDirectoryIndex * 8 + 4,
           checkedRva(thunkCount * sizeof(std::uint64_t)));
+    if (hasUnwindInfo) {
+        put32(output, directories + kExceptionDirectoryIndex * 8, pdataRva);
+        put32(output, directories + kExceptionDirectoryIndex * 8 + 4,
+              checkedRva(image.unwindFunctions.size() * 12));
+    }
 
     const std::size_t sectionTable = optional + kOptionalHeaderSize;
     setSection(output, sectionTable, ".text", checkedRva(image.code.size()), kTextRva,
-               textRawSize, static_cast<std::uint32_t>(kHeaderSize), 0x60000020);
+               textRawSize, textRawOffset, 0x60000020);
     setSection(output, sectionTable + kSectionHeaderSize, ".data", checkedRva(data.size()),
                dataRva, dataRawSize, dataRawOffset, 0xC0000040);
+    if (hasUnwindInfo) {
+        setSection(output, sectionTable + 2 * kSectionHeaderSize, ".pdata",
+                   checkedRva(unwindSections.functionTable.size()), pdataRva,
+                   pdataRawSize, pdataRawOffset, 0x40000040);
+        setSection(output, sectionTable + 3 * kSectionHeaderSize, ".xdata",
+                   checkedRva(unwindSections.unwindRecords.size()), xdataRva,
+                   xdataRawSize, xdataRawOffset, 0x40000040);
+    }
 
-    std::copy(image.code.begin(), image.code.end(), output.begin() + kHeaderSize);
+    std::copy(image.code.begin(), image.code.end(), output.begin() + textRawOffset);
     std::copy(data.begin(), data.end(), output.begin() + dataRawOffset);
+    if (hasUnwindInfo) {
+        std::copy(unwindSections.functionTable.begin(),
+                  unwindSections.functionTable.end(),
+                  output.begin() + pdataRawOffset);
+        std::copy(unwindSections.unwindRecords.begin(),
+                  unwindSections.unwindRecords.end(),
+                  output.begin() + xdataRawOffset);
+    }
 
     for (const auto& fixup : image.dataFixups) {
         if (fixup.displacementOffset > image.code.size() ||
@@ -292,7 +475,8 @@ std::vector<std::uint8_t> writePE(const NativeImage& image, bool windowsGui) {
             delta > std::numeric_limits<std::int32_t>::max()) {
             throw std::runtime_error("PE writer: code-to-data reference is out of range");
         }
-        put32(output, kHeaderSize + fixup.displacementOffset, static_cast<std::uint32_t>(delta));
+        put32(output, textRawOffset + fixup.displacementOffset,
+              static_cast<std::uint32_t>(delta));
     }
 
     for (const auto& fixup : image.importFixups) {
@@ -310,7 +494,8 @@ std::vector<std::uint8_t> writePE(const NativeImage& image, bool windowsGui) {
             delta > std::numeric_limits<std::int32_t>::max()) {
             throw std::runtime_error("PE writer: import reference is out of range");
         }
-        put32(output, kHeaderSize + fixup.displacementOffset, static_cast<std::uint32_t>(delta));
+        put32(output, textRawOffset + fixup.displacementOffset,
+              static_cast<std::uint32_t>(delta));
     }
 
     return output;

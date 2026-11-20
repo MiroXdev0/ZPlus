@@ -124,12 +124,25 @@ run_check("tests/compiler/generics_smoke.zp")
 run_check("tests/compiler/generic_collections.zp")
 run_success("tests/compiler/generics_smoke.zp" "${generic_output}")
 run_success("tests/compiler/generic_collections.zp" "${collection_output}")
+run_success("tests/compiler/explicit_generic_empty_array.zp" "0\n")
 expect_check_error(
     "tests/compiler/invalid_generic_call.zp"
     "conflicts with parameter type|does not satisfy constraints|cannot infer generic type parameter")
 expect_check_error(
     "tests/compiler/invalid_generic_call.zp"
     "constructor argument for field 1 of 'Box'.*expected 'number'")
+expect_check_error(
+    "tests/compiler/unknown_parameter_boundary.zp"
+    "argument 1 has type 'unknown', expected 'number'")
+expect_check_error(
+    "tests/compiler/unknown_return_boundary.zp"
+    "returns 'number' but this return provides 'unknown'")
+expect_check_error(
+    "tests/compiler/unknown_assignment_boundary.zp"
+    "cannot assign 'unknown' to 'number'")
+expect_check_error(
+    "tests/compiler/unknown_generic_call.zp"
+    "generic argument 1 has type 'unknown'")
 expect_check_error(
     "tests/compiler/recursive_generic_specialization.zp"
     "recursive generic specialization.*expands its type arguments")

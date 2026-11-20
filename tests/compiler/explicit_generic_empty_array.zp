@@ -1,0 +1,7 @@
+start {
+    fn size<T>(values: T[]) -> number {
+        return length(values)
+    } end fn
+
+    say(size<number>([]))
+} stop

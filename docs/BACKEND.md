@@ -12,8 +12,11 @@ Semantic analysis resolves source expressions and declarations to the shared
 compiler `Type` representation. The generated IR carries those types on
 function signatures, parameters, values, fields, and instruction results.
 Before interpretation or native generation, the compiler verifies function
-calls, return values, result types, and branch targets. Invalid IR is reported
-as an `E4001` compiler diagnostic rather than being passed to a backend.
+calls, return values, result types, and branch targets. A resolved `unknown`
+result marks a dynamic interpreter value; the native backend rejects
+operations on such values when it cannot preserve their runtime behavior.
+Invalid IR is reported as an `E4001` compiler diagnostic rather than being
+passed to a backend.
 
 Builtin signatures, generic argument patterns, arity rules, and execution
 availability are registered together during semantic analysis. The registry
@@ -26,6 +29,54 @@ reused, and expanding recursive specializations are rejected. The verifier
 sees only concrete executable functions and record layouts. The interpreter
 and Windows x64 backend consume the same specialized IR. Linux native
 execution is not claimed by this generic support.
+
+## Native ABI and platform support
+
+Windows x64 calls use the four positional argument registers, 32-byte shadow
+space, and stack arguments required by the Windows ABI. Generated PE files
+include sorted `.pdata` function entries and `UNWIND_INFO` for generated
+functions, the entry stub, and the native output helper. The Windows native
+ABI test registers the table with the OS, executes nested generated calls,
+exercises `RtlVirtualUnwind`, and verifies an OS exception unwinds across
+generated frames. Z+ language exceptions continue to use their existing
+runtime dispatch.
+
+Linux x86-64 calls use the System V AMD64 ABI: integer/pointer and floating
+arguments use their independent register sequences, overflow arguments are
+placed in aligned caller stack space, and generated functions load incoming
+stack arguments from the ABI-defined locations. This applies to generated
+calls, deferred calls, and supported runtime imports.
+
+Native Linux imports are currently limited to the audio, physics, and input
+runtime libraries. Managed arrays and structs, garbage-collected memory,
+graphics and string runtime operations, and the JSON, HTTP, web, SQLite, and
+other Windows-only standard-library runtimes require the Windows x64 runtime
+and are rejected by Linux native code generation. Linux native numeric
+`say`/`print` formatting is also unsupported; string and boolean output are
+available. These limits are intentional until compatible Linux runtimes exist.
+
+## IR optimization and native temporary allocation
+
+Native code generation verifies and optimizes a copy of the IR; interpreter
+execution continues to use the original module. The current pipeline includes
+constant propagation and folding, unreachable-block elimination, safe local
+common-subexpression and dead-code elimination, unary-plus simplification, and
+same-destination conditional-branch simplification. Potentially throwing or
+effectful operations are retained, and transformed modules are verified.
+
+Liveness analysis computes block and instruction live sets over control-flow
+and exception-handler edges. Native temporary allocation is deliberately
+limited to short-lived, block-local numeric values in volatile XMM registers,
+with other values spilled to stack slots. Block-local number and boolean spill
+slots may be reused when the function does not use managed memory. Managed
+references are not allocated to XMM registers or reused stack slots.
+
+This is not a general-purpose register allocator: general-purpose registers,
+values live across blocks or calls, callee-saved register allocation, and
+garbage-collector stack maps are not implemented. SIMD, general strength
+reduction, and redundant conversion elimination are also not implemented;
+the IR has no explicit conversion instruction, and Z+ numbers retain floating
+point semantics.
 
 ## Modules
 
@@ -346,13 +397,14 @@ parsing, persistent connections, supported methods, concurrent clients,
 timeouts, request limits, routing/query helpers, CORS, SQLite parameter
 binding and transactions, and interpreter/native Windows execution. Linux
 interpreter support is implemented in the POSIX socket and dynamic SQLite
-paths but was not validated in this Windows environment. Native Linux
-executables cannot currently import runtime functions; native backend support
-for these modules is Windows x64 only.
+paths but was not validated in this Windows environment. Linux native runtime
+imports are limited to audio, physics, and input; the backend runtime features
+described above remain Windows x64 only.
 
 The framework feature smoke test runs through both the interpreter and
 Windows x64 native backend. Runtime tests additionally cover binary multipart
 and HTTP bodies, upload path confinement, sessions, template rendering,
 middleware order, and static index responses. HTTPS/TLS, HTTP/2/3, chunked
 request decoding, callback-based route/middleware dispatch, concurrent Z+
-handler execution, and native Linux runtime imports remain unsupported.
+handler execution, and native Linux imports for these HTTP, web, SQLite, and
+managed-memory features remain unsupported.

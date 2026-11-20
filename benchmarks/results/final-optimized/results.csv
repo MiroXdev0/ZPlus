@@ -1,0 +1,981 @@
+workload,mode,run_type,run_index,duration_ns,status,checksum,expected_checksum,detail,stdout,stderr
+arithmetic,native,compile,1,53322300,success,,2399670,,"built: C:\Users\miros\OneDrive\Desktop\Projects\Z+ compiler\benchmarks\results\final-optimized\native\arithmetic.exe
+",
+arithmetic,interpreter,preflight,0,276160300,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,preflight,0,208087800,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,preflight,0,96646400,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,cpp_O2,preflight,0,77068200,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+STEADY_NS 427900
+",
+arithmetic,cpp_O3,preflight,0,79587400,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+STEADY_NS 532200
+",
+arithmetic,interpreter,warmup,1,321178400,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,interpreter,warmup,2,354855000,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,interpreter,measurement,1,283560300,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,interpreter,measurement,2,276645100,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,interpreter,measurement,3,285749900,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,interpreter,measurement,4,319188800,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,interpreter,measurement,5,329616400,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,warmup,1,31936100,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,warmup,2,34386900,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,measurement,1,29158500,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,measurement,2,31697400,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,measurement,3,29564600,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,measurement,4,27931800,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,native,measurement,5,31197600,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,warmup,1,94169300,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,warmup,2,87401500,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,measurement,1,90068400,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,measurement,2,81709300,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,measurement,3,84193000,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,measurement,4,85619600,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,python,measurement,5,83251800,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+",
+arithmetic,cpp_O2,warmup,1,29315300,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+STEADY_NS 549800
+",
+arithmetic,cpp_O2,warmup,2,26467900,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+STEADY_NS 409000
+",
+arithmetic,cpp_O2,measurement,1,26907700,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+STEADY_NS 416600
+",
+arithmetic,cpp_O2,measurement,2,30849200,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+STEADY_NS 511500
+",
+arithmetic,cpp_O2,measurement,3,27918300,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+STEADY_NS 499600
+",
+arithmetic,cpp_O2,measurement,4,30682600,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+STEADY_NS 409000
+",
+arithmetic,cpp_O2,measurement,5,29517200,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+STEADY_NS 411700
+",
+arithmetic,cpp_O3,warmup,1,26188200,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+STEADY_NS 413600
+",
+arithmetic,cpp_O3,warmup,2,27718200,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+STEADY_NS 409200
+",
+arithmetic,cpp_O3,measurement,1,26835200,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+STEADY_NS 410000
+",
+arithmetic,cpp_O3,measurement,2,33301100,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+STEADY_NS 527300
+",
+arithmetic,cpp_O3,measurement,3,30750700,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+STEADY_NS 409600
+",
+arithmetic,cpp_O3,measurement,4,30490400,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+STEADY_NS 447400
+",
+arithmetic,cpp_O3,measurement,5,29269900,passed,2399670,2399670,,"CHECKSUM arithmetic 2399670
+STEADY_NS 409500
+",
+mixed,native,compile,1,62400200,success,,155000,,"built: C:\Users\miros\OneDrive\Desktop\Projects\Z+ compiler\benchmarks\results\final-optimized\native\mixed.exe
+",
+mixed,interpreter,preflight,0,112839800,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,native,preflight,0,186710000,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,python,preflight,0,87712400,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,cpp_O2,preflight,0,31095200,passed,155000,155000,,"CHECKSUM mixed 155000
+STEADY_NS 69500
+",
+mixed,cpp_O3,preflight,0,33926400,passed,155000,155000,,"CHECKSUM mixed 155000
+STEADY_NS 68800
+",
+mixed,interpreter,warmup,1,88315600,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,interpreter,warmup,2,87159000,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,interpreter,measurement,1,97606100,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,interpreter,measurement,2,108251000,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,interpreter,measurement,3,108520200,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,interpreter,measurement,4,99109200,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,interpreter,measurement,5,81535400,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,native,warmup,1,29595200,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,native,warmup,2,34405700,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,native,measurement,1,36520200,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,native,measurement,2,35599300,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,native,measurement,3,29921900,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,native,measurement,4,26361900,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,native,measurement,5,27429800,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,python,warmup,1,64678200,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,python,warmup,2,63507300,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,python,measurement,1,63814700,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,python,measurement,2,61335800,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,python,measurement,3,65286500,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,python,measurement,4,62178000,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,python,measurement,5,66249800,passed,155000,155000,,"CHECKSUM mixed 155000
+",
+mixed,cpp_O2,warmup,1,31848300,passed,155000,155000,,"CHECKSUM mixed 155000
+STEADY_NS 68900
+",
+mixed,cpp_O2,warmup,2,26562200,passed,155000,155000,,"CHECKSUM mixed 155000
+STEADY_NS 68900
+",
+mixed,cpp_O2,measurement,1,28150600,passed,155000,155000,,"CHECKSUM mixed 155000
+STEADY_NS 69900
+",
+mixed,cpp_O2,measurement,2,23939000,passed,155000,155000,,"CHECKSUM mixed 155000
+STEADY_NS 68900
+",
+mixed,cpp_O2,measurement,3,27511100,passed,155000,155000,,"CHECKSUM mixed 155000
+STEADY_NS 68900
+",
+mixed,cpp_O2,measurement,4,28500400,passed,155000,155000,,"CHECKSUM mixed 155000
+STEADY_NS 68900
+",
+mixed,cpp_O2,measurement,5,24005200,passed,155000,155000,,"CHECKSUM mixed 155000
+STEADY_NS 69900
+",
+mixed,cpp_O3,warmup,1,25185400,passed,155000,155000,,"CHECKSUM mixed 155000
+STEADY_NS 68800
+",
+mixed,cpp_O3,warmup,2,23522700,passed,155000,155000,,"CHECKSUM mixed 155000
+STEADY_NS 68800
+",
+mixed,cpp_O3,measurement,1,28158500,passed,155000,155000,,"CHECKSUM mixed 155000
+STEADY_NS 70600
+",
+mixed,cpp_O3,measurement,2,24426200,passed,155000,155000,,"CHECKSUM mixed 155000
+STEADY_NS 68800
+",
+mixed,cpp_O3,measurement,3,27611500,passed,155000,155000,,"CHECKSUM mixed 155000
+STEADY_NS 68800
+",
+mixed,cpp_O3,measurement,4,25325300,passed,155000,155000,,"CHECKSUM mixed 155000
+STEADY_NS 68900
+",
+mixed,cpp_O3,measurement,5,28754000,passed,155000,155000,,"CHECKSUM mixed 155000
+STEADY_NS 68900
+",
+functions,native,compile,1,80905100,success,,2492250,,"built: C:\Users\miros\OneDrive\Desktop\Projects\Z+ compiler\benchmarks\results\final-optimized\native\functions.exe
+",
+functions,interpreter,preflight,0,399245100,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,preflight,0,192722000,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,preflight,0,93718600,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,cpp_O2,preflight,0,35691900,passed,2492250,2492250,,"CHECKSUM functions 2492250
+STEADY_NS 938900
+",
+functions,cpp_O3,preflight,0,29672100,passed,2492250,2492250,,"CHECKSUM functions 2492250
+STEADY_NS 946900
+",
+functions,interpreter,warmup,1,378389700,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,interpreter,warmup,2,382205800,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,interpreter,measurement,1,364754000,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,interpreter,measurement,2,398970200,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,interpreter,measurement,3,432139900,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,interpreter,measurement,4,416789400,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,interpreter,measurement,5,401092400,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,warmup,1,30130200,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,warmup,2,34975800,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,measurement,1,30551900,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,measurement,2,31041400,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,measurement,3,29985700,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,measurement,4,28899900,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,native,measurement,5,27911200,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,warmup,1,77007200,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,warmup,2,79260100,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,measurement,1,90121700,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,measurement,2,109698600,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,measurement,3,98518400,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,measurement,4,95059100,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,python,measurement,5,90808100,passed,2492250,2492250,,"CHECKSUM functions 2492250
+",
+functions,cpp_O2,warmup,1,31749000,passed,2492250,2492250,,"CHECKSUM functions 2492250
+STEADY_NS 912100
+",
+functions,cpp_O2,warmup,2,30146600,passed,2492250,2492250,,"CHECKSUM functions 2492250
+STEADY_NS 865500
+",
+functions,cpp_O2,measurement,1,30005800,passed,2492250,2492250,,"CHECKSUM functions 2492250
+STEADY_NS 869700
+",
+functions,cpp_O2,measurement,2,32316900,passed,2492250,2492250,,"CHECKSUM functions 2492250
+STEADY_NS 1134400
+",
+functions,cpp_O2,measurement,3,35352700,passed,2492250,2492250,,"CHECKSUM functions 2492250
+STEADY_NS 1156600
+",
+functions,cpp_O2,measurement,4,30258600,passed,2492250,2492250,,"CHECKSUM functions 2492250
+STEADY_NS 865500
+",
+functions,cpp_O2,measurement,5,23843400,passed,2492250,2492250,,"CHECKSUM functions 2492250
+STEADY_NS 869400
+",
+functions,cpp_O3,warmup,1,28600500,passed,2492250,2492250,,"CHECKSUM functions 2492250
+STEADY_NS 904900
+",
+functions,cpp_O3,warmup,2,32049700,passed,2492250,2492250,,"CHECKSUM functions 2492250
+STEADY_NS 954000
+",
+functions,cpp_O3,measurement,1,31361000,passed,2492250,2492250,,"CHECKSUM functions 2492250
+STEADY_NS 875600
+",
+functions,cpp_O3,measurement,2,29405400,passed,2492250,2492250,,"CHECKSUM functions 2492250
+STEADY_NS 1047800
+",
+functions,cpp_O3,measurement,3,28698400,passed,2492250,2492250,,"CHECKSUM functions 2492250
+STEADY_NS 880000
+",
+functions,cpp_O3,measurement,4,29762000,passed,2492250,2492250,,"CHECKSUM functions 2492250
+STEADY_NS 940100
+",
+functions,cpp_O3,measurement,5,29508500,passed,2492250,2492250,,"CHECKSUM functions 2492250
+STEADY_NS 865700
+",
+branching,native,compile,1,65122400,success,,3124925000,,"built: C:\Users\miros\OneDrive\Desktop\Projects\Z+ compiler\benchmarks\results\final-optimized\native\branching.exe
+",
+branching,interpreter,preflight,0,418784900,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,preflight,0,183056800,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,preflight,0,98680900,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,cpp_O2,preflight,0,30775700,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+STEADY_NS 337400
+",
+branching,cpp_O3,preflight,0,28291200,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+STEADY_NS 346700
+",
+branching,interpreter,warmup,1,381912000,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,interpreter,warmup,2,440075900,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,interpreter,measurement,1,384272900,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,interpreter,measurement,2,366625800,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,interpreter,measurement,3,363013100,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,interpreter,measurement,4,361552100,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,interpreter,measurement,5,342746300,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,warmup,1,26841400,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,warmup,2,26937900,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,measurement,1,28616500,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,measurement,2,26857000,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,measurement,3,27291100,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,measurement,4,26662600,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,native,measurement,5,26319100,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,warmup,1,75204800,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,warmup,2,81126100,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,measurement,1,78079800,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,measurement,2,89507300,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,measurement,3,95916000,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,measurement,4,91348300,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,python,measurement,5,84747400,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+",
+branching,cpp_O2,warmup,1,33994100,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+STEADY_NS 572600
+",
+branching,cpp_O2,warmup,2,29126600,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+STEADY_NS 459800
+",
+branching,cpp_O2,measurement,1,31334700,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+STEADY_NS 461100
+",
+branching,cpp_O2,measurement,2,26590500,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+STEADY_NS 335900
+",
+branching,cpp_O2,measurement,3,27897200,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+STEADY_NS 351500
+",
+branching,cpp_O2,measurement,4,31754400,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+STEADY_NS 565100
+",
+branching,cpp_O2,measurement,5,35415900,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+STEADY_NS 590000
+",
+branching,cpp_O3,warmup,1,27811000,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+STEADY_NS 496100
+",
+branching,cpp_O3,warmup,2,25400300,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+STEADY_NS 428400
+",
+branching,cpp_O3,measurement,1,27556300,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+STEADY_NS 346400
+",
+branching,cpp_O3,measurement,2,26921000,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+STEADY_NS 391500
+",
+branching,cpp_O3,measurement,3,27345000,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+STEADY_NS 346600
+",
+branching,cpp_O3,measurement,4,26232400,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+STEADY_NS 552300
+",
+branching,cpp_O3,measurement,5,28438300,passed,3124925000,3124925000,,"CHECKSUM branching 3124925000
+STEADY_NS 346400
+",
+combined,native,compile,1,63496000,success,,3034241,,"built: C:\Users\miros\OneDrive\Desktop\Projects\Z+ compiler\benchmarks\results\final-optimized\native\combined.exe
+",
+combined,interpreter,preflight,0,611919200,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,preflight,0,168771900,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,preflight,0,113457100,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,cpp_O2,preflight,0,33245500,passed,3034241,3034241,,"CHECKSUM combined 3034241
+STEADY_NS 1685300
+",
+combined,cpp_O3,preflight,0,30699100,passed,3034241,3034241,,"CHECKSUM combined 3034241
+STEADY_NS 1655200
+",
+combined,interpreter,warmup,1,603814400,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,interpreter,warmup,2,615199800,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,interpreter,measurement,1,644134700,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,interpreter,measurement,2,607793400,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,interpreter,measurement,3,599360800,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,interpreter,measurement,4,570551500,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,interpreter,measurement,5,559650100,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,warmup,1,33930800,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,warmup,2,34244000,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,measurement,1,31371900,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,measurement,2,31973800,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,measurement,3,30957100,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,measurement,4,31274000,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,native,measurement,5,30069500,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,warmup,1,96406700,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,warmup,2,95182800,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,measurement,1,90733800,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,measurement,2,90038500,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,measurement,3,98326000,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,measurement,4,94180600,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,python,measurement,5,94170900,passed,3034241,3034241,,"CHECKSUM combined 3034241
+",
+combined,cpp_O2,warmup,1,27804200,passed,3034241,3034241,,"CHECKSUM combined 3034241
+STEADY_NS 1749200
+",
+combined,cpp_O2,warmup,2,26317700,passed,3034241,3034241,,"CHECKSUM combined 3034241
+STEADY_NS 1660000
+",
+combined,cpp_O2,measurement,1,28694100,passed,3034241,3034241,,"CHECKSUM combined 3034241
+STEADY_NS 1761300
+",
+combined,cpp_O2,measurement,2,30227700,passed,3034241,3034241,,"CHECKSUM combined 3034241
+STEADY_NS 1719600
+",
+combined,cpp_O2,measurement,3,28247900,passed,3034241,3034241,,"CHECKSUM combined 3034241
+STEADY_NS 1659700
+",
+combined,cpp_O2,measurement,4,28510300,passed,3034241,3034241,,"CHECKSUM combined 3034241
+STEADY_NS 1822500
+",
+combined,cpp_O2,measurement,5,27006200,passed,3034241,3034241,,"CHECKSUM combined 3034241
+STEADY_NS 1660000
+",
+combined,cpp_O3,warmup,1,27395800,passed,3034241,3034241,,"CHECKSUM combined 3034241
+STEADY_NS 1650000
+",
+combined,cpp_O3,warmup,2,30403900,passed,3034241,3034241,,"CHECKSUM combined 3034241
+STEADY_NS 1650800
+",
+combined,cpp_O3,measurement,1,28195100,passed,3034241,3034241,,"CHECKSUM combined 3034241
+STEADY_NS 1723100
+",
+combined,cpp_O3,measurement,2,29387800,passed,3034241,3034241,,"CHECKSUM combined 3034241
+STEADY_NS 1699500
+",
+combined,cpp_O3,measurement,3,28311100,passed,3034241,3034241,,"CHECKSUM combined 3034241
+STEADY_NS 1650500
+",
+combined,cpp_O3,measurement,4,31877600,passed,3034241,3034241,,"CHECKSUM combined 3034241
+STEADY_NS 1700500
+",
+combined,cpp_O3,measurement,5,30821200,passed,3034241,3034241,,"CHECKSUM combined 3034241
+STEADY_NS 1649900
+",
+arrays,native,compile,1,66460400,success,,29994,,"built: C:\Users\miros\OneDrive\Desktop\Projects\Z+ compiler\benchmarks\results\final-optimized\native\arrays.exe
+",
+arrays,interpreter,preflight,0,89622900,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,native,preflight,0,219644700,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,python,preflight,0,81875700,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,cpp_O2,preflight,0,28435400,passed,29994,29994,,"CHECKSUM arrays 29994
+STEADY_NS 154600
+",
+arrays,cpp_O3,preflight,0,27789200,passed,29994,29994,,"CHECKSUM arrays 29994
+STEADY_NS 133600
+",
+arrays,interpreter,warmup,1,79015700,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,interpreter,warmup,2,90311000,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,interpreter,measurement,1,83435500,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,interpreter,measurement,2,85761600,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,interpreter,measurement,3,87871600,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,interpreter,measurement,4,79097500,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,interpreter,measurement,5,81209000,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,native,warmup,1,28962600,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,native,warmup,2,28779800,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,native,measurement,1,26538600,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,native,measurement,2,26535400,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,native,measurement,3,27379400,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,native,measurement,4,26306000,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,native,measurement,5,26586300,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,python,warmup,1,61360900,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,python,warmup,2,59054600,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,python,measurement,1,62030300,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,python,measurement,2,61505900,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,python,measurement,3,64099200,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,python,measurement,4,63217800,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,python,measurement,5,70269200,passed,29994,29994,,"CHECKSUM arrays 29994
+",
+arrays,cpp_O2,warmup,1,26429900,passed,29994,29994,,"CHECKSUM arrays 29994
+STEADY_NS 125100
+",
+arrays,cpp_O2,warmup,2,31348200,passed,29994,29994,,"CHECKSUM arrays 29994
+STEADY_NS 140700
+",
+arrays,cpp_O2,measurement,1,27448700,passed,29994,29994,,"CHECKSUM arrays 29994
+STEADY_NS 134800
+",
+arrays,cpp_O2,measurement,2,31258300,passed,29994,29994,,"CHECKSUM arrays 29994
+STEADY_NS 178700
+",
+arrays,cpp_O2,measurement,3,28801200,passed,29994,29994,,"CHECKSUM arrays 29994
+STEADY_NS 124800
+",
+arrays,cpp_O2,measurement,4,25705300,passed,29994,29994,,"CHECKSUM arrays 29994
+STEADY_NS 161200
+",
+arrays,cpp_O2,measurement,5,28947800,passed,29994,29994,,"CHECKSUM arrays 29994
+STEADY_NS 125000
+",
+arrays,cpp_O3,warmup,1,28189300,passed,29994,29994,,"CHECKSUM arrays 29994
+STEADY_NS 133800
+",
+arrays,cpp_O3,warmup,2,28699500,passed,29994,29994,,"CHECKSUM arrays 29994
+STEADY_NS 139600
+",
+arrays,cpp_O3,measurement,1,25539200,passed,29994,29994,,"CHECKSUM arrays 29994
+STEADY_NS 202500
+",
+arrays,cpp_O3,measurement,2,30857900,passed,29994,29994,,"CHECKSUM arrays 29994
+STEADY_NS 183800
+",
+arrays,cpp_O3,measurement,3,29218200,passed,29994,29994,,"CHECKSUM arrays 29994
+STEADY_NS 189200
+",
+arrays,cpp_O3,measurement,4,25383800,passed,29994,29994,,"CHECKSUM arrays 29994
+STEADY_NS 139900
+",
+arrays,cpp_O3,measurement,5,27132900,passed,29994,29994,,"CHECKSUM arrays 29994
+STEADY_NS 132900
+",
+structs,native,compile,1,54071800,success,,39994,,"built: C:\Users\miros\OneDrive\Desktop\Projects\Z+ compiler\benchmarks\results\final-optimized\native\structs.exe
+",
+structs,interpreter,preflight,0,89808300,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,native,preflight,0,494039500,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,python,preflight,0,68922100,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,cpp_O2,preflight,0,32126500,passed,39994,39994,,"CHECKSUM structs 39994
+STEADY_NS 61300
+",
+structs,cpp_O3,preflight,0,32703100,passed,39994,39994,,"CHECKSUM structs 39994
+STEADY_NS 85500
+",
+structs,interpreter,warmup,1,78162300,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,interpreter,warmup,2,75188000,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,interpreter,measurement,1,77648600,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,interpreter,measurement,2,77992500,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,interpreter,measurement,3,74502200,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,interpreter,measurement,4,78378700,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,interpreter,measurement,5,85288900,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,native,warmup,1,25666500,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,native,warmup,2,27717600,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,native,measurement,1,32020200,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,native,measurement,2,32632300,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,native,measurement,3,28154100,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,native,measurement,4,28615500,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,native,measurement,5,29042700,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,python,warmup,1,73093900,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,python,warmup,2,65206400,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,python,measurement,1,58667400,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,python,measurement,2,59382500,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,python,measurement,3,59260500,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,python,measurement,4,67215100,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,python,measurement,5,61159200,passed,39994,39994,,"CHECKSUM structs 39994
+",
+structs,cpp_O2,warmup,1,25343300,passed,39994,39994,,"CHECKSUM structs 39994
+STEADY_NS 107300
+",
+structs,cpp_O2,warmup,2,28569400,passed,39994,39994,,"CHECKSUM structs 39994
+STEADY_NS 61100
+",
+structs,cpp_O2,measurement,1,24686600,passed,39994,39994,,"CHECKSUM structs 39994
+STEADY_NS 61300
+",
+structs,cpp_O2,measurement,2,26974600,passed,39994,39994,,"CHECKSUM structs 39994
+STEADY_NS 61200
+",
+structs,cpp_O2,measurement,3,26320200,passed,39994,39994,,"CHECKSUM structs 39994
+STEADY_NS 61200
+",
+structs,cpp_O2,measurement,4,27220800,passed,39994,39994,,"CHECKSUM structs 39994
+STEADY_NS 61200
+",
+structs,cpp_O2,measurement,5,25614000,passed,39994,39994,,"CHECKSUM structs 39994
+STEADY_NS 61200
+",
+structs,cpp_O3,warmup,1,27682900,passed,39994,39994,,"CHECKSUM structs 39994
+STEADY_NS 61100
+",
+structs,cpp_O3,warmup,2,32140400,passed,39994,39994,,"CHECKSUM structs 39994
+STEADY_NS 63700
+",
+structs,cpp_O3,measurement,1,30352300,passed,39994,39994,,"CHECKSUM structs 39994
+STEADY_NS 104800
+",
+structs,cpp_O3,measurement,2,30576100,passed,39994,39994,,"CHECKSUM structs 39994
+STEADY_NS 66500
+",
+structs,cpp_O3,measurement,3,25401600,passed,39994,39994,,"CHECKSUM structs 39994
+STEADY_NS 70800
+",
+structs,cpp_O3,measurement,4,30222400,passed,39994,39994,,"CHECKSUM structs 39994
+STEADY_NS 61200
+",
+structs,cpp_O3,measurement,5,26822400,passed,39994,39994,,"CHECKSUM structs 39994
+STEADY_NS 61000
+",
+memory,native,compile,1,282334900,success,,69995,,"built: C:\Users\miros\OneDrive\Desktop\Projects\Z+ compiler\benchmarks\results\final-optimized\native\memory.exe
+",
+memory,interpreter,preflight,0,115865200,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,native,preflight,0,452889900,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,python,preflight,0,69703400,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,cpp_O2,preflight,0,31280300,passed,69995,69995,,"CHECKSUM memory 69995
+STEADY_NS 802600
+",
+memory,cpp_O3,preflight,0,28778800,passed,69995,69995,,"CHECKSUM memory 69995
+STEADY_NS 801600
+",
+memory,interpreter,warmup,1,109771500,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,interpreter,warmup,2,89402500,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,interpreter,measurement,1,95393000,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,interpreter,measurement,2,98953900,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,interpreter,measurement,3,107088600,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,interpreter,measurement,4,98645600,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,interpreter,measurement,5,99195100,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,native,warmup,1,33577200,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,native,warmup,2,34985500,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,native,measurement,1,44751600,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,native,measurement,2,38649000,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,native,measurement,3,32996500,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,native,measurement,4,35964600,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,native,measurement,5,35954000,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,python,warmup,1,61499900,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,python,warmup,2,61647900,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,python,measurement,1,62139000,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,python,measurement,2,68327500,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,python,measurement,3,71405000,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,python,measurement,4,63163300,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,python,measurement,5,63602600,passed,69995,69995,,"CHECKSUM memory 69995
+",
+memory,cpp_O2,warmup,1,29251600,passed,69995,69995,,"CHECKSUM memory 69995
+STEADY_NS 1306400
+",
+memory,cpp_O2,warmup,2,32105300,passed,69995,69995,,"CHECKSUM memory 69995
+STEADY_NS 1558700
+",
+memory,cpp_O2,measurement,1,28356800,passed,69995,69995,,"CHECKSUM memory 69995
+STEADY_NS 805400
+",
+memory,cpp_O2,measurement,2,26549800,passed,69995,69995,,"CHECKSUM memory 69995
+STEADY_NS 804300
+",
+memory,cpp_O2,measurement,3,27154600,passed,69995,69995,,"CHECKSUM memory 69995
+STEADY_NS 866000
+",
+memory,cpp_O2,measurement,4,25286600,passed,69995,69995,,"CHECKSUM memory 69995
+STEADY_NS 803500
+",
+memory,cpp_O2,measurement,5,28705000,passed,69995,69995,,"CHECKSUM memory 69995
+STEADY_NS 807700
+",
+memory,cpp_O3,warmup,1,24817000,passed,69995,69995,,"CHECKSUM memory 69995
+STEADY_NS 823800
+",
+memory,cpp_O3,warmup,2,26265000,passed,69995,69995,,"CHECKSUM memory 69995
+STEADY_NS 828900
+",
+memory,cpp_O3,measurement,1,26642600,passed,69995,69995,,"CHECKSUM memory 69995
+STEADY_NS 1101800
+",
+memory,cpp_O3,measurement,2,26073500,passed,69995,69995,,"CHECKSUM memory 69995
+STEADY_NS 835000
+",
+memory,cpp_O3,measurement,3,30126000,passed,69995,69995,,"CHECKSUM memory 69995
+STEADY_NS 1321900
+",
+memory,cpp_O3,measurement,4,28968900,passed,69995,69995,,"CHECKSUM memory 69995
+STEADY_NS 822400
+",
+memory,cpp_O3,measurement,5,27009700,passed,69995,69995,,"CHECKSUM memory 69995
+STEADY_NS 1000300
+",
+tight_loop,native,compile,1,219761100,success,,1499999500000,,"built: C:\Users\miros\OneDrive\Desktop\Projects\Z+ compiler\benchmarks\results\final-optimized\native\tight_loop.exe
+",
+tight_loop,interpreter,preflight,0,4591332600,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,native,preflight,0,405914400,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,python,preflight,0,354534700,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,cpp_O2,preflight,0,36064600,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1514300
+",
+tight_loop,cpp_O3,preflight,0,35477100,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1833600
+",
+tight_loop,interpreter,warmup,1,4464986600,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,interpreter,warmup,2,4241761800,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,interpreter,measurement,1,4101551900,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,interpreter,measurement,2,4499706400,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,interpreter,measurement,3,4065556300,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,interpreter,measurement,4,4404996700,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,interpreter,measurement,5,4295509900,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,native,warmup,1,31817300,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,native,warmup,2,22255200,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,native,measurement,1,23123300,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,native,measurement,2,21460900,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,native,measurement,3,21240700,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,native,measurement,4,20725700,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,native,measurement,5,21516100,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,python,warmup,1,332962700,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,python,warmup,2,348303800,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,python,measurement,1,314034100,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,python,measurement,2,319859300,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,python,measurement,3,324729100,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,python,measurement,4,327923400,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,python,measurement,5,327036900,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+",
+tight_loop,cpp_O2,warmup,1,36995800,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1515400
+",
+tight_loop,cpp_O2,warmup,2,28631800,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1524400
+",
+tight_loop,cpp_O2,measurement,1,25593000,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1453800
+",
+tight_loop,cpp_O2,measurement,2,26195700,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1514300
+",
+tight_loop,cpp_O2,measurement,3,25709700,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1509200
+",
+tight_loop,cpp_O2,measurement,4,25867300,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1496700
+",
+tight_loop,cpp_O2,measurement,5,24729200,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1512600
+",
+tight_loop,cpp_O3,warmup,1,35384200,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1582100
+",
+tight_loop,cpp_O3,warmup,2,25461500,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1634900
+",
+tight_loop,cpp_O3,measurement,1,27668600,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1498200
+",
+tight_loop,cpp_O3,measurement,2,24649700,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1623100
+",
+tight_loop,cpp_O3,measurement,3,25333000,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1501900
+",
+tight_loop,cpp_O3,measurement,4,26460700,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1585000
+",
+tight_loop,cpp_O3,measurement,5,28350200,passed,1499999500000,1499999500000,,"CHECKSUM tight_loop 1499999500000
+STEADY_NS 1465000
+",
+recursion,native,compile,1,51046500,success,,1191560,,"built: C:\Users\miros\OneDrive\Desktop\Projects\Z+ compiler\benchmarks\results\final-optimized\native\recursion.exe
+",
+recursion,interpreter,preflight,0,1527653200,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,native,preflight,0,194664700,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,python,preflight,0,146204000,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,cpp_O2,preflight,0,28737800,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 1717000
+",
+recursion,cpp_O3,preflight,0,28651900,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 828900
+",
+recursion,interpreter,warmup,1,1573625200,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,interpreter,warmup,2,1501094900,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,interpreter,measurement,1,1589313400,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,interpreter,measurement,2,1572044200,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,interpreter,measurement,3,1461536500,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,interpreter,measurement,4,1433072800,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,interpreter,measurement,5,1525415600,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,native,warmup,1,39328000,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,native,warmup,2,34380400,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,native,measurement,1,33712900,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,native,measurement,2,34028200,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,native,measurement,3,35626800,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,native,measurement,4,39931400,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,native,measurement,5,38565400,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,python,warmup,1,145670900,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,python,warmup,2,113606100,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,python,measurement,1,121945800,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,python,measurement,2,137921300,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,python,measurement,3,141981700,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,python,measurement,4,134025600,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,python,measurement,5,120341200,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+",
+recursion,cpp_O2,warmup,1,27695600,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 1755600
+",
+recursion,cpp_O2,warmup,2,26477300,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 1736500
+",
+recursion,cpp_O2,measurement,1,26247200,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 1755800
+",
+recursion,cpp_O2,measurement,2,31588000,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 1923400
+",
+recursion,cpp_O2,measurement,3,32823300,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 1928100
+",
+recursion,cpp_O2,measurement,4,30393400,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 1756000
+",
+recursion,cpp_O2,measurement,5,30999400,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 1776600
+",
+recursion,cpp_O3,warmup,1,35221400,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 1146000
+",
+recursion,cpp_O3,warmup,2,31276900,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 1122000
+",
+recursion,cpp_O3,measurement,1,31382300,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 828900
+",
+recursion,cpp_O3,measurement,2,29087100,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 829100
+",
+recursion,cpp_O3,measurement,3,31005500,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 829100
+",
+recursion,cpp_O3,measurement,4,30662600,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 862600
+",
+recursion,cpp_O3,measurement,5,33594700,passed,1191560,1191560,,"CHECKSUM recursion 1191560
+STEADY_NS 975800
+",

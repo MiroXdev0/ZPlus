@@ -1,0 +1,16 @@
+start {
+    let iterations: number = 50000 // BENCH_ITERATIONS
+    let expected: number = 2399670 // BENCH_EXPECTED
+    let checksum: number = 0
+
+    for (let i: number = 0; i < iterations; i++) {
+        let value: number = (i * 3 + 7) % 97
+        checksum += value
+    } end for
+
+    if checksum == expected {
+        say("CHECKSUM arithmetic 2399670")
+    } else {
+        say("CHECKSUM_ERROR arithmetic")
+    } end if
+} stop

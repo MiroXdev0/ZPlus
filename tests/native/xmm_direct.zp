@@ -1,0 +1,15 @@
+start {
+    let checksum: number = 0
+
+    for (let i: number = 0; i < 20; i++) {
+        let first: number = (i + 1.25) * 2.5
+        let second: number = (i + 0.75) * 1.5
+        checksum += (first + second) / 2
+    } end for
+
+    if checksum == 422.5 {
+        say("CHECKSUM xmm_direct 422.5")
+    } else {
+        say("CHECKSUM_ERROR xmm_direct")
+    } end if
+} stop

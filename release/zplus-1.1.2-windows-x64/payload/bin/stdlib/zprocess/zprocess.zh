@@ -1,5 +1,0 @@
-start {
-pub fn run(executable: string, arguments: string[], workingDirectory: string, timeoutMilliseconds: number): string {
-    return __zstdlib_process_run(executable, arguments, workingDirectory, timeoutMilliseconds)
-} end fn
-} stop

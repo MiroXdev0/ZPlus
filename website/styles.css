@@ -448,6 +448,11 @@ pre, code { font-family: var(--mono); }
 .footer-links a:hover { color: var(--accent); }
 .footer-inner > small { grid-column: 1 / -1; color: var(--quiet); font-size: 9px; }
 
+@media (max-width: 1150px) {
+  .site-header { gap: 18px; }
+  .primary-nav { gap: 13px; }
+  .site-search { width: 150px; }
+}
 @media (max-width: 940px) {
   .site-header { gap: 21px; }
   .primary-nav { gap: 15px; }

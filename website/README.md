@@ -87,3 +87,11 @@ no `npm run build` script.
 The learning course has 52 numbered lessons. The syntax, examples, backend limits, and module behavior are grounded in the repository's current `docs/syntax.md`, `MODULES.md`, `docs/ZBUILD.md`, and `stdlib/README.md`. The reference identifies features that are not implemented rather than presenting them as available. Examples are intended to be checked with `zp check`; interpreter/native support can differ.
 
 The existing static interface and its content remain the website foundation; the small Vercel function is limited to registry API routes.
+
+## ZTS and ZJS interoperability
+
+The website's `/zts` and `/zjs` pages document the experimental TypeScript and
+JavaScript API-client workflow. The dependency-free generator and its supported
+OpenAPI subset are in `../tools/zplus-web-interop/`; a real ZWeb server example
+is in `../examples/zweb-openapi/`. The tool is not published to npm, does not
+compile TS/JS into Z+, and does not add WebSockets or async server handlers.

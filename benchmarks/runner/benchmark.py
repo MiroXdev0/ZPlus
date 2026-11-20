@@ -22,14 +22,31 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 PROGRAMS = ROOT / "benchmarks" / "programs"
-WORKLOADS = ("arithmetic", "functions", "branching", "combined")
+WORKLOADS = (
+    "arithmetic",
+    "mixed",
+    "functions",
+    "branching",
+    "combined",
+    "arrays",
+    "structs",
+    "memory",
+    "tight_loop",
+    "recursion",
+)
 ITERATION_ARGUMENTS = {
     "arithmetic": "arithmetic_iterations",
+    "mixed": "mixed_iterations",
     "functions": "function_iterations",
     "branching": "branching_iterations",
     "combined": "combined_iterations",
+    "arrays": "arrays_iterations",
+    "structs": "structs_iterations",
+    "memory": "memory_iterations",
+    "tight_loop": "tight_loop_iterations",
+    "recursion": "recursion_iterations",
 }
-CHECKSUM_RE = re.compile(r"^CHECKSUM ([a-z]+) (-?\d+)\s*$", re.MULTILINE)
+CHECKSUM_RE = re.compile(r"^CHECKSUM ([a-z_]+) (-?\d+)\s*$", re.MULTILINE)
 
 
 def parse_args() -> argparse.Namespace:
@@ -38,14 +55,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--runs", type=int, default=10, help="measured processes per mode (default: 10)")
     parser.add_argument("--iterations", type=int, help="override iterations for every workload")
     parser.add_argument("--arithmetic-iterations", type=int, default=50000)
+    parser.add_argument("--mixed-iterations", type=int, default=10000)
     parser.add_argument("--function-iterations", type=int, default=50000)
     parser.add_argument("--branching-iterations", type=int, default=50000)
     parser.add_argument("--combined-iterations", type=int, default=50000)
+    parser.add_argument("--arrays-iterations", type=int, default=10000)
+    parser.add_argument("--structs-iterations", type=int, default=10000)
+    parser.add_argument("--memory-iterations", type=int, default=10000)
+    parser.add_argument("--tight-loop-iterations", type=int, default=1000000)
+    parser.add_argument("--recursion-iterations", type=int, default=50000)
     parser.add_argument("--workloads", nargs="+", choices=WORKLOADS, default=list(WORKLOADS))
     parser.add_argument("--output-dir", type=Path, default=ROOT / "benchmarks" / "results" / "latest")
     parser.add_argument("--zp", type=Path, help="compiler executable (default: bin/zp.exe or bin/zp)")
     parser.add_argument("--timeout", type=float, default=120.0, help="timeout per process in seconds")
     parser.add_argument("--compiler-config", default="Release", help="compiler build configuration to report")
+    parser.add_argument("--cpp-compiler", help="C++ compiler for -O2/-O3 reference binaries")
     args = parser.parse_args()
     if args.warmups < 0 or args.runs < 1:
         parser.error("--warmups must be non-negative and --runs must be at least one")
@@ -76,6 +100,20 @@ def compiler_path(requested: Path | None) -> Path:
     if located:
         return Path(located).resolve()
     raise FileNotFoundError("Z+ compiler not found; pass --zp or build bin/zp.exe")
+
+
+def cpp_compiler_path(requested: str | None) -> Path | None:
+    if requested:
+        located = shutil.which(requested) or requested
+        candidate = Path(located).expanduser()
+        if candidate.is_file():
+            return candidate.resolve()
+        return None
+    for name in ("g++", "clang++", "c++"):
+        located = shutil.which(name)
+        if located:
+            return Path(located).resolve()
+    return None
 
 
 def cpu_model() -> str:
@@ -182,9 +220,15 @@ def expected_checksum(workload: str, iterations: int) -> int:
     safe_integer = 2**53 - 1
     bounds = {
         "arithmetic": 96 * iterations,
+        "mixed": 30 * iterations,
         "functions": 100 * iterations,
         "branching": 3 * iterations * iterations + 1,
         "combined": 206 * iterations,
+        "arrays": 6 * iterations,
+        "structs": 7 * iterations,
+        "memory": 12 * iterations,
+        "tight_loop": 3 * iterations * iterations,
+        "recursion": 66 * iterations,
     }
     if bounds[workload] > safe_integer or 3 * iterations > safe_integer:
         raise ValueError(
@@ -195,6 +239,9 @@ def expected_checksum(workload: str, iterations: int) -> int:
     for i in range(iterations):
         if workload == "arithmetic":
             checksum += (i * 3 + 7) % 97
+        elif workload == "mixed":
+            value = i % 10 + 0.5
+            checksum += int((value * 1.5 + 0.25) * 2)
         elif workload == "functions":
             checksum += ((i % 1000) * 7 + 3) % 101
         elif workload == "branching":
@@ -202,6 +249,17 @@ def expected_checksum(workload: str, iterations: int) -> int:
         elif workload == "combined":
             value = ((i % 1000) * 7 + 11) % 103
             checksum += value * 2 if i % 3 == 0 else (value + i % 17) % 89
+        elif workload == "arrays":
+            checksum += i % 7
+        elif workload == "structs":
+            checksum += i % 7 + 1
+        elif workload == "memory":
+            checksum += i % 11 + 2
+        elif workload == "tight_loop":
+            checksum += i * 3 + 1
+        elif workload == "recursion":
+            value = i % 12
+            checksum += value * (value + 1) // 2
         else:
             raise ValueError(f"unknown workload: {workload}")
     return checksum
@@ -383,14 +441,14 @@ def render_report(
         f"- Timeout per process: {configuration['timeout_seconds']} s",
         "- Checksums are checked against a separately computed deterministic reference before any run is accepted.",
         "- Python and Z+ use the same loop counts and arithmetic expressions for each workload. Z+ prints its expected checksum only if its computed numeric checksum matches; otherwise it emits `CHECKSUM_ERROR`.",
-        "- The native backend supports only its documented integer-oriented subset. A native compile failure is recorded as unsupported with the original diagnostic; there is no interpreter fallback.",
+        "- Native compile failures are recorded as unsupported with the original diagnostic; there is no interpreter fallback.",
         "",
-        "Workloads: arithmetic/modulo accumulation; function calls plus arithmetic; conditional branch accumulation; combined function/branch/arithmetic accumulation.",
+        "Workloads: arithmetic/modulo accumulation; mixed fractional/integer arithmetic; function calls; conditional branches; combined scalar work; indexed array updates; mutable struct-field updates; and repeated managed-array allocation.",
         "",
         "## Results",
         "",
-        "| Workload | Iterations | Checksum | Z+ Interpreter median | Z+ Native median | Python median | Native vs Python | Interpreter vs Python | Native vs Interpreter |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| Workload | Iterations | Checksum | Z+ Interpreter | Z+ Native | Python | C++ O2 | C++ O3 | Native vs C++ O2 | Native vs C++ O3 |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for item in results:
         summary = item["summary"]
@@ -400,16 +458,17 @@ def render_report(
             else None
         )
         lines.append(
-            "| {name} | {iterations} | {checksum} | {interp} | {native} | {python} | {native_py} | {interp_py} | {native_interp} |".format(
+            "| {name} | {iterations} | {checksum} | {interp} | {native} | {python} | {cpp2} | {cpp3} | {native_cpp2} | {native_cpp3} |".format(
                 name=item["workload"],
                 iterations=item["iterations"],
                 checksum=item["expected_checksum"],
                 interp=format_ms(display_median("interpreter")),
                 native=format_ms(display_median("native")),
                 python=format_ms(display_median("python")),
-                native_py=format_speedup(item.get("speedups", {}).get("native_vs_python")),
-                interp_py=format_speedup(item.get("speedups", {}).get("interpreter_vs_python")),
-                native_interp=format_speedup(item.get("speedups", {}).get("native_vs_interpreter")),
+                cpp2=format_ms(display_median("cpp_O2")),
+                cpp3=format_ms(display_median("cpp_O3")),
+                native_cpp2=format_speedup(item.get("speedups", {}).get("native_vs_cpp_O2")),
+                native_cpp3=format_speedup(item.get("speedups", {}).get("native_vs_cpp_O3")),
             )
         )
     lines.extend(["", "## Compilation", "", "| Workload | Native compile wall time | Compile status |", "|---|---:|---|"])
@@ -432,7 +491,8 @@ def render_report(
                     "",
                 ]
             )
-        for mode in ("interpreter", "native", "python"):
+        benchmark_modes = ("interpreter", "native", "python", "cpp_O2", "cpp_O3")
+        for mode in benchmark_modes:
             stats = item["summary"][mode]
             if stats:
                 lines.append(
@@ -456,12 +516,12 @@ def render_report(
             comparable, key=lambda item: item["speedups"]["interpreter_vs_python"]
         )
         analysis = [
-            f"- Native Z+ had a measured median speedup over Python in all comparable workloads, ranging from {min(native_ratios):.2f}× to {max(native_ratios):.2f}×; its largest ratio was on `{best_native['workload']}`.",
+            f"- Native Z+ median speedup over Python ranged from {min(native_ratios):.2f}× to {max(native_ratios):.2f}× across the checksum-verified comparable workloads; its largest ratio was on `{best_native['workload']}`.",
             f"- The Z+ interpreter was slower than Python in all comparable workloads: its Python-relative ratios ranged from {min(interpreter_ratios):.3f}× to {max(interpreter_ratios):.3f}×. The weakest ratio was `{worst_interpreter['workload']}` ({1 / worst_interpreter['speedups']['interpreter_vs_python']:.2f}× slower than Python); `{best_interpreter['workload']}` was its strongest result.",
             "- The function-call and combined workloads have higher interpreter medians than arithmetic-only. This is consistent with the interpreter paying additional call/dispatch and branch work, but the workloads do more total work and do not isolate a per-call cost.",
             "- Native executable medians are process-level measurements and include startup. Their apparent advantage over Python therefore reflects both startup and workload execution; this harness does not isolate pure loop throughput.",
             "- Native compilation was measured separately. These compilation durations do not establish a compiler performance bottleneck, and are not part of any speedup ratio.",
-            "- All four selected workloads compiled and executed natively in this run. Arrays and other unsupported operations were intentionally not benchmarked; native array support remains unsupported.",
+            "- Native compilation and execution support is reported per workload; no unsupported operation is routed through interpreter execution.",
         ]
     else:
         analysis = [
@@ -496,6 +556,9 @@ def main() -> int:
     prepared_dir.mkdir(parents=True, exist_ok=True)
     native_dir = output_dir / "native"
     native_dir.mkdir(parents=True, exist_ok=True)
+    cpp_dir = output_dir / "cpp"
+    cpp_dir.mkdir(parents=True, exist_ok=True)
+    cpp_compiler = cpp_compiler_path(args.cpp_compiler)
 
     iterations = {
         workload: (
@@ -511,12 +574,37 @@ def main() -> int:
         "runs": args.runs,
         "timeout_seconds": args.timeout,
         "compiler_config": args.compiler_config,
+        "cpp_compiler": str(cpp_compiler) if cpp_compiler else None,
         "iterations": iterations,
         "workloads": args.workloads,
         "timing": "process wall-clock using time.perf_counter_ns",
     }
     raw_rows: list[dict[str, Any]] = []
     workload_results: list[dict[str, Any]] = []
+
+    cpp_executables: dict[str, Path] = {}
+    if cpp_compiler:
+        for optimization in ("O2", "O3"):
+            suffix = ".exe" if os.name == "nt" else ""
+            executable = cpp_dir / f"cpp_reference_{optimization}{suffix}"
+            compile_result = run_process(
+                [
+                    str(cpp_compiler),
+                    "-O" + optimization[1],
+                    "-DNDEBUG",
+                    str(PROGRAMS / "cpp_reference.cpp"),
+                    "-o",
+                    str(executable),
+                ],
+                args.timeout,
+            )
+            if compile_result["returncode"] == 0 and not compile_result["timed_out"]:
+                cpp_executables[optimization] = executable
+            else:
+                print(
+                    f"C++ {optimization} compilation failed: "
+                    f"{compile_result['stderr'] or compile_result['stdout']}"
+                )
 
     for workload in args.workloads:
         count = iterations[workload]
@@ -529,8 +617,20 @@ def main() -> int:
             "mode_status": {},
             "native_status": "pending",
             "compilation": {"status": "not attempted", "duration_ns": None},
-            "raw": {"interpreter": [], "native": [], "python": []},
-            "summary": {"interpreter": None, "native": None, "python": None},
+            "raw": {
+                "interpreter": [],
+                "native": [],
+                "python": [],
+                "cpp_O2": [],
+                "cpp_O3": [],
+            },
+            "summary": {
+                "interpreter": None,
+                "native": None,
+                "python": None,
+                "cpp_O2": None,
+                "cpp_O3": None,
+            },
             "speedups": {},
         }
 
@@ -586,13 +686,21 @@ def main() -> int:
             "interpreter": [str(zp), "run", str(zp_source)],
             "python": [sys.executable, str(py_source)],
         }
+        for optimization, executable in cpp_executables.items():
+            command_by_mode[f"cpp_{optimization}"] = [
+                str(executable),
+                workload,
+                str(count),
+                "1",
+            ]
         if item["native_status"] == "supported":
             command_by_mode["native"] = [str(native_executable)]
 
         # A preflight run verifies that each implementation computes the same
         # checksum before any measured timing is considered.
         eligible_modes: set[str] = set()
-        for mode in ("interpreter", "native", "python"):
+        benchmark_modes = ("interpreter", "native", "python", "cpp_O2", "cpp_O3")
+        for mode in benchmark_modes:
             if mode not in command_by_mode:
                 item["mode_status"][mode] = "unsupported"
                 continue
@@ -622,7 +730,7 @@ def main() -> int:
             else:
                 item["mode_status"][mode] = f"preflight failed: {reason}"
 
-        for mode in ("interpreter", "native", "python"):
+        for mode in benchmark_modes:
             if mode not in eligible_modes:
                 item["summary"][mode] = None
                 if mode == "native" and item["native_status"] == "unsupported":
@@ -672,11 +780,21 @@ def main() -> int:
             py_median = item["summary"]["python"]["median_ns"]
             interpreter_median = item["summary"]["interpreter"]["median_ns"]
             native_median = item["summary"]["native"]["median_ns"]
-            item["speedups"] = {
+            speedups = {
                 "native_vs_python": py_median / native_median,
                 "interpreter_vs_python": py_median / interpreter_median,
                 "native_vs_interpreter": interpreter_median / native_median,
             }
+            for cpp_mode in ("cpp_O2", "cpp_O3"):
+                cpp_median = (
+                    item["summary"][cpp_mode]["median_ns"]
+                    if item["summary"][cpp_mode]
+                    else None
+                )
+                if cpp_median is not None:
+                    speedups[f"native_vs_{cpp_mode}"] = cpp_median / native_median
+                    speedups[f"{cpp_mode}_vs_python"] = py_median / cpp_median
+            item["speedups"] = speedups
         else:
             item["speedups"] = {
                 "native_vs_python": None,
@@ -728,7 +846,7 @@ def main() -> int:
             "compile_status": item["compilation"]["status"],
             "compile_duration_ns": item["compilation"].get("duration_ns"),
         }
-        for mode in ("interpreter", "native", "python"):
+        for mode in ("interpreter", "native", "python", "cpp_O2", "cpp_O3"):
             stats = item["summary"][mode] or {}
             row[f"{mode}_status"] = item["mode_status"].get(mode)
             for stat in ("min_ns", "max_ns", "mean_ns", "median_ns", "stdev_ns"):

@@ -171,6 +171,10 @@ run_success(
     "tests/runtime/array_scopes.zp"
     "4\n6\n7\n9\n2\n1\n2\n9\n"
 )
+run_success(
+    "tests/native/unknown_dynamic_operation.zp"
+    "text1\n"
+)
 
 expect_check_error(
     "tests/runtime/array_type_mismatch.zp"
@@ -237,6 +241,22 @@ expect_runtime_error(
     "tests/runtime/array_index_out_of_bounds.zp"
     "tests[/\\\\]runtime[/\\\\]array_index_out_of_bounds\\.zp:[0-9]+:[0-9]+: array index 4\\.000000 is out of bounds.*at readPastEnd.*at main"
 )
+execute_process(
+    COMMAND "${ZP}" run
+        "${SOURCE_DIR}/tests/runtime/array_index_out_of_bounds.zp"
+        --diagnostics=json
+    RESULT_VARIABLE runtime_json_status
+    OUTPUT_VARIABLE runtime_json_output
+    ERROR_VARIABLE runtime_json_error
+    TIMEOUT 10
+)
+if(runtime_json_status EQUAL 0 OR
+   NOT "${runtime_json_output}${runtime_json_error}" MATCHES
+       "\"code\":\"E6001\".*\"category\":\"Runtime error\"")
+    message(FATAL_ERROR
+        "runtime diagnostic has the wrong code or category\n"
+        "${runtime_json_output}${runtime_json_error}")
+endif()
 expect_runtime_error(
     "tests/native/dynamic_array_pop_empty.zp"
     "cannot pop from an empty array"

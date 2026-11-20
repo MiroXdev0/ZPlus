@@ -1,0 +1,274 @@
+use zmath as math
+use zstring as text
+use zcollections as collections
+use zrandom as random
+use zfile as file
+use zpath as path
+use ztime as time
+use zenv as env
+use zargs as args
+use zlog as log
+use zmemory.management as memory
+
+start {
+    fn secretFunction(): string {
+        printz("Z+ is made by Miroslav Aleksandrov")
+        let secret: string = "Miroslav Aleksandrov has the most aura on earth"
+        return secret
+    } end fn
+// Z+ feature tour. Run with: zp run feature_tour.zp -- optional-argument
+
+    struct Report {
+        title: string
+        score: number = 0
+    } end struct
+
+    class Counter {
+        value: number = 0
+
+        fn increment(): number {
+            this.value += 1
+            return this.value
+        } end fn
+    } end class
+
+    enum DemoState {
+        Ready
+        Running
+        Done
+    } end enum
+
+    namespace DemoNamespace {
+        fn answer(): number {
+            return 42
+        } end fn
+    } end namespace
+
+    fn add(left: number, right: number): number {
+        return left + right
+    } end fn
+
+    fn factorial(value: number): number {
+        if value <= 1 {
+            return 1
+        } end if
+        return value * factorial(value - 1)
+    } end fn
+
+    fn greeting(name: string = "friend"): string {
+        return "Hello, " + name
+    } end fn
+
+    fn removeDemoFile(filePath: string) {
+        if file.exists(filePath) {
+            file.delete(filePath)
+        } end if
+    } end fn
+
+    fn failIfNegative(value: number) {
+        if value < 0 {
+            throw "negative values are not allowed"
+        } end if
+        say("value accepted")
+    } end fn
+
+    fn earlyReturn(value: number): number {
+        defer {
+            say("defer: early-return scope")
+        } end defer
+        if value > 0 {
+            return value
+        } end if
+        return 0
+    } end fn
+
+    const heading: string = "Z+ feature tour"
+    let version: string = "1.3.0"
+    let integerValue: number = 42
+    let decimalValue: number = 3.5
+    let hexadecimalValue: number = 0x10
+    let binaryValue: number = 0b101
+    let initial: char = 'Z'
+    let enabled: boolean = true
+    let emptyValue = null
+
+    say(heading + " - " + version)
+    say(integerValue + decimalValue)
+    say(hexadecimalValue + binaryValue)
+    say(initial == 'Z' ? "Z" : "not Z")
+    say(enabled and not false ? "true" : "false")
+    say(emptyValue == null ? "true" : "false")
+    say(greeting())
+    say(greeting("Z+"))
+    say(factorial(5))
+
+    let arithmetic: number = add(10, 4)
+    arithmetic += 2
+    arithmetic -= 1
+    arithmetic *= 2
+    arithmetic /= 2
+    arithmetic %= 7
+    say(arithmetic)
+    say((1 | 2) ^ 3)
+    say((2 << 2) + (8 >> 1))
+    say(-integerValue)
+    say(~0)
+
+    let comparison: boolean = integerValue >= 40 and integerValue != 0
+    let label: string = comparison ? "condition true" : "condition false"
+    say(label)
+    if comparison {
+        say("if branch")
+    } else if integerValue == 0 {
+        say("else-if branch")
+    } else {
+        say("else branch")
+    } end if
+
+    let values: number[] = [1, 2, 3]
+    push(values, 4)
+    insert(values, 1, 8)
+    say(values[1])
+    let removedValue: number = remove(values, 1)
+    say(removedValue)
+    say(values[1] == 2 ? "remove: ok" : "remove: failed")
+    let poppedValue: number = pop(values)
+    say(poppedValue)
+    say(contains(values, 3) ? "true" : "false")
+    say(length(values))
+
+    let matrix: number[][] = [[1, 2], [3, 4]]
+    say(matrix[1][0])
+    let total: number = collections.sum(values)
+    let ordered: number[] = collections.sort([3, 1, 2])
+    say(total)
+    say(ordered[0])
+
+    for index in 0..length(values) {
+        say("range item " + text.repeat(".", index) + text.upper("x"))
+    } end for
+
+    for item in values {
+        say("array item")
+        say(item)
+    } end for
+
+    let whileCount: number = 0
+    while whileCount < 2 {
+        whileCount++
+    } end while
+    say(whileCount)
+
+    repeat(2) {
+        say("repeat loop")
+    } end repeat
+
+    for (let index: number = 0; index < 4; index++) {
+        if index == 1 {
+            continue
+        } end if
+        if index == 3 {
+            break
+        } end if
+        say("C-style loop")
+        say(index)
+    } end for
+
+    switch total {
+        case 10 {
+            say("switch matched ten")
+        }
+        case 6 {
+            say("switch matched six")
+        }
+        default {
+            say("switch default")
+        }
+    } end switch
+
+    let report = Report("arrays and functions", total)
+    report.score += 1
+    if report is Report {
+        say(report.title)
+        say(report.score)
+    } else {
+        say("unexpected report type")
+    } end if
+
+    let counter = Counter()
+    say(counter.increment())
+    say(counter.increment() == 2 ? "class: ok" : "class: failed")
+    let state: DemoState = DemoState.Ready
+    say(state == DemoState.Ready ? "enum: ok" : "enum: failed")
+    say(DemoNamespace.answer() == 42 ? "namespace: ok" : "namespace: failed")
+
+    say(text.upper(text.trim("  standard library  ")))
+    let words: string[] = text.split("one,two,three", ",")
+    say(text.join(words, " / "))
+    say(math.sqrt(81))
+    say(math.pow(2, 5))
+
+    random.seed(7)
+    let randomNumber: number = random.integer(1, 6)
+    let randomItem: number = random.choice([10, 20, 30])
+    say(randomNumber >= 1 and randomNumber <= 6 and (randomItem == 10 or randomItem == 20 or randomItem == 30) ? "random: ok" : "random: failed")
+
+    let outputPath: string = path.join(env.currentDirectory(), "zplus-tour.txt")
+    defer {
+        removeDemoFile(outputPath)
+    } end defer
+    file.write(outputPath, "first line\n")
+    file.append(outputPath, "second line")
+    say(file.read(outputPath))
+    say(file.exists(outputPath) ? "true" : "false")
+    say(file.size(outputPath))
+
+    let timestamp: number = time.parse("2000-01-02", "%Y-%m-%d")
+    say(time.format(timestamp, "%Y-%m-%d"))
+
+    env.set("ZPLUS_TOUR", "visible")
+    say(env.get("ZPLUS_TOUR"))
+    say(args.count())
+    if args.count() > 0 {
+        say(args.get(0))
+    } else {
+        say("no command-line argument")
+    } end if
+
+    let logPath: string = path.join(env.currentDirectory(), "zplus-tour.log")
+    defer {
+        removeDemoFile(logPath)
+    } end defer
+    log.setOutput(logPath)
+    log.setLevel("warning")
+    log.info("filtered message")
+    log.warning("warning written to the log")
+    log.setOutput("")
+    let logContent: string = file.read(logPath)
+    say(text.contains(logContent, "warning written to the log") ? "logging: ok" : "logging: failed")
+
+    say("early return value")
+    say(earlyReturn(7))
+    try {
+        try {
+            failIfNegative(-1)
+        } catch inner {
+            say("inner catch: " + inner.message)
+            throw inner
+        } end try
+    } catch outer {
+        say("outer catch: " + outer.message)
+    } end try
+
+    defer {
+        say("defer: first registered")
+    } end defer
+    defer {
+        say("defer: second registered")
+    } end defer
+
+    memory.collect()
+    let liveObjects: number = memory.heapObjects()
+    say(liveObjects >= 0 ? "memory: ok" : "memory: failed")
+    printz("Z+ feature tour complete\n")
+} stop

@@ -51,6 +51,54 @@ function(run_interpreter_case name expected_output)
     endif()
 endfunction()
 
+function(run_native_interpreter_parity name expected_output)
+    set(source "${SOURCE_DIR}/tests/native/${name}.zp")
+    set(executable "${WORK_DIR}/${name}.native")
+
+    execute_process(
+        COMMAND "${ZP}" run "${source}"
+        RESULT_VARIABLE interpreter_result
+        OUTPUT_VARIABLE interpreter_output
+        ERROR_VARIABLE interpreter_error
+        TIMEOUT 15
+    )
+    if(NOT interpreter_result EQUAL 0 OR
+       NOT "${interpreter_output}" STREQUAL "${expected_output}")
+        message(FATAL_ERROR
+            "${name}: interpreter result mismatch (${interpreter_result})\n"
+            "expected: [${expected_output}]\nactual: [${interpreter_output}]\n"
+            "${interpreter_error}")
+    endif()
+
+    execute_process(
+        COMMAND "${ZP}" build "${source}" -o "${executable}"
+        RESULT_VARIABLE build_result
+        OUTPUT_VARIABLE build_stdout
+        ERROR_VARIABLE build_stderr
+        TIMEOUT 20
+    )
+    if(NOT build_result EQUAL 0)
+        message(FATAL_ERROR
+            "${name}: native build failed (${build_result})\n"
+            "${build_stdout}${build_stderr}")
+    endif()
+
+    execute_process(
+        COMMAND "${executable}"
+        RESULT_VARIABLE native_result
+        OUTPUT_VARIABLE native_output
+        ERROR_VARIABLE native_error
+        TIMEOUT 15
+    )
+    if(NOT native_result EQUAL 0 OR
+       NOT "${native_output}" STREQUAL "${interpreter_output}")
+        message(FATAL_ERROR
+            "${name}: interpreter/native result mismatch (${native_result})\n"
+            "interpreter: [${interpreter_output}]\n"
+            "native: [${native_output}]\n${native_error}")
+    endif()
+endfunction()
+
 function(run_native_runtime_error name expected_message)
     set(source "${SOURCE_DIR}/tests/native/${name}.zp")
     set(executable "${WORK_DIR}/${name}.native")
@@ -87,7 +135,9 @@ function(run_native_build_error name expected_message)
         TIMEOUT 15
     )
     if(build_result EQUAL 0 OR
-       NOT "${build_stdout}${build_stderr}" MATCHES "${expected_message}")
+       NOT "${build_stdout}${build_stderr}" MATCHES "${expected_message}" OR
+       NOT "${build_stdout}${build_stderr}" MATCHES
+           "E5001.*Backend error")
         message(FATAL_ERROR "${name}: expected native build error [${expected_message}]\n${build_stdout}${build_stderr}")
     endif()
 endfunction()
@@ -278,6 +328,25 @@ run_input_failure(
     "read_boolean: end of input")
 run_input_arity_check()
 
+run_native_interpreter_parity(
+    deferred_stack_arguments
+    "0\n10\n15\n21\n22\ntwo\nsix\n5\n22\ntwo\nsix\n5\n22\ntwo\nsix\n5\n42.5\ntwo\nsix\nten\ntwelve\n5\n")
+run_native_interpreter_parity(
+    indexed_compound_assignments
+    "11.875\n10\n")
+run_native_interpreter_parity(
+    register_allocation
+    "CHECKSUM register_allocation 318720\n")
+run_native_interpreter_parity(
+    xmm_direct
+    "CHECKSUM xmm_direct 422.5\n")
+run_native_interpreter_parity(
+    floating_remainder
+    "1.5\n-1.5\n1.5\n-1.5\n1\n-1.5\n")
+run_native_interpreter_parity(
+    systemv_arguments
+    "float 0 passed\nfloat 4 passed\nfloat 6 passed\nfloat 7 passed\nfloat 8 passed\nfloat 9 passed\nfloat 12 passed\nfloat 16 passed\ninteger 7 passed\ninteger 9 passed\ninteger 12 passed\ninteger 16 passed\nmixed integer overflow passed\nmixed float overflow passed\npointer-1\npointer-2\npointer-3\npointer-4\npointer-5\npointer-6\npointer-7\npointer-8\npointer-9\ndeferred integer stack passed\ndeferred float stack passed\n")
+
 run_case(empty 0 "")
 run_case(main_exit_code 42 "native main returned 42\n")
 run_case(integer_return 0 "integer constant passed\n")
@@ -298,12 +367,25 @@ run_case(
     "2.75\n3.25\n4.25\n1.75\n1.25\n3.75\n3\n2\n8\n4\n5\n4\n12\n6\n1\n2\n1\neq\nne\nlt\nle\ngt\nge\ninverse\npositive\nnegative\n"
 )
 run_case(operators 0 "operators passed\n")
+run_case(
+    bitwise_defined
+    0
+    "1\n-4\n-9.223372036854776e+18\n-9.223372036854776e+18\n"
+)
+run_case(member_bitwise_assignment 0 "4\n")
+run_case(unicode_characters 0 "é\n🙂\n")
 run_case(control_flow 0 "control flow passed\n")
 run_case(loop_control 0 "loop control passed\n")
 run_case(functions 0 "function calls passed\n")
 run_case(switch 0 "switch passed\n")
 run_case(output 0 "native backend éЖ🙂 legacy output\ntrue\nfalse\ntrue\n")
 run_interpreter_case(output "native backend éЖ🙂 legacy output\ntrue\nfalse\ntrue\n")
+run_interpreter_case(
+    bitwise_defined
+    "1\n-4\n-9.223372036854776e+18\n-9.223372036854776e+18\n"
+)
+run_interpreter_case(member_bitwise_assignment "4\n")
+run_interpreter_case(unicode_characters "é\n🙂\n")
 run_case(classes 0 "2\n5\n5\n10\n")
 run_interpreter_case(classes "2\n5\n5\n10\n")
 run_case(enums 0 "true\n4\ntrue\n")
@@ -330,6 +412,10 @@ run_interpreter_case(
     "string equality passed\nstring inequality passed\ndynamic string equality passed\ndynamic string inequality passed\ndynamic conjunction passed\n"
 )
 run_native_build_error(unsupported_say_type "unsupported_say_type.zp:3:8")
+run_native_build_error(
+    unknown_dynamic_operation
+    "native backend: operations on unknown values are unsupported")
+run_interpreter_case(unknown_dynamic_operation "text1\n")
 run_interpreter_case(
     arrays
     "empty array passed\ninitialized array read and write passed\narray argument mutation passed\nnested array mutation passed\narrays\nboolean array passed\narray references survived collection\nnative \nunreachable arrays reclaimed\nmanaged array collection passed\n"
@@ -384,6 +470,10 @@ if(HOST_WINDOWS)
         structs
         0
         "struct type check passed\nstruct reference identity passed\n11\nnative\n19\nnative\n19\nstruct references survived collection\n"
+    )
+    run_native_runtime_error(
+        modulo_by_zero
+        "modulo by zero"
     )
     run_native_runtime_error(
         dynamic_array_pop_empty

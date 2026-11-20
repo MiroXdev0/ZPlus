@@ -1,5 +1,5 @@
 (() => {
-  const { course, docs, wiki, examples } = window.ZPlusSite;
+  const { course, docs, wiki, examples, zts, zjs } = window.ZPlusSite;
   const main = document.querySelector("#main");
   const footer = document.querySelector("#site-footer");
   const search = document.querySelector("#site-search");
@@ -36,6 +36,8 @@
   const contentIndex = [
     ...docs.map(item => ({ title: item.title, summary: item.summary, href: `/docs/${item.id}`, type: "Documentation" })),
     ...wiki.map(item => ({ title: item.title, summary: item.summary, href: `/wiki/${item.id}`, type: "Wiki" })),
+    { title: zts.title, summary: zts.summary, href: "/zts", type: "Web interoperability" },
+    { title: zjs.title, summary: zjs.summary, href: "/zjs", type: "Web interoperability" },
     ...lessons.map(item => ({ title: item.title, summary: item.explain, href: `/learn/${item.id}`, type: `Lesson ${item.number}` })),
     ...examples.map(item => ({ title: item.title, summary: item.summary, href: `/examples#${item.id}`, type: "Example" })),
     { title: "Package registry", summary: "Search and inspect published Z+ packages.", href: "/packages", type: "Registry" },
@@ -123,6 +125,8 @@
         ${link("/learn", "Learn")}
         ${link("/docs", "Documentation")}
         ${link("/wiki", "Wiki")}
+        ${link("/zts", "ZTS")}
+        ${link("/zjs", "ZJS")}
         ${link("/packages", "Registry")}
         ${link("/dashboard", "Developer account")}
         <a href="${releasesUrl}" target="_blank" rel="noreferrer">GitHub Releases ↗</a>
@@ -164,7 +168,7 @@
     </section>
     <section class="section-block resource-strip">
       <div><p class="eyebrow">The reference shelf</p><h2>Learn the rules.<br>See what is implemented.</h2></div>
-      <div class="resource-links">${link("/docs", "Technical documentation", "resource-link")} ${link("/wiki", "Wiki & practical guides", "resource-link")} ${link("/examples", "Runnable examples", "resource-link")}</div>
+      <div class="resource-links">${link("/docs", "Technical documentation", "resource-link")} ${link("/wiki", "Wiki & practical guides", "resource-link")} ${link("/examples", "Runnable examples", "resource-link")} ${link("/zts", "TypeScript interoperability · experimental", "resource-link")} ${link("/zjs", "JavaScript interoperability · experimental", "resource-link")}</div>
     </section>
     <section class="section-block registry-callout">
       <div><p class="eyebrow">ZPM PACKAGE REGISTRY</p><h2>Find a package.<br>Share what you build.</h2><p>Search published Z+ packages, inspect their manifests and release history, or sign in to publish a verified archive.</p></div>
@@ -468,7 +472,7 @@
     return `<section class="page-hero compact"><p class="eyebrow">${label}</p><h1>${label === "Technical reference" ? "Documentation" : label}</h1><p>${label === "Technical reference" ? "Precise reference for syntax, modules, tools, and runtime limits." : "Practical explanations of how Z+ is designed and used."} Search across both sections from the bar above.</p></section><div class="article-grid">${items.map(item => `<a class="article-card" href="${base}/${item.id}"><p class="eyebrow">${escapeHtml(item.section || "GUIDE")}</p><h2>${escapeHtml(item.title)}</h2><p>${escapeHtml(item.summary)}</p><span>Read article →</span></a>`).join("")}</div>`;
   }
 
-  function articlePage(item, kind, all, base) {
+  function articlePage(item, kind, all, base, extraRelated = []) {
     if (!item) return notFound();
     const index = all.indexOf(item);
     const previous = all[index - 1];
@@ -476,7 +480,7 @@
     const sections = item.body;
     return `<article class="article-page"><div class="breadcrumbs">${link("/", "Home")} <span>/</span> ${link(base, kind)} <span>/</span> ${escapeHtml(item.title)}</div><div class="article-layout"><div><p class="eyebrow">${escapeHtml(item.section || kind)}</p><h1>${escapeHtml(item.title)}</h1><p class="article-lede">${escapeHtml(item.summary)}</p>
       ${sections.map(([heading, text], sectionIndex) => `<section id="${slug(heading)}"><h2>${escapeHtml(heading)}</h2><p>${inlineMarkup(text)}</p>${kind === "Documentation" && sectionIndex === 0 ? `<p>${link("/learn", "Follow the step-by-step learning course")} · ${link("/examples", "Browse runnable examples")}</p>` : ""}</section>`).join("")}
-      <div class="related-links"><strong>Related</strong>${link("/learn", "Learn Z+")}${link("/examples", "Examples")}${link(kind === "Wiki" ? "/docs" : "/wiki", kind === "Wiki" ? "Technical documentation" : "Wiki guides")}</div>
+      <div class="related-links"><strong>Related</strong>${link("/learn", "Learn Z+")}${link("/examples", "Examples")}${link(kind === "Wiki" ? "/docs" : "/wiki", kind === "Wiki" ? "Technical documentation" : "Wiki guides")}${extraRelated.map(item => link(item.href, item.label)).join("")}</div>
       <nav class="article-pager">${previous ? link(`${base}/${previous.id}`, `← ${escapeHtml(previous.title)}`) : "<span></span>"}${next ? link(`${base}/${next.id}`, `${escapeHtml(next.title)} →`) : "<span></span>"}</nav>
       </div><aside class="table-of-contents"><strong>ON THIS PAGE</strong><ol>${sections.map(([heading]) => `<li><a href="#${slug(heading)}">${escapeHtml(heading)}</a></li>`).join("")}</ol></aside></div></article>`;
   }
@@ -922,6 +926,7 @@
     document.querySelectorAll(".primary-nav a").forEach(anchor => {
       const active = route === anchor.pathname || (anchor.pathname === "/learn" && route.startsWith("/learn/")) ||
         (anchor.pathname === "/docs" && route.startsWith("/docs/")) || (anchor.pathname === "/wiki" && route.startsWith("/wiki/")) ||
+        (anchor.pathname === "/zts" && route === "/zts") || (anchor.pathname === "/zjs" && route === "/zjs") ||
         (anchor.pathname === "/packages" && route.startsWith("/packages")) ||
         (anchor.pathname === "/dashboard" && ["/dashboard", "/publish", "/login", "/register"].includes(route));
       anchor.classList.toggle("nav-active", active);
@@ -958,6 +963,12 @@
       const item = wikiArticles.find(article => article.id === route.slice(6));
       main.innerHTML = articlePage(item, "Wiki", wikiArticles, "/wiki");
       document.title = item ? `${item.title} — Z+ Wiki` : "Not found — Z+";
+    } else if (route === "/zts") {
+      main.innerHTML = articlePage(zts, "ZTS", [zts], "/zts", [{ href: "/zjs", label: "ZJS JavaScript guide" }]);
+      document.title = "ZTS TypeScript interoperability — Z+";
+    } else if (route === "/zjs") {
+      main.innerHTML = articlePage(zjs, "ZJS", [zjs], "/zjs", [{ href: "/zts", label: "ZTS TypeScript guide" }]);
+      document.title = "ZJS JavaScript interoperability — Z+";
     } else if (route === "/examples") {
       main.innerHTML = examplesPage();
       document.title = "Examples — Z+";
@@ -998,6 +1009,8 @@
       : route.startsWith("/learn/") ? lessonById.get(route.slice(7))?.explain
       : route.startsWith("/docs/") ? docs.find(item => item.id === route.slice(6))?.summary
       : route.startsWith("/wiki/") ? wiki.find(item => item.id === route.slice(6))?.summary
+      : route === "/zts" ? zts.summary
+      : route === "/zjs" ? zjs.summary
       : route === "/docs" ? "Technical reference for Z+ syntax, modules, tools, and runtime support."
       : route === "/wiki" ? "Guides to Z+ architecture, modules, projects, and contributing."
       : route === "/examples" ? "Real Z+ source examples for functions, files, modules, and collections."

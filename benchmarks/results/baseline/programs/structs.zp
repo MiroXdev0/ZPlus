@@ -1,0 +1,19 @@
+start {
+    struct Counter {
+        value: number
+    } end struct
+
+    let iterations: number = 10000 // BENCH_ITERATIONS
+    let expected: number = 39994 // BENCH_EXPECTED
+    let counter = Counter(0)
+
+    for (let i: number = 0; i < iterations; i++) {
+        counter.value += i % 7 + 1
+    } end for
+
+    if counter.value == expected {
+        say("CHECKSUM structs 39994")
+    } else {
+        say("CHECKSUM_ERROR structs")
+    } end if
+} stop

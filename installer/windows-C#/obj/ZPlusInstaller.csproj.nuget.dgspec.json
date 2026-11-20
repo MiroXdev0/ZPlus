@@ -5,10 +5,10 @@
   },
   "projects": {
     "C:\\Users\\miros\\OneDrive\\Desktop\\Projects\\Z+ compiler\\installer\\windows-C#\\ZPlusInstaller.csproj": {
-      "version": "1.0.0",
+      "version": "1.3.3",
       "restore": {
         "projectUniqueName": "C:\\Users\\miros\\OneDrive\\Desktop\\Projects\\Z+ compiler\\installer\\windows-C#\\ZPlusInstaller.csproj",
-        "projectName": "ZPlus-1.1.2-Setup",
+        "projectName": "ZPlus-1.3.3-Setup",
         "projectPath": "C:\\Users\\miros\\OneDrive\\Desktop\\Projects\\Z+ compiler\\installer\\windows-C#\\ZPlusInstaller.csproj",
         "packagesPath": "C:\\Users\\miros\\.nuget\\packages\\",
         "outputPath": "C:\\Users\\miros\\OneDrive\\Desktop\\Projects\\Z+ compiler\\installer\\windows-C#\\obj\\",

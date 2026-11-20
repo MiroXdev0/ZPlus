@@ -3,7 +3,7 @@ if(NOT DEFINED ZP OR NOT DEFINED SOURCE_DIR OR NOT DEFINED WORK_DIR)
 endif()
 
 file(MAKE_DIRECTORY "${WORK_DIR}")
-set(program "${SOURCE_DIR}/test.zp")
+set(program "${SOURCE_DIR}/tests/integration/feature_tour.zp")
 set(argument "feature-tour-argument")
 
 execute_process(

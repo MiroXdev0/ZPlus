@@ -1,0 +1,60 @@
+use zweb as web
+
+start {
+    let routes = "[]"
+    routes = web.routeAdd(routes, "GET", "/api/greetings/{name}", "greeting")
+    routes = web.routeAdd(routes, "POST", "/api/echo", "echo")
+
+    let server = web.serverCreate("127.0.0.1", 18789)
+    web.configureCors(server, "http://localhost:3000", "GET, POST, OPTIONS", "Content-Type")
+    web.serverConfigure(server, 1048576, 10000)
+    if web.serverStart(server) == false {
+        say("Could not start the Z+ interoperability example server.")
+        web.serverStop(server)
+    } else {
+        say("Z+ interoperability example is running at http://127.0.0.1:18789")
+        let requests = 0
+        while requests < 2 {
+            let request = web.serverNext(server, 250)
+            if request != "" {
+                let requestId = web.requestNumber(request)
+                let method = web.requestMethod(request)
+                let path = web.requestPath(request)
+                let matched = web.routeMatch(routes, method, path)
+                let status = web.jsonGetNumber(matched, "/status")
+                if status == 404 {
+                    web.serverRespondJson(server, requestId, 404, web.securityHeaders("{}"), "{\"error\":\"Not found.\"}")
+                } else if status == 405 {
+                    let allow = web.jsonGetString(matched, "/allow")
+                    let headers = "{\"allow\":" + web.jsonQuote(allow) + "}"
+                    web.serverRespondJson(server, requestId, 405, web.securityHeaders(headers), "{\"error\":\"Method not allowed.\"}")
+                } else {
+                    let handler = web.jsonGetString(matched, "/handler")
+                    if handler == "greeting" {
+                        let parameters = web.jsonGet(matched, "/params")
+                        let name = web.jsonGetString(parameters, "/name")
+                        let locale = web.queryValue(web.requestQuery(request), "locale")
+                        let selectedLocale = locale
+                        if selectedLocale == "" {
+                            selectedLocale = "en"
+                        } end if
+                        let body = "{\"message\":" + web.jsonQuote("Hello " + name)
+                        body = body + ",\"locale\":" + web.jsonQuote(selectedLocale) + "}"
+                        web.serverRespondJson(server, requestId, 200, web.securityHeaders("{}"), body)
+                    } else {
+                        if handler == "echo" {
+                            let body = web.requestBody(request)
+                            if web.jsonValid(body) {
+                                web.serverRespondJson(server, requestId, 200, web.securityHeaders("{}"), web.jsonCompact(body))
+                            } else {
+                                web.serverRespondJson(server, requestId, 400, web.securityHeaders("{}"), "{\"error\":\"Invalid JSON request body.\"}")
+                            } end if
+                        } end if
+                    } end if
+                } end if
+                requests = requests + 1
+            } end if
+        } end while
+        web.serverStop(server)
+    } end if
+} stop

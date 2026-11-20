@@ -1,0 +1,63 @@
+start {
+fn sum0(): number { return 0 } end fn
+fn sum4(a: number, b: number, c: number, d: number): number { return a + b + c + d } end fn
+fn sum6(a: number, b: number, c: number, d: number, e: number, f: number): number { return a + b + c + d + e + f } end fn
+fn sum7(a: number, b: number, c: number, d: number, e: number, f: number, g: number): number { return a + b + c + d + e + f + g } end fn
+fn sum8(a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number): number { return a + b + c + d + e + f + g + h } end fn
+fn sum9(a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number): number { return a + b + c + d + e + f + g + h + i } end fn
+fn sum12(a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number): number { return a + b + c + d + e + f + g + h + i + j + k + l } end fn
+fn sum16(a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number): number { return a + b + c + d + e + f + g + h + i + j + k + l + m + n + o + p } end fn
+
+fn all7(a: boolean, b: boolean, c: boolean, d: boolean, e: boolean, f: boolean, g: boolean): boolean { return a and b and c and d and e and f and g } end fn
+fn all9(a: boolean, b: boolean, c: boolean, d: boolean, e: boolean, f: boolean, g: boolean, h: boolean, i: boolean): boolean { return a and b and c and d and e and f and g and h and i } end fn
+fn all12(a: boolean, b: boolean, c: boolean, d: boolean, e: boolean, f: boolean, g: boolean, h: boolean, i: boolean, j: boolean, k: boolean, l: boolean): boolean { return a and b and c and d and e and f and g and h and i and j and k and l } end fn
+fn all16(a: boolean, b: boolean, c: boolean, d: boolean, e: boolean, f: boolean, g: boolean, h: boolean, i: boolean, j: boolean, k: boolean, l: boolean, m: boolean, n: boolean, o: boolean, p: boolean): boolean { return a and b and c and d and e and f and g and h and i and j and k and l and m and n and o and p } end fn
+
+fn mixedIntegerOverflow(a: boolean, b: number, c: boolean, d: number, e: boolean, f: number, g: boolean, h: number, i: boolean, j: number, k: boolean, l: number, m: boolean, n: number, o: boolean, p: boolean): boolean {
+    return a and c and e and g and i and k and m and o and p and b + d + f + h + j + l + n == 3.5
+} end fn
+fn mixedFloatOverflow(a: boolean, b: number, c: boolean, d: number, e: boolean, f: number, g: boolean, h: number, i: boolean, j: number, k: boolean, l: number, m: boolean, n: number, o: number, p: number): boolean {
+    return a and c and e and g and i and k and m and b + d + f + h + j + l + n + o + p == 4.5
+} end fn
+
+fn pointerStack(a: string, b: string, c: string, d: string, e: string, f: string, g: string, h: string, i: string) {
+    say(a)
+    say(b)
+    say(c)
+    say(d)
+    say(e)
+    say(f)
+    say(g)
+    say(h)
+    say(i)
+} end fn
+
+fn deferredFloatCheck(a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) {
+    if a + b + c + d + e + f + g + h + i == 4.5 { say("deferred float stack passed") } else { say("deferred float stack failed") } end if
+} end fn
+fn deferredIntegerCheck(a: boolean, b: boolean, c: boolean, d: boolean, e: boolean, f: boolean, g: boolean) {
+    if a and b and c and d and e and f and g { say("deferred integer stack passed") } else { say("deferred integer stack failed") } end if
+} end fn
+fn runDeferred() {
+    defer { deferredFloatCheck(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5) } end defer
+    defer { deferredIntegerCheck(true, true, true, true, true, true, true) } end defer
+} end fn
+
+    if sum0() == 0 { say("float 0 passed") } else { say("float 0 failed") } end if
+    if sum4(0.5, 0.5, 0.5, 0.5) == 2 { say("float 4 passed") } else { say("float 4 failed") } end if
+    if sum6(0.5, 0.5, 0.5, 0.5, 0.5, 0.5) == 3 { say("float 6 passed") } else { say("float 6 failed") } end if
+    if sum7(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5) == 3.5 { say("float 7 passed") } else { say("float 7 failed") } end if
+    if sum8(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5) == 4 { say("float 8 passed") } else { say("float 8 failed") } end if
+    if sum9(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5) == 4.5 { say("float 9 passed") } else { say("float 9 failed") } end if
+    if sum12(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5) == 6 { say("float 12 passed") } else { say("float 12 failed") } end if
+    if sum16(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5) == 8 { say("float 16 passed") } else { say("float 16 failed") } end if
+
+    if all7(true, true, true, true, true, true, true) { say("integer 7 passed") } else { say("integer 7 failed") } end if
+    if all9(true, true, true, true, true, true, true, true, true) { say("integer 9 passed") } else { say("integer 9 failed") } end if
+    if all12(true, true, true, true, true, true, true, true, true, true, true, true) { say("integer 12 passed") } else { say("integer 12 failed") } end if
+    if all16(true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true) { say("integer 16 passed") } else { say("integer 16 failed") } end if
+    if mixedIntegerOverflow(true, 0.5, true, 0.5, true, 0.5, true, 0.5, true, 0.5, true, 0.5, true, 0.5, true, true) { say("mixed integer overflow passed") } else { say("mixed integer overflow failed") } end if
+    if mixedFloatOverflow(true, 0.5, true, 0.5, true, 0.5, true, 0.5, true, 0.5, true, 0.5, true, 0.5, 0.5, 0.5) { say("mixed float overflow passed") } else { say("mixed float overflow failed") } end if
+    pointerStack("pointer-1", "pointer-2", "pointer-3", "pointer-4", "pointer-5", "pointer-6", "pointer-7", "pointer-8", "pointer-9")
+    runDeferred()
+} stop

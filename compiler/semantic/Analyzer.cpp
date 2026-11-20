@@ -17,6 +17,18 @@ const T* as(const U* node) {
     return dynamic_cast<const T*>(node);
 }
 
+bool hasTypeParameter(const Type& type) {
+    if (type.kind == TypeKind::TypeParameter) return true;
+    if (type.elementType && hasTypeParameter(*type.elementType)) return true;
+    for (const Type& argument : type.arguments) {
+        if (hasTypeParameter(argument)) return true;
+    }
+    for (const Type& parameter : type.parameters) {
+        if (hasTypeParameter(parameter)) return true;
+    }
+    return type.returnType && hasTypeParameter(*type.returnType);
+}
+
 } // namespace
 
 
@@ -1687,10 +1699,18 @@ void Analyzer::analyzeAssignmentStatement(
             *statement.target
         );
 
+    const auto* arrayValue =
+        as<zplus::ast::ArrayExpression>(statement.value.get());
+    const std::optional<Type> previousExpectedType = expectedExpressionType_;
+    if (arrayValue && arrayValue->elements.empty() &&
+        target.kind == TypeKind::Array) {
+        expectedExpressionType_ = target;
+    }
     Type value =
         expressionType(
             *statement.value
         );
+    expectedExpressionType_ = previousExpectedType;
 
     if (!isAssignable(target, value)) {
 
@@ -3013,12 +3033,20 @@ Type Analyzer::typeOfBinary(
                 return Type::string();
             }
 
+            if (isUnknown(left) || isUnknown(right)) {
+                return Type::unknown();
+            }
+
             [[fallthrough]];
 
         case zplus::TokenType::Minus:
         case zplus::TokenType::Star:
         case zplus::TokenType::Slash:
         case zplus::TokenType::Percent:
+
+            if (isUnknown(left) || isUnknown(right)) {
+                return Type::unknown();
+            }
 
             if (
                 (
@@ -3198,10 +3226,18 @@ Type Analyzer::typeOfAssignment(
             *expression.target
         );
 
+    const auto* arrayValue =
+        as<zplus::ast::ArrayExpression>(expression.value.get());
+    const std::optional<Type> previousExpectedType = expectedExpressionType_;
+    if (arrayValue && arrayValue->elements.empty() &&
+        target.kind == TypeKind::Array) {
+        expectedExpressionType_ = target;
+    }
     Type value =
         expressionType(
             *expression.value
         );
+    expectedExpressionType_ = previousExpectedType;
 
     if (!isValidAssignmentTarget(
             *expression.target
@@ -3392,6 +3428,10 @@ Type Analyzer::typeOfConditional(
             *expression.elseExpression
         );
 
+    if (isUnknown(thenType) || isUnknown(elseType)) {
+        return Type::unknown();
+    }
+
     if (!typesEqual(
             thenType,
             elseType
@@ -3466,13 +3506,6 @@ Type Analyzer::typeOfCall(
                     return Type::unknown();
                 }
 
-                std::vector<Type> argumentTypes;
-                argumentTypes.reserve(expression.arguments.size());
-                for (const auto& argument : expression.arguments) {
-                    argumentTypes.push_back(
-                        argument ? expressionType(*argument) : Type::unknown());
-                }
-
                 if (!expression.explicitTypeArguments.empty() &&
                     expression.explicitTypeArguments.size() !=
                         declarationType.arguments.size()) {
@@ -3503,6 +3536,29 @@ Type Analyzer::typeOfCall(
                         }
                         typeArguments.push_back(std::move(actual));
                     }
+                }
+
+                std::vector<Type> argumentTypes;
+                argumentTypes.reserve(expression.arguments.size());
+                for (std::size_t index = 0;
+                     index < expression.arguments.size(); ++index) {
+                    const auto& argument = expression.arguments[index];
+                    if (!argument) {
+                        argumentTypes.push_back(Type::unknown());
+                        continue;
+                    }
+                    const Type expected =
+                        substitute(fieldTypes[index], substitutions);
+                    const auto* array =
+                        as<zplus::ast::ArrayExpression>(argument.get());
+                    const std::optional<Type> previousExpectedType =
+                        expectedExpressionType_;
+                    if (array && array->elements.empty() &&
+                        expected.kind == TypeKind::Array) {
+                        expectedExpressionType_ = expected;
+                    }
+                    argumentTypes.push_back(expressionType(*argument));
+                    expectedExpressionType_ = previousExpectedType;
                 }
 
                 for (std::size_t index = 0; index < argumentTypes.size(); ++index) {
@@ -3631,17 +3687,66 @@ Type Analyzer::typeOfCall(
 
     std::vector<Type> argumentTypes;
 
-    for (const auto& argument :
-         expression.arguments) {
+    const BuiltinMetadata* calledBuiltin = nullptr;
+    if (calleeIdentifier) {
+        calledBuiltin = builtinRegistry_.find(calleeIdentifier->name);
+    }
 
-        if (argument) {
-
-            argumentTypes.push_back(
-                expressionType(
-                    *argument
-                )
-            );
+    std::vector<Type> resolvedExplicitTypeArguments;
+    TypeSubstitution argumentContextSubstitutions;
+    if (calleeType.kind == TypeKind::Function &&
+        !calleeType.genericParameters.empty() &&
+        expression.explicitTypeArguments.size() ==
+            calleeType.genericParameters.size()) {
+        resolvedExplicitTypeArguments.reserve(
+            expression.explicitTypeArguments.size());
+        for (std::size_t index = 0;
+             index < expression.explicitTypeArguments.size();
+             ++index) {
+            Type argument = expression.explicitTypeArguments[index]
+                ? resolveType(*expression.explicitTypeArguments[index])
+                : Type::unknown();
+            argumentContextSubstitutions.emplace(
+                calleeType.genericParameters[index].id, argument);
+            resolvedExplicitTypeArguments.push_back(std::move(argument));
         }
+    }
+
+    for (std::size_t index = 0;
+         index < expression.arguments.size();
+         ++index) {
+        const auto& argument = expression.arguments[index];
+        if (!argument) {
+            argumentTypes.push_back(Type::unknown());
+            continue;
+        }
+
+        const Type* expectedType = nullptr;
+        std::optional<Type> contextualExpectedType;
+        if (calledBuiltin &&
+            !calledBuiltin->signature.parameters.empty()) {
+            const std::size_t parameter =
+                std::min(index, calledBuiltin->signature.parameters.size() - 1);
+            expectedType = &calledBuiltin->signature.parameters[parameter];
+        } else if (calleeType.kind == TypeKind::Function &&
+                   index < calleeType.parameters.size()) {
+            contextualExpectedType =
+                substitute(calleeType.parameters[index],
+                           argumentContextSubstitutions);
+            expectedType = &*contextualExpectedType;
+        }
+
+        const auto* array =
+            as<zplus::ast::ArrayExpression>(argument.get());
+        const std::optional<Type> previousExpectedType =
+            expectedExpressionType_;
+        if (array && array->elements.empty() &&
+            expectedType && expectedType->kind == TypeKind::Array &&
+            !hasTypeParameter(*expectedType)) {
+            expectedExpressionType_ = *expectedType;
+        }
+        argumentTypes.push_back(expressionType(*argument));
+        expectedExpressionType_ = previousExpectedType;
     }
 
     if (calleeIdentifier) {
@@ -3756,7 +3861,8 @@ Type Analyzer::typeOfCall(
         if (!expression.explicitTypeArguments.empty()) {
             for (std::size_t index = 0;
                  index < expression.explicitTypeArguments.size(); ++index) {
-                Type argument = resolveType(*expression.explicitTypeArguments[index]);
+                const Type& argument =
+                    resolvedExplicitTypeArguments[index];
                 const auto& parameter = genericParameters[index];
                 bool satisfiesConstraints = true;
                 for (const TypeConstraint constraint : parameter.constraints) {
@@ -4246,13 +4352,18 @@ Type Analyzer::typeOfArray(
 ) {
 
     if (expression.elements.empty()) {
+        if (expectedExpressionType_ &&
+            expectedExpressionType_->kind == TypeKind::Array) {
+            return *expectedExpressionType_;
+        }
         return Type::array(
             Type::unknown()
         );
     }
 
-    Type elementType =
-        Type::unknown();
+    Type elementType = Type::unknown();
+    bool hasConcreteElement = false;
+    bool hasUnknownElement = false;
 
     for (const auto& element :
          expression.elements) {
@@ -4266,13 +4377,14 @@ Type Analyzer::typeOfArray(
                 *element
             );
 
-        if (
-            isUnknown(elementType)
-        ) {
+        if (isUnknown(currentType)) {
+            hasUnknownElement = true;
+            continue;
+        }
 
-            elementType =
-                currentType;
-
+        if (!hasConcreteElement) {
+            elementType = currentType;
+            hasConcreteElement = true;
             continue;
         }
 
@@ -4291,7 +4403,7 @@ Type Analyzer::typeOfArray(
     }
 
     return Type::array(
-        std::move(elementType)
+        hasUnknownElement ? Type::unknown() : std::move(elementType)
     );
 }
 

@@ -562,6 +562,38 @@ start {
     { id: "packages", title: "Publishing Z+ packages", summary: "Build, publish, and install packages with ZPM.", body: "The Z+ registry accepts versioned ZPM archives. Use `zpm init` to create a package, `zpm pack` to produce an archive, and `zpm publish` or the website's Publish page to publish it. Registry archives are limited to 4 MiB; the server validates metadata and archive contents before publication. Use `zpm search` and `zpm add` to discover and install published dependencies." },
   ];
 
+  const zts = {
+    id: "zts",
+    title: "ZTS — TypeScript interoperability",
+    section: "Experimental web interoperability",
+    summary: "Generate a typed TypeScript-facing client for JSON APIs served by Z+.",
+    body: [
+      ["Status and scope", "ZTS is an experimental interoperability workflow, not a new language mode or a TypeScript compiler. It uses existing TypeScript and npm tooling together with the Z+ web interoperability generator. The generator produces a JavaScript Fetch client and a matching `.d.ts` declaration file from an OpenAPI JSON contract."],
+      ["Version and changelog", "ZTS has no separate stable release or binary. The private generator package is version 0.1.0 and experimental. Initial changelog: generate a Fetch ES module and matching TypeScript declarations from supported OpenAPI 3.0/3.1 JSON. No standalone ZTS compiler or downloadable binary is published."],
+      ["Install and generate", "The generator is not published to npm. From a frontend project beside a checkout of this repository, install `../Z-lang-release/tools/zplus-web-interop` as a development dependency, then run `npx zplus-web-interop generate api/openapi.json --out src/generated`. The generator writes `zplus-api.js` and `zplus-api.d.ts`; it refuses to overwrite either unless `--force` is supplied."],
+      ["Typed operations and shared data", "OpenAPI `components.schemas` become TypeScript types. Supported schemas include local references, objects, arrays, primitives, literal enums, nullable types, and oneOf/anyOf/allOf compositions. Path, query, and header parameters and JSON request bodies become typed operation inputs. This provides shared contract types, but does not inspect Z+ source or prove that server routes match the contract."],
+      ["Call a Z+ API", "Import `createClient` from `./generated/zplus-api.js`, create a client with `baseUrl`, then call `await api.getGreeting({ path: { name: \"Ada\" }, query: { locale: \"en\" } })`. Responses are checked by TypeScript through the generated declaration. Non-2xx responses reject with `ApiError`; network, abort, and invalid JSON failures are not converted into successful empty values."],
+      ["Connect the Z+ server", "ZWeb provides JSON request/response helpers, route matching, and explicit CORS configuration. Serve the OpenAPI contract and implement each described route with the existing `serverNext`, `routeMatch`, and `serverRespondJson` APIs. For browser cookie sessions, configure Fetch `credentials: \"include\"` and matching credential-aware CORS at the trusted deployment boundary."],
+      ["Compatibility limits", "The tool accepts a documented subset of OpenAPI 3.0/3.1 JSON; remote references, non-JSON bodies, custom parameter serialization, and unsupported schema keywords are rejected. Z+ does not parse TypeScript source, generate declarations directly from Z+ declarations, compile TypeScript, or provide WebSockets, async handlers, HTTPS transport, or source maps. Use TypeScript's own compiler for TypeScript language features."]
+    ]
+  };
+
+  const zjs = {
+    id: "zjs",
+    title: "ZJS — JavaScript interoperability",
+    section: "Experimental web interoperability",
+    summary: "Use a generated ES module client with native JavaScript Fetch and browser tools.",
+    body: [
+      ["Status and scope", "ZJS is an experimental JavaScript interoperability workflow, not a JavaScript runtime or a backend language. It generates an ES module that calls JSON endpoints implemented by a Z+ server. The generated client uses the standard Fetch API and has no runtime dependency."],
+      ["Version and changelog", "ZJS has no separate stable release or binary. The private generator package is version 0.1.0 and experimental. Initial changelog: generate an ES module Fetch client from supported OpenAPI 3.0/3.1 JSON. No standalone ZJS runtime or downloadable binary is published."],
+      ["Install and generate", "The generator is not published to npm. Install the local package from a repository checkout with `npm install --save-dev ../Z-lang-release/tools/zplus-web-interop`, then run `npx zplus-web-interop generate api/openapi.json --out src/generated`. Import the generated client from `./generated/zplus-api.js` in an existing ES module or npm application."],
+      ["Use JavaScript modules", "Create a client with `createClient({ baseUrl: \"https://api.example.test\" })` and call generated operations with `await api.getGreeting({ path: { name: \"Ada\" } })`. Use the caller's existing JavaScript module system, bundler, and npm packages; this tool does not rewrite or bundle the rest of the application."],
+      ["Promises, browser APIs, and errors", "Generated operations return Promises and accept an optional `AbortSignal`. Use browser-native DOM, events, WebSocket, and other Web APIs directly. The generated client does not polyfill browser APIs or add a Z+ WebSocket feature. HTTP error responses reject with `ApiError`, including status, body, and the original response."],
+      ["Authentication and transport", "Supply bearer headers through the client's `headers` option, or select `credentials: \"include\"` for same-origin or explicitly CORS-enabled cookie sessions. Never put private credentials in browser bundles. The browser may use HTTPS through a trusted host or reverse proxy; the current Z+ `zhttp` client itself only accepts `http://` URLs."],
+      ["Compatibility limits", "The generated client supports GET, POST, PUT, PATCH, DELETE, HEAD, and OPTIONS; path/query/header parameters; JSON request bodies; and JSON or bodyless success responses from the supported OpenAPI 3.0/3.1 subset. It does not execute JavaScript inside Z+, provide a JS server runtime, add WebSockets to ZWeb, or guarantee that an API contract matches its application implementation."]
+    ]
+  };
+
   const examples = [
     { id: "hello", title: "Hello World", summary: "The smallest executable Z+ program.", code: `start {
     say("Hello, Z+!")
@@ -651,5 +683,5 @@ start {
 } stop` },
   ];
 
-  return { course, docs, wiki, examples };
+  return { course, docs, wiki, examples, zts, zjs };
 })();

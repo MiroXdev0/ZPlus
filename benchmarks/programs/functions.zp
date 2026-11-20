@@ -1,8 +1,8 @@
-fn arithmetic(value: number): number {
-    return (value * 7 + 3) % 101
-} end fn
-
 start {
+    fn arithmetic(value: number): number {
+        return (value * 7 + 3) % 101
+    } end fn
+
     let iterations: number = 50000 // BENCH_ITERATIONS
     let expected: number = 2492250 // BENCH_EXPECTED
     let checksum: number = 0

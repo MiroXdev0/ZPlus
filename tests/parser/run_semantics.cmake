@@ -108,3 +108,20 @@ foreach(case unsupported_is malformed_binary_literal invalid_escape expected_tok
         endif()
     endif()
 endforeach()
+
+execute_process(
+    COMMAND "${ZP}" check
+        "${SOURCE_DIR}/tests/parser/unicode_position.zp"
+        --diagnostics=json
+    RESULT_VARIABLE unicode_position_status
+    OUTPUT_VARIABLE unicode_position_output
+    ERROR_VARIABLE unicode_position_error
+    TIMEOUT 20
+)
+if(unicode_position_status EQUAL 0 OR
+   NOT "${unicode_position_output}${unicode_position_error}" MATCHES
+       "\"line\":2,\"column\":15")
+    message(FATAL_ERROR
+        "unicode_position: diagnostic column is not UTF-16-compatible\n"
+        "${unicode_position_output}${unicode_position_error}")
+endif()

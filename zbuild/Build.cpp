@@ -28,7 +28,7 @@
 #include <unordered_set>
 
 #ifndef ZBUILD_VERSION
-#define ZBUILD_VERSION "development"
+#define ZBUILD_VERSION "1.0.0"
 #endif
 
 #ifdef _WIN32

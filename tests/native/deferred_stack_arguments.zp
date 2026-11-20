@@ -1,0 +1,86 @@
+start {
+fn record0() {
+    say(0)
+} end fn
+
+fn record4(a: number, b: number, c: number, d: number) {
+    say(a + b + c + d)
+} end fn
+
+fn record5(a: number, b: number, c: number, d: number, e: number) {
+    say(a + b + c + d + e)
+} end fn
+
+fn record6(a: number, b: number, c: number, d: number, e: number, f: number) {
+    say(a + b + c + d + e + f)
+} end fn
+
+fn record8(a: number, b: string, c: number, first: number[], d: number, e: string, f: number, second: number[]) {
+    say(a + c + length(first) + d + f + length(second))
+    say(b)
+    say(e)
+    say(length(first) + length(second))
+} end fn
+
+fn record12(a: number, b: string, c: number, first: number[], d: number, e: string, f: number, second: number[], g: number, h: string, i: number, j: string) {
+    say(a + c + length(first) + d + f + length(second) + g + i)
+    say(b)
+    say(e)
+    say(h)
+    say(j)
+    say(length(first) + length(second))
+} end fn
+
+fn deferred0() {
+    defer {
+        record0()
+    } end defer
+} end fn
+
+fn deferred4() {
+    defer {
+        record4(1, 2, 3, 4)
+    } end defer
+} end fn
+
+fn deferred5() {
+    defer {
+        record5(1, 2, 3, 4, 5)
+    } end defer
+} end fn
+
+fn deferred6() {
+    defer {
+        record6(1, 2, 3, 4, 5, 6)
+    } end defer
+} end fn
+
+fn deferred8Only(first: number[], second: number[]) {
+    defer {
+        record8(1, "two", 3.5, first, 5, "six", 7.5, second)
+    } end defer
+} end fn
+
+fn deferred8WithOrdinaryCall(first: number[], second: number[]) {
+    record8(1, "two", 3.5, first, 5, "six", 7.5, second)
+    defer {
+        record8(1, "two", 3.5, first, 5, "six", 7.5, second)
+    } end defer
+} end fn
+
+fn deferred12(first: number[], second: number[]) {
+    defer {
+        record12(1, "two", 3.5, first, 5, "six", 7.5, second, 9, "ten", 11.5, "twelve")
+    } end defer
+} end fn
+
+    let first: number[] = [2, 4]
+    let second: number[] = [3, 5, 7]
+    deferred0()
+    deferred4()
+    deferred5()
+    deferred6()
+    deferred8Only(first, second)
+    deferred8WithOrdinaryCall(first, second)
+    deferred12(first, second)
+} stop

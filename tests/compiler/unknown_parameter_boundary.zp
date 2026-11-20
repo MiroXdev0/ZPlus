@@ -1,0 +1,9 @@
+start {
+    fn acceptNumber(value: number) -> number {
+        return value
+    } end fn
+
+    fn forward(value) {
+        acceptNumber(value)
+    } end fn
+} stop

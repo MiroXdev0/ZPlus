@@ -1,0 +1,4 @@
+start {
+    say('é')
+    say('🙂')
+} stop

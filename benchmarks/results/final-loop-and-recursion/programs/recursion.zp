@@ -1,0 +1,22 @@
+start {
+    fn recursive_sum(value: number): number {
+        if value == 0 {
+            return 0
+        } end if
+        return value + recursive_sum(value - 1)
+    } end fn
+
+    let iterations: number = 50000 // BENCH_ITERATIONS
+    let expected: number = 1191560 // BENCH_EXPECTED
+    let checksum: number = 0
+
+    for (let i: number = 0; i < iterations; i++) {
+        checksum += recursive_sum(i % 12)
+    } end for
+
+    if checksum == expected {
+        say("CHECKSUM recursion 1191560")
+    } else {
+        say("CHECKSUM_ERROR recursion")
+    } end if
+} stop

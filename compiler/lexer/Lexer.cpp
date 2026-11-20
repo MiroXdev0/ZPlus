@@ -2,6 +2,7 @@
 #include "../NumericLiteral.hpp"
 
 #include <cctype>
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -48,11 +49,13 @@ void Lexer::advance() {
         return;
     }
 
-    if (current() == '\n') {
+    const unsigned char byte =
+        static_cast<unsigned char>(current());
+    if (byte == '\n') {
         ++line_;
         column_ = 1;
-    } else {
-        ++column_;
+    } else if ((byte & 0xC0) != 0x80) {
+        column_ += byte >= 0xF0 && byte <= 0xF4 ? 2 : 1;
     }
 
     ++position_;
@@ -693,7 +696,7 @@ void Lexer::lexCharacter(
             case 'f': value = "\f"; break;
             case 'v': value = "\v"; break;
             case 'a': value = "\a"; break;
-            case '0': value = "\0"; break;
+            case '0': value.assign(1, '\0'); break;
             case '\\': value = "\\"; break;
             case '\'': value = "'"; break;
             case '"': value = "\""; break;
@@ -711,9 +714,66 @@ void Lexer::lexCharacter(
         advance();
 
     } else {
+        const unsigned char lead =
+            static_cast<unsigned char>(current());
+        std::size_t length = 1;
+        std::uint32_t codePoint = lead;
+        std::uint32_t minimum = 0;
+        if (lead >= 0xC2 && lead <= 0xDF) {
+            length = 2;
+            codePoint = lead & 0x1F;
+            minimum = 0x80;
+        } else if (lead >= 0xE0 && lead <= 0xEF) {
+            length = 3;
+            codePoint = lead & 0x0F;
+            minimum = 0x800;
+        } else if (lead >= 0xF0 && lead <= 0xF4) {
+            length = 4;
+            codePoint = lead & 0x07;
+            minimum = 0x10000;
+        } else if (lead >= 0x80) {
+            length = 0;
+        }
 
-        value += current();
-        advance();
+        bool valid = length != 0 &&
+            position_ + length <= source_.size();
+        for (std::size_t index = 1; valid && index < length; ++index) {
+            const unsigned char continuation =
+                static_cast<unsigned char>(source_[position_ + index]);
+            if ((continuation & 0xC0) != 0x80) {
+                valid = false;
+                break;
+            }
+            codePoint = (codePoint << 6) | (continuation & 0x3F);
+        }
+        valid = valid &&
+            (length == 1 ||
+             (codePoint >= minimum && codePoint <= 0x10FFFF &&
+              !(codePoint >= 0xD800 && codePoint <= 0xDFFF)));
+
+        if (!valid) {
+            error(
+                "character literal must contain one valid Unicode scalar value",
+                startLine,
+                startColumn
+            );
+            while (!isAtEnd() && current() != '\'' && current() != '\n') {
+                advance();
+            }
+            if (current() == '\'') advance();
+            tokens.push_back(makeToken(
+                zplus::TokenType::Unknown,
+                "",
+                startLine,
+                startColumn
+            ));
+            return;
+        }
+
+        for (std::size_t index = 0; index < length; ++index) {
+            value += current();
+            advance();
+        }
     }
 
     if (current() != '\'') {

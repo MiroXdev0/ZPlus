@@ -1,0 +1,8 @@
+start {
+    say(1 << 64)
+    say(-8 >> 1)
+    say(1 << 63)
+
+    let invalid: number = 0 / 0
+    say(invalid | 0)
+} stop

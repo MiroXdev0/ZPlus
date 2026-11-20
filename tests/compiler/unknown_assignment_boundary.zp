@@ -1,0 +1,5 @@
+start {
+    let dynamic
+    let concrete: number = 1
+    concrete = dynamic
+} stop

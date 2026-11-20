@@ -8,7 +8,7 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $buildDir = Join-Path $root 'build-zbuild'
 $cachePath = Join-Path $buildDir 'CMakeCache.txt'
 $releaseDir = Join-Path $root 'release\windows'
-$releaseZip = Join-Path $root 'release\ZPlus-1.1.2-Windows-x64.zip'
+$releaseZip = Join-Path $root 'release\ZPlus-1.3.3-Windows-x64.zip'
 $payloadDir = Join-Path $releaseDir 'payload'
 
 function Invoke-Checked {
@@ -52,7 +52,7 @@ if (-not (Test-Path (Join-Path $binaryDir 'zp.exe')) -or
     throw "Release compiler or ZBuild output is missing from '$binaryDir'."
 }
 $versionOutput = (& (Join-Path $binaryDir 'zp.exe') version | Out-String).Trim()
-if ($LASTEXITCODE -ne 0 -or $versionOutput -ne 'Z+ Compiler 1.1.2') {
+if ($LASTEXITCODE -ne 0 -or $versionOutput -ne 'Z+ Compiler 1.3.3') {
     throw "Release compiler version verification failed: '$versionOutput'."
 }
 
@@ -194,7 +194,7 @@ foreach ($file in Get-ChildItem $payloadDir -Recurse -File | Sort-Object FullNam
 }
 $manifest = [ordered]@{
     product = 'Z+'
-    version = '1.1.2'
+    version = '1.3.3'
     files = $files
     components = $components
 }
@@ -211,7 +211,7 @@ Invoke-Checked 'dotnet' @(
     '-p:IncludeNativeLibrariesForSelfExtract=true', '-p:EnableCompressionInSingleFile=true',
     '--output', $releaseDir
 )
-$setup = Join-Path $releaseDir 'ZPlus-1.1.2-Setup.exe'
+$setup = Join-Path $releaseDir 'ZPlus-1.3.3-Setup.exe'
 if (-not (Test-Path $setup -PathType Leaf)) {
     throw "The published setup executable was not produced: $setup"
 }
@@ -228,7 +228,7 @@ if (-not $SkipTests) {
     & (Join-Path $PSScriptRoot 'tests\Run-InstallerTests.ps1') -ReleaseDirectory $releaseDir
 }
 
-$temporaryZip = Join-Path $env:TEMP "ZPlus-1.1.2-Windows-x64-$([guid]::NewGuid().ToString('N')).zip"
+$temporaryZip = Join-Path $env:TEMP "ZPlus-1.3.3-Windows-x64-$([guid]::NewGuid().ToString('N')).zip"
 [IO.Compression.ZipFile]::CreateFromDirectory(
     $releaseDir, $temporaryZip, [IO.Compression.CompressionLevel]::Optimal, $false)
 New-Item -ItemType Directory -Path (Split-Path $releaseZip -Parent) -Force | Out-Null

@@ -1,0 +1,7 @@
+start {
+    fn addOne(value) {
+        say(value + 1)
+    } end fn
+
+    addOne("text")
+} stop

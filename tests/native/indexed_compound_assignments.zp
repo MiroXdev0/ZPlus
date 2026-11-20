@@ -1,0 +1,27 @@
+start {
+    let values: number[] = []
+    push(values, 1.5)
+    push(values, 2.25)
+    push(values, 3)
+    push(values, 4.125)
+
+    for (let i: number = 0; i < length(values); i++) {
+        values[i] += 0.5
+        values[i] -= 0.25
+        values[i] *= 2
+        values[i] /= 2
+    } end for
+
+    let floatingChecksum: number = 0
+    for (let i: number = 0; i < length(values); i++) {
+        floatingChecksum += values[i]
+    } end for
+    say(floatingChecksum)
+
+    let integerValues: number[] = [1, 2, 3, 4]
+    let integerChecksum: number = 0
+    for (let i: number = 0; i < length(integerValues); i++) {
+        integerChecksum += integerValues[i]
+    } end for
+    say(integerChecksum)
+} stop

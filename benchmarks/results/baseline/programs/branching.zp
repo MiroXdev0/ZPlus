@@ -1,19 +1,19 @@
-start:
+start {
     let iterations: number = 50000 // BENCH_ITERATIONS
     let expected: number = 3124925000 // BENCH_EXPECTED
     let checksum: number = 0
 
-    for (let i: number = 0; i < iterations; i++):
-        if i % 2 == 0:
+    for (let i: number = 0; i < iterations; i++) {
+        if i % 2 == 0 {
             checksum += i * 3 + 1
-        else:
+        } else {
             checksum += i * 2 - 1
-        end
-    end
+        } end if
+    } end for
 
-    if checksum == expected:
+    if checksum == expected {
         say("CHECKSUM branching 3124925000")
-    else:
+    } else {
         say("CHECKSUM_ERROR branching")
-    end
-stop
+    } end if
+} stop

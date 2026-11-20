@@ -1,0 +1,9 @@
+start {
+    fn identity<T>(value: T) -> T {
+        return value
+    } end fn
+
+    fn forward(value) {
+        identity(value)
+    } end fn
+} stop
