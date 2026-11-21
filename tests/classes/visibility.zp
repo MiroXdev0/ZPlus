@@ -1,0 +1,38 @@
+start {
+    class Player {
+        private let health: number = 100
+        protected fn reset() {
+            this.health = 100
+        } end fn
+        private fn damage(amount: number) {
+            this.health -= amount
+        } end fn
+        pub fn hit(amount: number) {
+            this.damage(amount)
+        } end fn
+        pub fn getHealth() -> number {
+            return this.health
+        } end fn
+        pub fn restore() {
+            this.reset()
+        } end fn
+    } end class
+
+    let player = Player()
+    player.hit(25)
+    player.restore()
+    player.hit(25)
+    say(player.getHealth())
+
+    // Existing unannotated members remain public for compatibility.
+    class Legacy {
+        value: number = 3
+        fn increment() -> number {
+            this.value += 1
+            return this.value
+        } end fn
+    } end class
+    let legacy = Legacy()
+    say(legacy.increment())
+    say(legacy.value)
+} stop

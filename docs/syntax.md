@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This reference describes the language accepted by the Z+ 1.3.5 command-line compiler in this repository. It follows the lexer, parser, semantic analyzer, IR builder, and interpreter—not proposed or aspirational features.
+This reference describes the language accepted by the Z+ 1.4.0 development compiler in this repository. It follows the lexer, parser, semantic analyzer, IR builder, and interpreter—not proposed or aspirational features.
 
 The status labels used below mean:
 
@@ -478,8 +478,8 @@ struct Name {
 } end struct
 
 class Name {
-    field [: type] [= initializer]
-    fn method(...) {
+    [pub | private | protected] [let] field [: type] [= initializer]
+    [pub | private | protected] fn method(...) {
         ...
     } end fn
 } end class
@@ -528,16 +528,47 @@ start {
 } stop
 ```
 
-Fields without defaults are required constructor arguments. Constructor arguments fill fields in declaration order, so required fields must precede defaulted fields. Current field defaults must be literals. Assignment, array insertion, and function argument/return passing preserve object identity; mutating an alias changes the same instance. Interpreter structs are traced by the interpreter's managed heap. Windows native structs are tagged managed references in the existing native tracing heap; collection traces references in arrays and struct fields. Fields are public; per-field visibility is not implemented.
+Fields without defaults are required constructor arguments. Constructor arguments fill fields in declaration order, so required fields must precede defaulted fields. Current field defaults must be literals. Assignment, array insertion, and function argument/return passing preserve object identity; mutating an alias changes the same instance. Interpreter structs are traced by the interpreter's managed heap. Windows native structs are tagged managed references in the existing native tracing heap; collection traces references in arrays and struct fields. Struct fields remain public.
 
 Classes use typed fields, literal field initializers, implicit positional
-construction, instance methods, and `this` for field access. Enums assign
+construction, instance methods, and `this` for field access. Class members
+accept `pub`, `private`, or `protected`. Members without an explicit modifier
+remain public for compatibility with existing classes. `private` and
+`protected` members are accessible only from methods of the declaring class;
+the analyzer rejects other accesses before interpretation or native code
+generation. `protected` is reserved for subclass access, but inheritance is
+not implemented yet, so subclasses cannot currently be declared. The `let`
+keyword before a class field is optional. For example:
+
+```zp
+start {
+    class Player {
+        private let health: number = 100
+        pub fn getHealth() -> number {
+            return this.health
+        } end fn
+        pub fn damage(amount: number) {
+            this.health -= amount
+        } end fn
+    } end class
+
+    let player = Player()
+    player.damage(25)
+    say(player.getHealth())
+} stop
+```
+
+Conflicting or repeated visibility modifiers and duplicate member names are
+errors. Visibility is enforced consistently for interpreter and native
+programs because both pass through semantic analysis. Classes work across
+modules when the class itself is exported; member access follows the same
+rules after import. Enums assign
 successive numeric values unless a member specifies a numeric literal. Enum
 members retain the declared enum type for assignment, comparisons, and
 function parameters/returns. Class and enum interpreter/native behavior is
 covered by regression tests on Windows x64. Inheritance, explicit
-constructors, member visibility modifiers, and function values are not
-implemented. Linux native aggregate operations remain unsupported.
+constructors, and function values are not implemented. Linux native aggregate
+operations remain unsupported.
 
 ### Pointers and references
 
@@ -757,7 +788,7 @@ Bitwise operators follow the tiers shown above. The parser does not recognize `a
 | `zphysics` standard module | `use zphysics` and its documented API pass checking | Box2D engine and Windows native runtime are implemented; Linux native execution is not validated |
 | `import`, `export`, namespaces | Parsed and analyzed | Legacy `import` does not load files; `export` wraps declarations; namespace functions use qualified names |
 | `pub` | Parsed for module functions, variables/constants, structs, classes, and enums | Enforced for imported references |
-| `public`, `private`, `protected`, `this` | `this` is supported in class methods; visibility keywords are lexed | Class-member visibility syntax is not implemented |
+| `public`, `private`, `protected`, `this` | `this` is supported in class methods; visibility modifiers are supported on class fields and methods | Non-public access is checked semantically; protected subclass access awaits inheritance |
 | Casts (`as`), scope resolution (`::`), braces, `#`, `@` | Some are tokenized | No corresponding parser implementation |
 | Native `zp build` | Not a source-language feature | Generates a native executable for its supported IR subset; see [NATIVE_BACKEND.md](./NATIVE_BACKEND.md) for platform support and limitations |
 

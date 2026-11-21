@@ -1,0 +1,42 @@
+<h1>Z+ Compiler 1.3.5</h1>
+<p>Z+ 1.3.5 is the final stabilization release of the 1.3.x series. ZPM and ZPBuild remain at 1.0.0.</p>
+<h2>Included and verified</h2>
+<ul>
+  <li>Compiler release metadata and the CLI version identify 1.3.5.</li>
+  <li>The release regression suite covers the existing parser, interpreter, native backend, runtime, standard library, package manager, build system, and installer workflows.</li>
+  <li>Parser recovery now guarantees token progress when synchronization stops on a token that the enclosing parse loop would otherwise retry. Regression cases cover:
+    <ul>
+      <li>Malformed switch terminators.</li>
+      <li>Malformed struct and enum members.</li>
+      <li>Legacy switch recovery.</li>
+      <li>An imported class member using the unsupported <code>pub</code> modifier.</li>
+    </ul>
+    These cases terminate with diagnostics; class visibility modifiers remain outside the 1.3.5 language.
+  </li>
+  <li>The existing imported ZShell project passes <code>zp check</code>, <code>zp dependencies</code>, and <code>zp build</code>. Its interactive <code>zp run</code> displays the greeting and prompt; the application remains in its command loop by design.</li>
+  <li>The input runtime changes present in this worktree support prompted and unprompted line and typed input, with interpreter/native Windows coverage, EOF and conversion error handling, and native string-rooting stress cases.</li>
+  <li>The Windows x64 release was built with Inno Setup 7.1.1. The generated installer, manifest, and SHA-256 sidecar were checked; an isolated install ran the installed project workflow and uninstalled cleanly.</li>
+  <li>The final installer audit verified an upgrade from 1.3.4, same-version repair, default and custom install locations, PATH restoration, and uninstallation.
+    <ul>
+      <li>Setup refuses to downgrade a newer registered compiler or relocate an existing installation during repair or upgrade.</li>
+      <li>Build staging verifies the staged compiler hash and includes shipped tools and runtime resources without unit-test binaries, benchmarks, or linker artifacts.</li>
+      <li>New installs refuse nonempty unregistered destination directories to avoid replacing unrelated files.</li>
+    </ul>
+  </li>
+  <li>The complete Windows Release CTest run passed 50/50 tests, including package resolution, ZPBuild workflows, runtime/input tests, native execution, and installer workflow tests.</li>
+</ul>
+<h2>Compatibility</h2>
+<p>No intentional language or package-format incompatibility is introduced by the version update. ZPM and ZPBuild versions are unchanged. The compiler's native backend continues to have a narrower supported platform and feature set than the interpreter; see <a href="https://github.com/MiroXdev0/ZPluse-release/blob/main/NATIVE_BACKEND.md">NATIVE_BACKEND.md</a>.</p>
+<h2>Release components</h2>
+<table>
+  <thead><tr><th>Component</th><th>Version</th></tr></thead>
+  <tbody><tr><td>Z+ Compiler</td><td>1.3.5</td></tr><tr><td>ZPM</td><td>1.0.0</td></tr><tr><td>ZPBuild</td><td>1.0.0</td></tr></tbody>
+</table>
+<p>Read the <a href="https://github.com/MiroXdev0/ZPluse-release/releases/tag/v1.3.5">official 1.3.5 release</a> for downloads.</p>
+<p><img src="https://zpluse.vercel.app/assets/zplus-logo-light.png" alt="Z+ logo"></p>
+<pre><code>zp --version
+zp check hello.zp</code></pre>
+<h2>Limitations</h2>
+<blockquote><p>Linux native runtime behavior and installation are not claimed as verified unless the release test run is executed on Linux.</p></blockquote>
+<p>The architecture work recommended for 1.4.0 is described in <a href="https://github.com/MiroXdev0/ZPluse-release/blob/main/docs/1.4.0-ROADMAP.md">docs/1.4.0-ROADMAP.md</a>.</p>
+<hr>

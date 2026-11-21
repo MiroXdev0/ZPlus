@@ -1,0 +1,5 @@
+start {
+    class Secret {
+        private pub value: number = 7
+    } end class
+} stop

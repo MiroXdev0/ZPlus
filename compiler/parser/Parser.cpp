@@ -4193,6 +4193,30 @@ Parser::parseClass() {
         !(braced ? check(TokenType::RightBrace) : check(TokenType::End))
     ) {
 
+        using Visibility = zplus::ast::MemberVisibility;
+        Visibility visibility = Visibility::Public;
+        bool sawVisibility = false;
+        const auto isVisibilityToken = [this]() {
+            return check(TokenType::Pub) || check(TokenType::Public) ||
+                   check(TokenType::Private) || check(TokenType::Protected);
+        };
+        while (isVisibilityToken()) {
+            const Token modifier = current();
+            Visibility parsed = Visibility::Public;
+            if (match(TokenType::Private)) {
+                parsed = Visibility::Private;
+            } else if (match(TokenType::Protected)) {
+                parsed = Visibility::Protected;
+            } else {
+                advance(); // `pub` and `public` are equivalent.
+            }
+            if (sawVisibility) {
+                errorAt(modifier, "duplicate or conflicting class-member visibility modifier");
+            }
+            visibility = parsed;
+            sawVisibility = true;
+        }
+
         // ----------------------------------------------------
         // Method
         // ----------------------------------------------------
@@ -4215,6 +4239,7 @@ Parser::parseClass() {
                     function->ownerClass = declaration->name;
                     function->internalName =
                         declaration->name + "::" + function->name;
+                    function->memberVisibility = visibility;
 
                     declaration->methods.emplace_back(
                         function
@@ -4230,6 +4255,7 @@ Parser::parseClass() {
         // Field
         // ----------------------------------------------------
 
+        const bool hasLet = match(TokenType::Let);
         if (check(TokenType::Identifier)) {
 
             const Token fieldToken =
@@ -4247,6 +4273,7 @@ Parser::parseClass() {
 
             field->name =
                 current().value;
+            field->visibility = visibility;
 
             advance();
 
@@ -4279,6 +4306,10 @@ Parser::parseClass() {
 
             skipNewlines();
             continue;
+        }
+
+        if (hasLet) {
+            error("expected class field name after 'let'");
         }
 
         error(

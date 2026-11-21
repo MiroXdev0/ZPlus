@@ -378,7 +378,7 @@
       ${title ? `<p class="release-title">${escapeHtml(title)}</p>` : ""}
       <p class="release-platform"><span class="live-dot"></span>${asset ? `Compatible download: ${escapeHtml(target.label)}` : `Checking for ${escapeHtml(target.label)} installer`}</p>
       ${downloadAction}
-      ${release.body ? `<details class="release-notes" open><summary>Release notes</summary><pre>${escapeHtml(release.body)}</pre></details>` : `<div class="release-notes"><p class="muted">No release notes were published.</p></div>`}
+      ${release.body ? `<details class="release-notes" open><summary>Release notes</summary><div class="release-notes-content">${window.renderReleaseNotes(release.body)}</div></details>` : `<div class="release-notes"><p class="muted">No release notes were published.</p></div>`}
       <section class="release-assets"><h3>Available assets</h3>${assetList}</section>
     </article>`;
   }

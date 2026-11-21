@@ -12,7 +12,7 @@ node website\server.mjs
 
 Open `http://localhost:8000`. Set the `PORT` environment variable to use another port. `_redirects` supplies a Netlify rewrite; `404.html` recovers deep links on static hosts that serve a root-level 404 page. Deploy the contents of this directory at the domain root and configure host fallback/rewrite behavior for `index.html`.
 
-No build step, client-side dependency, secret, API key, or analytics service is used. Release information is fetched from the public GitHub Releases API for `MiroXdev0/ZPluse-release`; the official Releases page is shown as a fallback. Progress is stored in this browser's local storage.
+No build step or external client service is used. Release information is fetched from the public GitHub Releases API for `MiroXdev0/ZPluse-release`; release-note HTML is sanitized in the browser with the locally served DOMPurify 3.4.18 bundle. The bundled sanitizer is tracked alongside its npm dependency and should be refreshed from `node_modules/dompurify/dist/purify.min.js` when updating that dependency. The official Releases page is shown as a fallback. Progress is stored in this browser's local storage.
 
 The shared transparent logo artwork is maintained in the repository's `logo/` directory. The website header uses the dark-surface artwork; the favicon selects the corresponding light or dark artwork from the visitor's color-scheme preference.
 

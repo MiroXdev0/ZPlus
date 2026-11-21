@@ -13,6 +13,12 @@
 
 namespace zplus::ast {
 
+enum class MemberVisibility {
+    Public,
+    Private,
+    Protected
+};
+
 // ============================================================
 // Source location
 // ============================================================
@@ -1162,6 +1168,8 @@ struct FunctionDeclaration final : Statement {
 
     bool isPrivate = false;
 
+    MemberVisibility memberVisibility = MemberVisibility::Public;
+
     bool isExported = false;
 
     std::string moduleName;
@@ -1260,11 +1268,7 @@ struct ClassField final : Node {
 
     Expr initializer;
 
-    bool isPublic = true;
-
-    bool isPrivate = false;
-
-    bool isProtected = false;
+    MemberVisibility visibility = MemberVisibility::Public;
 };
 
 

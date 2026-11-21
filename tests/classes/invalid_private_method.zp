@@ -1,0 +1,12 @@
+start {
+    class Secret {
+        private fn reveal() -> number {
+            return 7
+        } end fn
+        pub fn expose() -> number {
+            return this.reveal()
+        } end fn
+    } end class
+    let item = Secret()
+    say(item.reveal())
+} stop
