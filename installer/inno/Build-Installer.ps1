@@ -228,12 +228,35 @@ try {
 
     New-Item -ItemType Directory -Path $temporaryDirectory -Force | Out-Null
     $stageDirectory = Join-Path $temporaryDirectory 'stage'
-    Copy-DirectoryContents -SourceDirectory $binaryDirectory -DestinationDirectory (Join-Path $stageDirectory 'bin')
     $stagedBinaryDirectory = Join-Path $stageDirectory 'bin'
+    New-Item -ItemType Directory -Path $stagedBinaryDirectory -Force | Out-Null
+    $sourceCompilerHash = (Get-FileHash -LiteralPath (Join-Path $binaryDirectory 'zp.exe') -Algorithm SHA256).Hash
+    foreach ($relativePath in @(
+        'zp.exe',
+        'zbuild.exe',
+        'zpbuild.exe',
+        'zpm.exe',
+        'zgraphics_runtime.dll',
+        'zaudio_runtime.dll',
+        'zphysics_runtime.dll',
+        'zplus_input_runtime.dll',
+        'sqlite3.dll'
+    )) {
+        Copy-Item -LiteralPath (Join-Path $binaryDirectory $relativePath) `
+            -Destination $stagedBinaryDirectory
+    }
+    Copy-DirectoryContents -SourceDirectory (Join-Path $binaryDirectory 'stdlib') `
+        -DestinationDirectory (Join-Path $stagedBinaryDirectory 'stdlib')
+    Copy-DirectoryContents -SourceDirectory (Join-Path $binaryDirectory 'zbuild-templates') `
+        -DestinationDirectory (Join-Path $stagedBinaryDirectory 'zbuild-templates')
     $stagedCompiler = Join-Path $stagedBinaryDirectory 'zp.exe'
     $stagedCompilerVersion = Get-CompilerVersion -CompilerPath $stagedCompiler
     if ($stagedCompilerVersion -ne $version) {
         throw "Staged compiler version $stagedCompilerVersion does not match bin compiler version $version."
+    }
+    $stagedCompilerHash = (Get-FileHash -LiteralPath $stagedCompiler -Algorithm SHA256).Hash
+    if ($stagedCompilerHash -ne $sourceCompilerHash) {
+        throw 'The staged compiler is not byte-identical to the selected Release compiler.'
     }
     $stagedZbuild = Join-Path $stagedBinaryDirectory 'zbuild.exe'
     $stagedZbuildVersion = (& $stagedZbuild --version 2>&1 | Out-String).Trim()

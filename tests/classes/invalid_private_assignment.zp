@@ -1,0 +1,7 @@
+start {
+    class Secret {
+        private value: number = 7
+    } end class
+    let item = Secret()
+    item.value = 8
+} stop

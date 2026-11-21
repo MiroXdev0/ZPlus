@@ -1,5 +1,5 @@
 start {
-    class commands {
+    pub class Greeter {
         pub fn message(name: string): string {
             return "Hello, " + name
         } end fn

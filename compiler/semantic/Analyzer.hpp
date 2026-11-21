@@ -426,6 +426,8 @@ private:
     std::unordered_map<std::string, const zplus::ast::EnumDeclaration*>
         enumDeclarations_;
 
+    std::string currentClassName_;
+
     std::unordered_map<std::string, std::string> moduleNamesByFile_;
 
     std::unordered_map<std::string, std::string> privateTypeOwners_;

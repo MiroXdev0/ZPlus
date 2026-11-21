@@ -1,0 +1,7 @@
+start {
+    class Secret {
+        protected value: number = 7
+    } end class
+    let item = Secret()
+    say(item.value)
+} stop

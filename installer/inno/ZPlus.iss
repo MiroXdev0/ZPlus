@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #error "Build with Build-Installer.ps1 so AppVersion comes from bin\zp.exe."
+  #error "Build with Build-Installer.ps1 so AppVersion comes from the selected Release compiler."
 #endif
 #ifndef StageDirectory
   #error "Build with Build-Installer.ps1 so StageDirectory contains the staged local distribution."
@@ -128,6 +128,19 @@ begin
       Version);
 end;
 
+function GetRegisteredInstallLocation(var InstallLocation: String): Boolean;
+begin
+  Result := RegQueryStringValue(HKCU, UninstallRegistryPath, 'InstallLocation', InstallLocation);
+  if not Result then
+    Result := RegQueryStringValue(HKLM, UninstallRegistryPath, 'InstallLocation', InstallLocation);
+  if not Result then
+    Result := RegQueryStringValue(
+      HKLM,
+      'Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\{A474863A-1AE9-423A-BC40-A9D7DD3FA291}_is1',
+      'InstallLocation',
+      InstallLocation);
+end;
+
 function InitializeSetup(): Boolean;
 var
   InstalledVersion: String;
@@ -164,6 +177,51 @@ begin
     Result := Copy(Result, 2, Length(Result) - 2);
   while (Length(Result) > 3) and (Result[Length(Result)] = '\') do
     Delete(Result, Length(Result), 1);
+end;
+
+function DirectoryHasEntries(Path: String): Boolean;
+var
+  SearchRecord: TFindRec;
+begin
+  Result := True;
+  if FindFirst(Path + '\*', SearchRecord) then
+  begin
+    Result := False;
+    repeat
+      if (SearchRecord.Name <> '.') and (SearchRecord.Name <> '..') then
+      begin
+        Result := True;
+        Break;
+      end;
+    until not FindNext(SearchRecord);
+    FindClose(SearchRecord);
+  end;
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  InstalledVersion, ExistingLocation, SelectedLocation: String;
+begin
+  Result := '';
+  if not GetRegisteredVersion(InstalledVersion) then
+  begin
+    SelectedLocation := WizardDirValue;
+    if DirExists(SelectedLocation) and DirectoryHasEntries(SelectedLocation) then
+      Result := 'The selected installation directory already contains files and is not a registered Z+ installation. Choose an empty directory or uninstall the existing application before continuing.';
+    Exit;
+  end;
+
+  if not GetRegisteredInstallLocation(ExistingLocation) or (ExistingLocation = '') then
+  begin
+    Result := 'A previous Z+ installation is registered, but its installation directory could not be determined. Uninstall that installation before continuing.';
+    Exit;
+  end;
+
+  SelectedLocation := WizardDirValue;
+  if CompareText(
+       NormalizePathEntry(ExistingLocation),
+       NormalizePathEntry(SelectedLocation)) <> 0 then
+    Result := 'Z+ is already installed at ' + ExistingLocation + '. Use that directory to upgrade or repair. To move Z+ to a different directory, uninstall the existing installation first.';
 end;
 
 function ExpandKnownPathVariables(Value: string): string;

@@ -24,6 +24,14 @@ ZPBuild remain at 1.0.0.
 - The Windows x64 release was built with Inno Setup 7.1.1. The generated
   installer, manifest, and SHA-256 sidecar were checked; an isolated install
   ran the installed project workflow and uninstalled cleanly.
+- The final installer audit verified an upgrade from 1.3.4, same-version
+  repair, default and custom install locations, PATH restoration, and
+  uninstallation. Setup now refuses to downgrade a newer registered compiler
+  or relocate an existing installation during repair/upgrade. Build staging
+  verifies the staged compiler hash and includes shipped tools and runtime
+  resources without unit-test binaries, benchmarks, or linker artifacts.
+  New installs refuse nonempty unregistered destination directories to avoid
+  replacing unrelated files.
 - The complete Windows Release CTest run passed 50/50 tests, including package
   resolution, ZPBuild workflows, runtime/input tests, native execution, and
   installer workflow tests.

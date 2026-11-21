@@ -1,5 +1,6 @@
-use "commands.zh" as commands
+use "commands.zh"
 
 start {
-    say(commands.message("Z+"))
+    let greeter = Greeter()
+    say(greeter.message("Z+"))
 } stop

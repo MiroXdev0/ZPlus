@@ -142,18 +142,17 @@ if(switch_dependencies_result EQUAL 0 OR
 endif()
 
 execute_process(
-    COMMAND "${ZP}" dependencies
+    COMMAND "${ZP}" run
         "${SOURCE_DIR}/tests/parser/module_class_pub_method/main.zp"
     RESULT_VARIABLE class_dependencies_result
     OUTPUT_VARIABLE class_dependencies_output
     ERROR_VARIABLE class_dependencies_error
     TIMEOUT 20
 )
-if(class_dependencies_result EQUAL 0 OR
-   NOT "${class_dependencies_output}${class_dependencies_error}"
-       MATCHES "expected class field or method")
+if(NOT class_dependencies_result EQUAL 0 OR
+   NOT "${class_dependencies_output}" STREQUAL "Hello, Z+\n")
     message(FATAL_ERROR
-        "class_pub_method: dependencies did not terminate with a class diagnostic\n"
+        "class_pub_method: imported public class method failed\n"
         "${class_dependencies_output}${class_dependencies_error}")
 endif()
 

@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(ZPlus
-    VERSION 1.3.5
+    VERSION 1.4.0
     LANGUAGES CXX
 )
 
@@ -525,7 +525,7 @@ if(BUILD_TESTING)
 
     add_test(NAME zp_version COMMAND zp version)
     set_tests_properties(zp_version PROPERTIES
-        PASS_REGULAR_EXPRESSION "Z[+] Compiler 1\\.3\\.5"
+        PASS_REGULAR_EXPRESSION "Z[+] Compiler 1\\.4\\.0"
     )
     add_test(NAME zpbuild_version COMMAND zpbuild version)
     set_tests_properties(zpbuild_version PROPERTIES
@@ -879,6 +879,14 @@ if(BUILD_TESTING)
             "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
             "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/parser-brace-test-output"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/parser/run_brace_syntax.cmake"
+    )
+    add_test(
+        NAME class_system_visibility
+        COMMAND ${CMAKE_COMMAND}
+            "-DZP=$<TARGET_FILE:zp>"
+            "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/class-system-test-output"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/classes/run_class_system.cmake"
     )
     add_test(
         NAME standard_library_integration

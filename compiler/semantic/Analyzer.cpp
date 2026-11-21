@@ -435,6 +435,7 @@ bool Analyzer::analyze(
     structDeclarations_.clear();
     classDeclarations_.clear();
     enumDeclarations_.clear();
+    currentClassName_.clear();
     moduleNamesByFile_.clear();
     privateTypeOwners_.clear();
     ambiguousPublicTypeNames_.clear();
@@ -2143,6 +2144,8 @@ void Analyzer::analyzeFunction(
 
     const std::string previousFunction =
         currentFunctionName_;
+    const std::string previousClass = currentClassName_;
+    currentClassName_ = statement.ownerClass;
 
     currentReturnType_ =
         statement.returnType
@@ -2275,6 +2278,7 @@ void Analyzer::analyzeFunction(
 
     currentFunctionName_ =
         previousFunction;
+    currentClassName_ = previousClass;
     popGenericTypeParameters();
 }
 
@@ -4184,8 +4188,29 @@ Type Analyzer::typeOfMember(
                 }
             }
             expression.resolvedGenericTypeArguments = objectType.arguments;
+            const auto rejectInaccessible = [this, &expression, &klass](
+                zplus::ast::MemberVisibility visibility,
+                const std::string& memberName
+            ) {
+                if (visibility ==
+                        zplus::ast::MemberVisibility::Public ||
+                    currentClassName_ == klass->first) {
+                    return false;
+                }
+                const bool protectedMember = visibility ==
+                    zplus::ast::MemberVisibility::Protected;
+                error(expression,
+                      std::string(protectedMember ? "protected" : "private") +
+                          " member '" + memberName + "' of class '" +
+                          klass->second->name + "' is not accessible here",
+                      zplus::DiagnosticCategory::Type);
+                return true;
+            };
             for (const auto& field : klass->second->fields) {
                 if (field && field->name == expression.member) {
+                    if (rejectInaccessible(field->visibility, field->name)) {
+                        return Type::unknown();
+                    }
                     const Type fieldType = field->resolvedType
                         ? *field->resolvedType
                         : field->type
@@ -4198,6 +4223,9 @@ Type Analyzer::typeOfMember(
             }
             for (const auto& method : klass->second->methods) {
                 if (!method || method->name != expression.member) continue;
+                if (rejectInaccessible(method->memberVisibility, method->name)) {
+                    return Type::unknown();
+                }
                 Type methodType = method->resolvedType.value_or(Type::function(
                     {}, method->returnType
                             ? resolveType(*method->returnType)
