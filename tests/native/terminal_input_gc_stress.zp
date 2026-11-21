@@ -1,0 +1,10 @@
+start {
+    let first: string = read()
+    let current: string = ""
+    for (let index: number = 0; index < 5000; index++) {
+        current = read()
+    } end for
+
+    say(first)
+    say(current)
+} stop

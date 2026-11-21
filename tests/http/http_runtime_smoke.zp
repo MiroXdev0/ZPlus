@@ -1,7 +1,6 @@
 use zhttp as http
 
 start {
-
     let server = http.serverCreate("127.0.0.1", 0)
     if http.serverStart(server) {
         printz("http-started\n")

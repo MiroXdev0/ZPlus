@@ -31,6 +31,7 @@ NativeAvailability nativeAvailabilityFor(const std::string& name) {
     }
     if (name.rfind("__zaudio_", 0) == 0 ||
         name.rfind("__zphysics_", 0) == 0 ||
+        name == "string" ||
         name == "read" ||
         name == "read_number" ||
         name == "read_integer" ||

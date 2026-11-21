@@ -1,0 +1,28 @@
+start {
+fn accumulate(seed: number, count: number) -> number {
+    let total = seed
+    let index = 0
+    while (index < count) {
+        if (index % 2 == 0) {
+            total = total + index
+        } else {
+            total = total - index
+        } end if
+        index = index + 1
+    } end while
+    return total
+} end fn
+
+fn nested(seed: number) -> number {
+    let result = seed
+    if (seed > 0) {
+        let branch = accumulate(seed, 12)
+        result = branch
+    } else {
+        result = 0
+    } end if
+    return result
+} end fn
+
+say(nested(5))
+} stop

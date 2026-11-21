@@ -27,6 +27,7 @@ AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}/issues
 AppUpdatesURL={#ReleaseURL}
 DefaultDirName={localappdata}\Programs\ZPlus
+UsePreviousAppDir=yes
 DefaultGroupName=Z+
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
@@ -67,6 +68,93 @@ Name: "{autodesktop}\Z+ Command Prompt"; Filename: "{cmd}"; Parameters: "/K """"
 const
   EnvironmentKey = 'Environment';
   PathValueName = 'Path';
+  UninstallRegistryPath = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{A474863A-1AE9-423A-BC40-A9D7DD3FA291}_is1';
+
+function TryParseVersion(Version: String; var Major, Minor, Patch: Integer): Boolean;
+var
+  FirstDot, SecondDot: Integer;
+  Remaining, MajorText, MinorText, PatchText: String;
+begin
+  Result := False;
+  Major := -1;
+  Minor := -1;
+  Patch := -1;
+
+  FirstDot := Pos('.', Version);
+  if FirstDot <= 1 then Exit;
+  Remaining := Copy(Version, FirstDot + 1, Length(Version));
+  SecondDot := Pos('.', Remaining);
+  if SecondDot <= 1 then Exit;
+  PatchText := Copy(Remaining, SecondDot + 1, Length(Remaining));
+  if (PatchText = '') or (Pos('.', PatchText) <> 0) then Exit;
+
+  MajorText := Copy(Version, 1, FirstDot - 1);
+  MinorText := Copy(Remaining, 1, SecondDot - 1);
+  Major := StrToIntDef(MajorText, -1);
+  Minor := StrToIntDef(MinorText, -1);
+  Patch := StrToIntDef(PatchText, -1);
+  Result := (Major >= 0) and (Minor >= 0) and (Patch >= 0);
+end;
+
+function CompareVersions(LeftVersion, RightVersion: String; var Comparison: Integer): Boolean;
+var
+  LeftMajor, LeftMinor, LeftPatch: Integer;
+  RightMajor, RightMinor, RightPatch: Integer;
+begin
+  Result := False;
+  Comparison := 0;
+  if not TryParseVersion(LeftVersion, LeftMajor, LeftMinor, LeftPatch) then Exit;
+  if not TryParseVersion(RightVersion, RightMajor, RightMinor, RightPatch) then Exit;
+
+  if LeftMajor < RightMajor then Comparison := -1
+  else if LeftMajor > RightMajor then Comparison := 1
+  else if LeftMinor < RightMinor then Comparison := -1
+  else if LeftMinor > RightMinor then Comparison := 1
+  else if LeftPatch < RightPatch then Comparison := -1
+  else if LeftPatch > RightPatch then Comparison := 1;
+  Result := True;
+end;
+
+function GetRegisteredVersion(var Version: String): Boolean;
+begin
+  Result := RegQueryStringValue(HKCU, UninstallRegistryPath, 'DisplayVersion', Version);
+  if not Result then
+    Result := RegQueryStringValue(HKLM, UninstallRegistryPath, 'DisplayVersion', Version);
+  if not Result then
+    Result := RegQueryStringValue(
+      HKLM,
+      'Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\{A474863A-1AE9-423A-BC40-A9D7DD3FA291}_is1',
+      'DisplayVersion',
+      Version);
+end;
+
+function InitializeSetup(): Boolean;
+var
+  InstalledVersion: String;
+  Comparison: Integer;
+begin
+  Result := True;
+  if not GetRegisteredVersion(InstalledVersion) then Exit;
+
+  if not CompareVersions(InstalledVersion, '{#AppVersion}', Comparison) then
+  begin
+    MsgBox(
+      'A Z+ installation is registered with an invalid version (' + InstalledVersion + '). Setup cannot safely determine whether this installer would downgrade it. Uninstall that installation before continuing.',
+      mbError,
+      MB_OK);
+    Result := False;
+    Exit;
+  end;
+
+  if Comparison > 0 then
+  begin
+    MsgBox(
+      'Z+ ' + InstalledVersion + ' is already installed. This installer is Z+ {#AppVersion} and cannot downgrade the existing installation. Download the newer installer, or uninstall Z+ ' + InstalledVersion + ' before installing this version.',
+      mbError,
+      MB_OK);
+    Result := False;
+  end;
+end;
 
 function NormalizePathEntry(Value: string): string;
 begin

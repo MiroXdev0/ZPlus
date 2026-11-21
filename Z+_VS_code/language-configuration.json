@@ -47,15 +47,15 @@
 
     "folding": {
         "markers": {
-            "start": "^\\s*(?:start|fn\\b.*|if\\b.*|else|while\\b.*|for\\b.*|repeat\\b.*|switch\\b.*|case\\b.*|default|struct\\b.*|class\\b.*|enum\\b.*|namespace\\b.*)\\s*:\\s*$",
-            "end": "^\\s*(?:stop|end)\\b.*$"
+            "start": "^\\s*(?:start|fn\\b.*|if\\b.*|else|while\\b.*|for\\b.*|repeat\\b.*|switch\\b.*|case\\b.*|default|struct\\b.*|class\\b.*|enum\\b.*|namespace\\b.*)(?:\\s*:\\s*|\\s*\\{\\s*)$",
+            "end": "^\\s*(?:\\}\\s*end\\s+\\w+|stop|end)\\b.*$"
         }
     },
 
     "indentationRules": {
-        "increaseIndentPattern": "^\\s*(?:start|fn\\b.*|if\\b.*|else|while\\b.*|for\\b.*|repeat\\b.*|switch\\b.*|case\\b.*|default|struct\\b.*|class\\b.*|enum\\b.*|namespace\\b.*)\\s*:\\s*$",
-        "decreaseIndentPattern": "^\\s*(?:stop|end|else|case\\b.*|default)\\b.*$",
-        "indentNextLinePattern": "^\\s*(?:start|fn\\b.*|if\\b.*|else|while\\b.*|for\\b.*|repeat\\b.*|switch\\b.*|case\\b.*|default|struct\\b.*|class\\b.*|enum\\b.*|namespace\\b.*)\\s*:\\s*$"
+        "increaseIndentPattern": "^\\s*(?:start|fn\\b.*|if\\b.*|else|while\\b.*|for\\b.*|repeat\\b.*|switch\\b.*|case\\b.*|default|struct\\b.*|class\\b.*|enum\\b.*|namespace\\b.*)(?:\\s*:\\s*|\\s*\\{\\s*)$",
+        "decreaseIndentPattern": "^\\s*(?:\\}|(?:stop|end|else|case\\b.*|default)\\b).*$",
+        "indentNextLinePattern": "^\\s*(?:start|fn\\b.*|if\\b.*|else|while\\b.*|for\\b.*|repeat\\b.*|switch\\b.*|case\\b.*|default|struct\\b.*|class\\b.*|enum\\b.*|namespace\\b.*)(?:\\s*:\\s*|\\s*\\{\\s*)$"
     },
 
     "wordPattern": "[a-zA-Z_][a-zA-Z0-9_]*"

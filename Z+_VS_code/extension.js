@@ -5,6 +5,9 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { executeCompiler, resolveCompilerPath } = require("./lib/compiler");
 const { parseDiagnostics } = require("./lib/diagnostics");
+const { formatText, formatSelectedLines } = require("./lib/formatter");
+const { createProjectTooling } = require("./lib/project-tooling");
+const { WorkspaceIndex } = require("./lib/workspace-index");
 
 const keywords = [
     "start", "stop", "fn", "return", "let", "const", "if", "else", "end",
@@ -28,15 +31,26 @@ const builtins = {
 
 const timers = new Map();
 const runningChecks = new Map();
+const runningUserCommands = new Map();
 const diagnosticsByRoot = new Map();
+const workspaceIndex = new WorkspaceIndex();
+const symbolParseCache = new Map();
+const visibleSymbolCache = new Map();
 let diagnosticCollection;
 let outputChannel;
 let statusItem;
+let projectTooling;
 
 function activate(context) {
     outputChannel = vscode.window.createOutputChannel("Z+");
     diagnosticCollection = vscode.languages.createDiagnosticCollection("zplus");
     context.subscriptions.push(outputChannel, diagnosticCollection);
+    projectTooling = createProjectTooling(vscode, {
+        executeCompiler,
+        getZBuildPath,
+        outputChannel
+    });
+    projectTooling.register(context);
 
     const commands = [
         ["zplus.checkFile", () => withActiveDocument(checkFile)],
@@ -47,6 +61,7 @@ function activate(context) {
         ["zplus.zbuildBuildProject", () => runZBuildProject("build")],
         ["zplus.zbuildRunProject", () => runZBuildProject("run")],
         ["zplus.zbuildTestProject", () => runZBuildProject("test")],
+        ["zplus.zbuildInitProject", initializeZBuildProject],
         ["zplus.zpmInstall", () => runZpmCommand("install")],
         ["zplus.zpmAdd", addZpmPackage],
         ["zplus.zpmRemove", removeZpmPackage],
@@ -58,8 +73,12 @@ function activate(context) {
 
     context.subscriptions.push(
         vscode.workspace.onDidChangeTextDocument(({ document }) => {
-            if (document.languageId === "zplus" &&
-                vscode.workspace.getConfiguration("zplus").get("checkWhileTyping", true)) {
+            if (document.languageId !== "zplus") return;
+            invalidateLanguageAnalysis(document.uri);
+            runningChecks.get(document.uri.toString())?.controller.abort();
+            runningUserCommands.get(document.uri.toString())?.abort();
+            clearDiagnosticsForRoot(document.uri);
+            if (vscode.workspace.getConfiguration("zplus").get("checkWhileTyping", true)) {
                 scheduleCheck(document);
             }
         }),
@@ -74,10 +93,26 @@ function activate(context) {
             clearDiagnosticsForRoot(document.uri);
             clearTimeout(timers.get(key));
             timers.delete(key);
+            runningChecks.get(key)?.controller.abort();
             runningChecks.delete(key);
-        })
+            runningUserCommands.get(key)?.abort();
+            runningUserCommands.delete(key);
+            invalidateLanguageAnalysis(document.uri);
+        }),
+        vscode.workspace.onDidChangeWorkspaceFolders(() => visibleSymbolCache.clear())
     );
-
+    if (vscode.workspace.createFileSystemWatcher) {
+        const sourceWatcher = vscode.workspace.createFileSystemWatcher("**/*.{zp,zh}");
+        context.subscriptions.push(sourceWatcher);
+        for (const eventName of ["onDidCreate", "onDidChange", "onDidDelete"]) {
+            if (typeof sourceWatcher[eventName] === "function") {
+                context.subscriptions.push(sourceWatcher[eventName](uri => {
+                    invalidateLanguageAnalysis(uri);
+                    clearDiagnosticsForRoot(uri);
+                }));
+            }
+        }
+    }
     const language = { language: "zplus" };
     context.subscriptions.push(
         vscode.languages.registerCompletionItemProvider(language, {
@@ -89,12 +124,58 @@ function activate(context) {
         vscode.languages.registerDefinitionProvider(language, {
             provideDefinition: (document, position) => provideDefinition(document, position)
         }),
+        vscode.languages.registerTypeDefinitionProvider(language, {
+            provideTypeDefinition: (document, position) => provideTypeDefinition(document, position)
+        }),
         vscode.languages.registerDocumentSymbolProvider(language, {
             provideDocumentSymbols: document => provideDocumentSymbols(document)
         }),
         vscode.languages.registerSignatureHelpProvider(language, {
             provideSignatureHelp: (document, position) => provideSignatureHelp(document, position)
-        }, "(", ",")
+        }, "(", ","),
+        vscode.languages.registerReferenceProvider(language, {
+            provideReferences: (document, position, context, token) =>
+                provideReferences(document, position, context, token)
+        }),
+        vscode.languages.registerRenameProvider(language, {
+            provideRenameEdits: (document, position, newName, token) =>
+                provideRenameEdits(document, position, newName, token)
+        }),
+        vscode.languages.registerWorkspaceSymbolProvider({
+            provideWorkspaceSymbols: (query, token) => provideWorkspaceSymbols(query, token)
+        }),
+        vscode.languages.registerDocumentFormattingEditProvider(language, {
+            provideDocumentFormattingEdits: (document, options) => {
+                const source = document.getText();
+                const formatted = formatText(source, options);
+                if (formatted === source) return [];
+                return [vscode.TextEdit.replace(
+                    new vscode.Range(document.positionAt(0), document.positionAt(source.length)),
+                    formatted
+                )];
+            }
+        }),
+        vscode.languages.registerDocumentRangeFormattingEditProvider(language, {
+            provideDocumentRangeFormattingEdits: (document, range, options) => {
+                const source = document.getText();
+                const formattedRange = formatSelectedLines(
+                    source,
+                    range.start.line,
+                    range.start.character,
+                    range.end.line,
+                    range.end.character,
+                    options
+                );
+                if (!formattedRange || formattedRange.text === formattedRange.original) return [];
+                return [vscode.TextEdit.replace(
+                    new vscode.Range(
+                        formattedRange.startLine, 0,
+                        formattedRange.endLine, document.lineAt(formattedRange.endLine).text.length
+                    ),
+                    formattedRange.text
+                )];
+            }
+        })
     );
 
     statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -129,7 +210,19 @@ async function withActiveDocument(action) {
 
 function getCompilerPath() {
     const configured = vscode.workspace.getConfiguration("zplus").get("compilerPath", "");
-    return resolveCompilerPath(configured);
+    const executable = process.platform === "win32" ? "zp.exe" : "zp";
+    const candidates = [];
+    for (const folder of vscode.workspace.workspaceFolders || []) {
+        candidates.push(
+            path.join(folder.uri.fsPath, "bin", executable),
+            path.join(folder.uri.fsPath, "build", "Release", executable),
+            path.join(folder.uri.fsPath, "build", executable)
+        );
+    }
+    if (process.platform === "win32" && process.env.LOCALAPPDATA) {
+        candidates.push(path.join(process.env.LOCALAPPDATA, "Programs", "ZPlus", "bin", executable));
+    }
+    return resolveCompilerPath(configured, process.env, process.platform, candidates);
 }
 
 function scheduleCheck(document, overrideDelay) {
@@ -142,6 +235,13 @@ function scheduleCheck(document, overrideDelay) {
         timers.delete(key);
         void checkFile(document);
     }, delay));
+}
+
+function invalidateLanguageAnalysis(uri) {
+    if (!uri) return;
+    workspaceIndex.invalidate(uri);
+    symbolParseCache.delete(uri.toString());
+    visibleSymbolCache.clear();
 }
 
 function toVscodeDiagnostics(output, document) {
@@ -210,21 +310,26 @@ function publishDiagnostics(output, document, compiledSourcePath = document.uri.
 }
 
 function clearDiagnosticsForRoot(rootUri) {
-    const rootKey = rootUri.toString();
-    const previous = diagnosticsByRoot.get(rootKey);
-    if (previous) {
+    const targetKey = rootUri.toString();
+    let cleared = false;
+    for (const [rootKey, previous] of diagnosticsByRoot) {
+        const includesTarget = rootKey === targetKey ||
+            [...previous.values()].some(uri => uri.toString() === targetKey);
+        if (!includesTarget) continue;
         for (const uri of previous.values()) diagnosticCollection.delete(uri);
         diagnosticsByRoot.delete(rootKey);
-    } else {
-        diagnosticCollection.delete(rootUri);
+        cleared = true;
     }
+    if (!cleared) diagnosticCollection.delete(rootUri);
 }
 
 async function checkFile(document) {
     if (!document || document.languageId !== "zplus") return;
     const key = document.uri.toString();
     const version = document.version;
-    runningChecks.set(key, version);
+    runningChecks.get(key)?.controller.abort();
+    const controller = new AbortController();
+    runningChecks.set(key, { version, controller });
 
     try {
         const result = await executeCompiler(
@@ -232,10 +337,11 @@ async function checkFile(document) {
             ["check", document.uri.fsPath, "--source-stdin", "--diagnostics=json"],
             {
                 cwd: path.dirname(document.uri.fsPath),
-                input: document.getText()
+                input: document.getText(),
+                signal: controller.signal
             }
         );
-        if (runningChecks.get(key) !== version || document.version !== version) return;
+        if (runningChecks.get(key)?.version !== version || document.version !== version) return;
 
         const output = `${result.stderr}\n${result.stdout}`;
         publishDiagnostics(result.stderr, document);
@@ -251,10 +357,11 @@ async function checkFile(document) {
             outputChannel.appendLine("Compiler check timed out.");
         }
     } catch (error) {
+        if (controller.signal.aborted) return;
         outputChannel.appendLine(`Z+ check failed: ${error.message}`);
         vscode.window.showErrorMessage(`Z+ check failed: ${error.message}`);
     } finally {
-        if (runningChecks.get(key) === version) runningChecks.delete(key);
+        if (runningChecks.get(key)?.version === version) runningChecks.delete(key);
     }
 }
 
@@ -304,6 +411,11 @@ function configuredOutputPath(document) {
 
 async function executeUserCommand(document, command, args, expectedOutput = "") {
     const compiler = getCompilerPath();
+    const key = document.uri.toString();
+    runningUserCommands.get(key)?.abort();
+    const controller = new AbortController();
+    const documentVersion = document.version;
+    runningUserCommands.set(key, controller);
     args.push("--diagnostics=json");
     outputChannel.show(true);
     outputChannel.appendLine(`---- Z+ ${command === "run" ? "Interpreter" : "Native Build"} ----`);
@@ -313,15 +425,25 @@ async function executeUserCommand(document, command, args, expectedOutput = "") 
 
     const progressTitle = command === "run" ? "Running Z+ with the interpreter" : "Building native Z+ executable";
     await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: progressTitle, cancellable: false },
-        async () => {
-            const result = await executeCompiler(compiler, args, { cwd: path.dirname(document.uri.fsPath) });
+        { location: vscode.ProgressLocation.Notification, title: progressTitle, cancellable: true },
+        async (_, token) => {
+            const cancellation = token?.onCancellationRequested(() => controller.abort());
+            try {
+            const result = await executeCompiler(compiler, args, {
+                cwd: path.dirname(document.uri.fsPath), signal: controller.signal
+            });
+            if (controller.signal.aborted || document.version !== documentVersion) {
+                if (controller.signal.aborted) outputChannel.appendLine(`Z+ ${command} cancelled.`);
+                return;
+            }
             const output = `${result.stdout}${result.stderr ? `\n${result.stderr}` : ""}`;
             if (output.trim()) outputChannel.appendLine(output.trimEnd());
             publishDiagnostics(`${result.stderr}\n${result.stdout}`, document);
 
             if (result.error && result.error.code === "ENOENT") {
                 showCompilerMissing(compiler);
+            } else if (result.error && result.error.killed) {
+                vscode.window.showErrorMessage(`Z+ ${command} timed out. See the Z+ output channel.`);
             } else if (result.code !== 0) {
                 const message = parseDiagnostics(`${result.stderr}\n${result.stdout}`)
                     .map(item => item.message).join("; ") ||
@@ -333,6 +455,15 @@ async function executeUserCommand(document, command, args, expectedOutput = "") 
                 );
             } else {
                 outputChannel.appendLine("Z+ interpreter run finished.");
+            }
+            } catch (error) {
+                if (!controller.signal.aborted) {
+                    outputChannel.appendLine(`Z+ ${command} failed: ${error.message}`);
+                    vscode.window.showErrorMessage(`Z+ ${command} failed: ${error.message}`);
+                }
+            } finally {
+                cancellation?.dispose();
+                if (runningUserCommands.get(key) === controller) runningUserCommands.delete(key);
             }
         }
     );
@@ -398,16 +529,44 @@ function findZpmProjectRoot() {
     return findProjectRoot("zpm.json");
 }
 
+function getZBuildPath() {
+    const configured = vscode.workspace.getConfiguration("zplus").get("zbuildPath", "");
+    if (configured) return resolveCompilerPath(configured);
+
+    const executableNames = process.platform === "win32"
+        ? ["zpbuild.exe", "zbuild.exe"] : ["zpbuild", "zbuild"];
+    const roots = (vscode.workspace.workspaceFolders || []).map(folder => folder.uri.fsPath);
+    roots.push(path.resolve(__dirname, ".."));
+    for (const root of roots) {
+        for (const executable of executableNames) {
+            for (const candidate of [
+                path.join(root, "bin", executable),
+                path.join(root, "build", "Release", executable),
+                path.join(root, "build", executable)
+            ]) {
+                try {
+                    if (fs.statSync(candidate).isFile()) return candidate;
+                } catch (error) {
+                    if (error.code !== "ENOENT" && error.code !== "ENOTDIR") throw error;
+                }
+            }
+        }
+    }
+
+    for (const executable of executableNames) {
+        const resolved = resolveCompilerPath(executable);
+        if (resolved !== executable) return resolved;
+    }
+    return executableNames[0];
+}
+
 async function runZBuildProject(command) {
     const root = await findZBuildProjectRoot();
     if (!root) {
         vscode.window.showWarningMessage("Z+: No zproject.toml found in the active project.");
         return;
     }
-    const configured = vscode.workspace.getConfiguration("zplus").get("zbuildPath", "");
-    const executable = resolveCompilerPath(
-        configured || (process.platform === "win32" ? "zbuild.exe" : "zbuild")
-    );
+    const executable = getZBuildPath();
     outputChannel.show(true);
     outputChannel.appendLine(`---- ZBuild ${command} ----`);
     outputChannel.appendLine(`Project: ${root}`);
@@ -424,6 +583,64 @@ async function runZBuildProject(command) {
     } else {
         vscode.window.showInformationMessage(`ZBuild ${command} completed.`);
     }
+}
+
+async function initializeZBuildProject() {
+    const templates = [
+        { label: "Console", description: "Runnable command-line starter" },
+        { label: "Empty", description: "Minimal executable project" },
+        { label: "Library", description: "Reusable modules with a test target" },
+        { label: "Game", description: "Interactive ZGraphics starter" },
+        { label: "Desktop", description: "Desktop window and event starter" }
+    ];
+    const template = await vscode.window.showQuickPick(templates, {
+        placeHolder: "Choose a Z+ project template"
+    });
+    if (!template) return;
+
+    const parentSelection = await vscode.window.showOpenDialog({
+        canSelectFiles: false,
+        canSelectFolders: true,
+        canSelectMany: false,
+        openLabel: "Choose project parent folder"
+    });
+    if (!parentSelection || parentSelection.length === 0) return;
+
+    const name = await vscode.window.showInputBox({
+        prompt: "Enter the new Z+ project name",
+        placeHolder: "MyProject",
+        validateInput(value) {
+            return /^[A-Za-z0-9_][A-Za-z0-9_-]{0,63}$/.test(value.trim())
+                ? undefined : "Use up to 64 letters, digits, underscores, or hyphens; start with a letter, digit, or underscore.";
+        }
+    });
+    if (!name) return;
+
+    const parent = parentSelection[0].fsPath;
+    const destination = path.join(parent, name.trim());
+    const executable = getZBuildPath();
+    const args = createZBuildInitArgs(name.trim(), template.label, destination);
+    outputChannel.show(true);
+    outputChannel.appendLine("---- ZBuild init ----");
+    outputChannel.appendLine(`Template: ${template.label}`);
+    outputChannel.appendLine(`Destination: ${destination}`);
+    const result = await executeCompiler(executable, args, { cwd: parent });
+    const output = `${result.stdout}${result.stderr ? `\n${result.stderr}` : ""}`.trim();
+    if (output) outputChannel.appendLine(output);
+    if (result.error && result.error.code === "ENOENT") {
+        const message = `ZPBuild not found: ${executable}. Set zplus.zbuildPath or add zpbuild to PATH.`;
+        outputChannel.appendLine(message);
+        vscode.window.showErrorMessage(message);
+    } else if (result.code !== 0) {
+        vscode.window.showErrorMessage(output || `ZBuild project creation failed with exit code ${result.code}.`);
+    } else {
+        await projectTooling.refreshProjects();
+        vscode.window.showInformationMessage(`Z+ project created: ${destination}`);
+    }
+}
+
+function createZBuildInitArgs(name, template, destination) {
+    return ["init", name, "--template", template, "--path", destination];
 }
 
 async function runZpmCommand(command, args = []) {
@@ -476,13 +693,27 @@ function showCompilerMissing(compiler) {
 }
 
 function parseSymbols(document) {
+    const key = document.uri.toString();
+    const text = document.getText();
+    const cached = symbolParseCache.get(key);
+    if (cached && cached.text === text) return cached.symbols.map(symbol => ({ ...symbol }));
+    const symbols = parseSymbolsUncached(document, text);
+    symbolParseCache.delete(key);
+    symbolParseCache.set(key, { text, symbols });
+    while (symbolParseCache.size > 2048) {
+        symbolParseCache.delete(symbolParseCache.keys().next().value);
+    }
+    return symbols.map(symbol => ({ ...symbol }));
+}
+
+function parseSymbolsUncached(document, text) {
     const symbols = [];
-    const lines = document.getText().split(/\r?\n/);
+    const lines = text.split(/\r\n|\n|\r/);
     for (let lineNumber = 0; lineNumber < lines.length; lineNumber++) {
         const raw = lines[lineNumber];
         const code = raw.replace(/\/\/.*$/, "").trim();
         const offset = document.offsetAt(new vscode.Position(lineNumber, 0));
-        let match = code.match(/^(?:(pub|export)\s+)?fn\s+([A-Za-z_]\w*)\s*\(([^)]*)\)\s*(?:->\s*([A-Za-z_]\w*(?:\[\]|\*)?))?\s*:/);
+        let match = code.match(/^(?:(pub|export)\s+)?fn\s+([A-Za-z_]\w*)\s*\(([^)]*)\)\s*(?:(?:->|:)\s*([A-Za-z_]\w*(?:\[\]|\*)?))?\s*(?::|\{)/);
         if (match) {
             const params = match[3].split(",").map(value => value.trim()).filter(Boolean);
             symbols.push(makeSymbol(match[2], "function", match[4] || "void", params, lineNumber, offset, raw,
@@ -490,7 +721,7 @@ function parseSymbols(document) {
         } else if ((match = code.match(/^(?:(pub|export)\s+)?(let|const)\s+([A-Za-z_]\w*)\s*(?::\s*([A-Za-z_]\w*(?:\[\]|\*)?))?/))) {
             symbols.push(makeSymbol(match[3], match[2] === "const" ? "constant" : "variable",
                 match[4] || "", [], lineNumber, offset, raw, document.uri, raw.indexOf(match[3]), Boolean(match[1])));
-        } else if ((match = code.match(/^(?:(pub|export)\s+)?(struct|class|enum|namespace)\s+([A-Za-z_]\w*)\s*:/))) {
+        } else if ((match = code.match(/^(?:(pub|export)\s+)?(struct|class|enum|namespace)\s+([A-Za-z_]\w*)\s*(?::|\{)/))) {
             symbols.push(makeSymbol(match[3], match[2], "", [], lineNumber, offset, raw,
                 document.uri, raw.indexOf(match[3]), Boolean(match[1])));
         }
@@ -499,20 +730,42 @@ function parseSymbols(document) {
 }
 
 function parseVisibleSymbols(document) {
+    const rootKey = document.uri.toString();
+    const rootText = document.getText();
+    const cached = visibleSymbolCache.get(rootKey);
+    if (cached && cached.text === rootText) {
+        visibleSymbolCache.delete(rootKey);
+        visibleSymbolCache.set(rootKey, cached);
+        return cached.symbols.map(symbol => ({ ...symbol }));
+    }
+
     const symbols = [];
     const visited = new Set();
+    const openDocuments = new Map((vscode.workspace.textDocuments || [])
+        .filter(item => item.uri && item.uri.fsPath)
+        .map(item => [normalizedFilePath(item.uri.fsPath), item]));
+    if (document.uri.fsPath) openDocuments.set(normalizedFilePath(document.uri.fsPath), document);
     const visit = (sourcePath, sourceText, sourceUri, moduleAlias, isRoot = false) => {
-        const key = normalizedFilePath(sourcePath);
+        const key = `${normalizedFilePath(sourcePath)}\0${moduleAlias || ""}`;
         if (visited.has(key)) return;
         visited.add(key);
 
+        const lines = sourceText.split(/\r\n|\n|\r/);
+        const lineOffsets = [0];
+        for (let index = 0; index < sourceText.length; index++) {
+            if (sourceText[index] === "\r") {
+                if (sourceText[index + 1] === "\n") index++;
+                lineOffsets.push(index + 1);
+            } else if (sourceText[index] === "\n") {
+                lineOffsets.push(index + 1);
+            }
+        }
         const moduleDocument = {
             uri: sourceUri,
             getText: () => sourceText,
             offsetAt(position) {
-                const lines = sourceText.split(/\r?\n/);
-                return lines.slice(0, position.line).reduce((sum, line) => sum + line.length + 1, 0) +
-                    position.character;
+                return Math.min(sourceText.length,
+                    (lineOffsets[Math.min(position.line, lineOffsets.length - 1)] || 0) + position.character);
             }
         };
         for (const symbol of parseSymbols(moduleDocument)) {
@@ -521,7 +774,7 @@ function parseVisibleSymbols(document) {
             symbols.push(symbol);
         }
 
-        for (const line of sourceText.split(/\r?\n/)) {
+        for (const line of lines) {
             const use = line.match(/^\s*use\s+(?:"([^"]+)"|([^\s;]+))(?:\s+as\s+([A-Za-z_]\w*))?/);
             if (!use) continue;
             const relativePath = (use[1] || use[2]).replace(/\\/g, path.sep);
@@ -539,6 +792,7 @@ function parseVisibleSymbols(document) {
                 }
             }
             const modulePath = modulePaths.find(candidate => {
+                if (openDocuments.has(normalizedFilePath(candidate))) return true;
                 try {
                     return fs.statSync(candidate).isFile();
                 } catch {
@@ -546,21 +800,28 @@ function parseVisibleSymbols(document) {
                 }
             });
             if (!modulePath) continue;
-            let moduleText;
-            try {
-                moduleText = fs.readFileSync(modulePath, "utf8");
-            } catch {
-                continue;
+            const openModule = openDocuments.get(normalizedFilePath(modulePath));
+            let moduleText = openModule && openModule.getText();
+            if (moduleText === undefined) {
+                try {
+                    moduleText = fs.readFileSync(modulePath, "utf8");
+                } catch {
+                    continue;
+                }
             }
             const alias = moduleIdentifier(
                 use[3] || path.basename(relativePath, path.extname(relativePath))
             );
-            visit(modulePath, moduleText, vscode.Uri.file(modulePath), alias);
+            visit(modulePath, moduleText, openModule ? openModule.uri : vscode.Uri.file(modulePath), alias);
         }
     };
 
-    visit(document.uri.fsPath, document.getText(), document.uri, undefined, true);
-    return symbols;
+    visit(document.uri.fsPath, rootText, document.uri, undefined, true);
+    visibleSymbolCache.set(rootKey, { text: rootText, symbols });
+    while (visibleSymbolCache.size > 512) {
+        visibleSymbolCache.delete(visibleSymbolCache.keys().next().value);
+    }
+    return symbols.map(symbol => ({ ...symbol }));
 }
 
 function makeSymbol(name, kind, type, parameters, line, offset, sourceLine, uri, column, isPublic = false) {
@@ -704,6 +965,35 @@ function provideDefinition(document, position) {
     return new vscode.Location(targetUri, new vscode.Position(symbol.line, symbol.column));
 }
 
+function provideTypeDefinition(document, position) {
+    const word = wordAt(document, position);
+    if (!word) return undefined;
+    const reference = qualifiedReferenceAt(document, position);
+    const visible = parseVisibleSymbols(document);
+    const symbol = findSymbol(visible, word.name, reference && reference.moduleAlias);
+    if (!symbol) return undefined;
+
+    const aggregateKinds = new Set(["struct", "class", "enum"]);
+    const typeName = aggregateKinds.has(symbol.kind)
+        ? symbol.name : String(symbol.type || "").replace(/(?:\[\]|\*)+$/, "");
+    if (!typeName || types.includes(typeName)) return undefined;
+
+    let candidates = visible.filter(candidate => candidate.name === typeName &&
+        aggregateKinds.has(candidate.kind) && (!candidate.isImported || candidate.isPublic));
+    if (aggregateKinds.has(symbol.kind)) {
+        candidates = candidates.filter(candidate => normalizedFilePath(candidate.uri.fsPath) ===
+            normalizedFilePath(symbol.uri.fsPath));
+    } else if (symbol.isImported) {
+        candidates = candidates.filter(candidate => candidate.moduleAlias === symbol.moduleAlias);
+    } else {
+        const local = candidates.filter(candidate => !candidate.isImported);
+        if (local.length) candidates = local;
+    }
+    if (candidates.length !== 1) return undefined;
+    const target = candidates[0];
+    return new vscode.Location(target.uri, new vscode.Position(target.line, target.column));
+}
+
 function provideDocumentSymbols(document) {
     const kinds = {
         function: vscode.SymbolKind.Function,
@@ -725,6 +1015,122 @@ function provideDocumentSymbols(document) {
             new vscode.Range(position, position.translate(0, symbol.name.length))
         );
     });
+}
+
+function identifierOccurrences(text, name) {
+    const masked = String(text).replace(/\/\*[\s\S]*?\*\/|\/\/[^\r\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g,
+        match => match.replace(/[^\r\n]/g, " "));
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const expression = new RegExp(`\\b${escaped}\\b`, "g");
+    const occurrences = [];
+    for (const match of masked.matchAll(expression)) occurrences.push(match.index);
+    return occurrences;
+}
+
+function documentPositionAtText(text, offset) {
+    const before = text.slice(0, offset);
+    const line = (before.match(/\n/g) || []).length;
+    return { line, character: offset - before.lastIndexOf("\n") - 1 };
+}
+
+function importsDocument(document, definitionPath) {
+    for (const line of document.getText().split(/\r?\n/)) {
+        const match = line.match(/^\s*use\s+(?:"([^"]+)"|([^\s;]+))/);
+        if (!match) continue;
+        const reference = (match[1] || match[2]).replace(/\\/g, path.sep);
+        if (path.isAbsolute(reference) || /^[A-Za-z]:/.test(reference)) continue;
+        const base = path.resolve(path.dirname(document.uri.fsPath), reference);
+        const candidates = [base, `${base}.zh`, path.join(base, `${path.basename(base)}.zh`)];
+        try {
+            if (candidates.some(candidate => normalizedFilePath(candidate) === normalizedFilePath(definitionPath))) {
+                return true;
+            }
+        } catch { }
+    }
+    return false;
+}
+
+async function findReferences(document, position, includeDeclaration, token) {
+    const word = wordAt(document, position);
+    if (!word) return [];
+    const qualified = qualifiedReferenceAt(document, position);
+    const symbol = findSymbol(parseVisibleSymbols(document), word.name,
+        qualified && qualified.moduleAlias);
+    if (!symbol) return [];
+    const declarations = parseSymbols(document).filter(item => item.name === word.name);
+    if (!symbol.isImported && declarations.length !== 1) return [];
+    if (symbol.isImported && parseVisibleSymbols(document).filter(item =>
+        item.isImported && item.isPublic && item.name === word.name &&
+        item.moduleAlias === symbol.moduleAlias).length !== 1) return [];
+    const definitionPath = symbol.uri ? symbol.uri.fsPath : document.uri.fsPath;
+    if (symbol.isImported && !symbol.isPublic) return [];
+    const documents = await workspaceIndex.documents(vscode, document, token);
+    const results = [];
+    for (const candidate of documents) {
+        if (token && token.isCancellationRequested) return [];
+        const isDefinition = normalizedFilePath(candidate.uri.fsPath) === normalizedFilePath(definitionPath);
+        if (!isDefinition && (!symbol.isPublic || !importsDocument(candidate, definitionPath))) continue;
+        const text = candidate.getText();
+        const visible = isDefinition ? undefined : parseVisibleSymbols(candidate);
+        for (const offset of identifierOccurrences(text, word.name)) {
+            if (!includeDeclaration && isDefinition && offset === symbol.offset + symbol.column) continue;
+            const start = documentPositionAtText(text, offset);
+            if (!isDefinition) {
+                const reference = qualifiedReferenceAt(candidate,
+                    new vscode.Position(start.line, start.character));
+                const resolved = findSymbol(visible, word.name,
+                    reference && reference.moduleAlias);
+                if (!resolved || normalizedFilePath(resolved.uri.fsPath) !==
+                    normalizedFilePath(definitionPath)) continue;
+            }
+            results.push(new vscode.Location(candidate.uri,
+                new vscode.Range(start.line, start.character, start.line, start.character + word.name.length)));
+        }
+    }
+    return results;
+}
+
+function provideReferences(document, position, context, token) {
+    return findReferences(document, position, context.includeDeclaration, token);
+}
+
+async function provideRenameEdits(document, position, newName, token) {
+    if (!/^[A-Za-z_]\w*$/.test(newName)) {
+        throw new Error("Z+ symbol names must start with a letter or underscore and contain only letters, digits, or underscores.");
+    }
+    const references = await findReferences(document, position, true, token);
+    if (!references.length) return undefined;
+    const edits = new vscode.WorkspaceEdit();
+    for (const reference of references) edits.replace(reference.uri, reference.range, newName);
+    return edits;
+}
+
+async function provideWorkspaceSymbols(query, token) {
+    const folders = vscode.workspace.workspaceFolders || [];
+    if (!folders.length) return [];
+    const seed = {
+        uri: vscode.Uri.file(folders[0].uri.fsPath),
+        getText: () => "",
+        offsetAt: () => 0,
+        languageId: "zplus"
+    };
+    const documents = await workspaceIndex.documents(vscode, seed, token);
+    const needle = String(query || "").toLowerCase();
+    const kindMap = { function: vscode.SymbolKind.Function, struct: vscode.SymbolKind.Struct,
+        class: vscode.SymbolKind.Class, enum: vscode.SymbolKind.Enum,
+        namespace: vscode.SymbolKind.Namespace, variable: vscode.SymbolKind.Variable,
+        constant: vscode.SymbolKind.Constant };
+    const result = [];
+    for (const source of documents) {
+        for (const symbol of parseSymbols(source)) {
+            if (needle && !symbol.name.toLowerCase().includes(needle)) continue;
+            const start = new vscode.Position(symbol.line, symbol.column);
+            result.push(new vscode.SymbolInformation(symbol.name,
+                kindMap[symbol.kind] || vscode.SymbolKind.Variable, symbol.kind,
+                new vscode.Location(source.uri, start)));
+        }
+    }
+    return result;
 }
 
 function currentCall(document, position) {
@@ -790,7 +1196,14 @@ function provideSignatureHelp(document, position) {
 function deactivate() {
     for (const timer of timers.values()) clearTimeout(timer);
     timers.clear();
+    for (const check of runningChecks.values()) check.controller.abort();
     runningChecks.clear();
+    for (const command of runningUserCommands.values()) command.abort();
+    runningUserCommands.clear();
+    visibleSymbolCache.clear();
+    symbolParseCache.clear();
+    projectTooling?.dispose();
+    projectTooling = undefined;
 }
 
 module.exports = {
@@ -798,11 +1211,19 @@ module.exports = {
     deactivate,
     parseSymbols,
     parseVisibleSymbols,
+    invalidateLanguageAnalysis,
     provideCompletions,
     provideDefinition,
+    provideTypeDefinition,
     provideDocumentSymbols,
     provideHover,
     provideSignatureHelp,
+    createZBuildInitArgs,
+    getZBuildPath,
+    refreshTestProjects: () => projectTooling?.refreshProjects(),
+    provideReferences,
+    provideRenameEdits,
+    provideWorkspaceSymbols,
     publishDiagnostics,
     toVscodeDiagnostics,
     findZBuildProjectRoot,

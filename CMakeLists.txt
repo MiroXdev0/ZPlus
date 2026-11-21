@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(ZPlus
-    VERSION 1.3.3
+    VERSION 1.3.5
     LANGUAGES CXX
 )
 
@@ -525,7 +525,7 @@ if(BUILD_TESTING)
 
     add_test(NAME zp_version COMMAND zp version)
     set_tests_properties(zp_version PROPERTIES
-        PASS_REGULAR_EXPRESSION "Z[+] Compiler 1\\.3\\.3"
+        PASS_REGULAR_EXPRESSION "Z[+] Compiler 1\\.3\\.5"
     )
     add_test(NAME zpbuild_version COMMAND zpbuild version)
     set_tests_properties(zpbuild_version PROPERTIES
@@ -544,14 +544,27 @@ if(BUILD_TESTING)
     )
     target_link_libraries(zbuild_unit_tests PRIVATE zbuild_engine)
     add_test(NAME zbuild_unit COMMAND zbuild_unit_tests)
+    if(WIN32 AND DEFINED ENV{TEMP} AND NOT "$ENV{TEMP}" STREQUAL "")
+        string(SHA256 zpm_local_test_key
+            "${CMAKE_CURRENT_SOURCE_DIR}|${CMAKE_CURRENT_BINARY_DIR}")
+        string(SUBSTRING "${zpm_local_test_key}" 0 12 zpm_local_test_key)
+        set(zpm_local_test_work_dir
+            "$ENV{TEMP}/zplus-zpm-local-${zpm_local_test_key}-$<CONFIG>")
+    else()
+        set(zpm_local_test_work_dir
+            "${CMAKE_CURRENT_BINARY_DIR}/zpm-test-output")
+    endif()
     add_test(
         NAME zpm_local_package_integration
         COMMAND ${CMAKE_COMMAND}
             "-DZPM=$<TARGET_FILE:zpm>"
             "-DZBUILD=$<TARGET_FILE:zpbuild>"
             "-DZP=$<TARGET_FILE:zp>"
-            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/zpm-test-output"
+            "-DWORK_DIR=${zpm_local_test_work_dir}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/zpm/run_local_package.cmake"
+    )
+    set_tests_properties(zpm_local_package_integration PROPERTIES
+        RESOURCE_LOCK zpm_local_package_integration_workdir
     )
     add_test(
         NAME resource_copy_incremental
@@ -612,6 +625,15 @@ if(BUILD_TESTING)
         NAME standard_library_unicode
         COMMAND zp_standard_library_unit_tests
     )
+    add_executable(zp_input_unit_tests
+        tests/runtime/input_tests.cpp
+        runtime/InputRuntime.cpp
+    )
+    target_include_directories(zp_input_unit_tests PRIVATE runtime)
+    target_compile_definitions(zp_input_unit_tests PRIVATE
+        ZPLUS_INPUT_RUNTIME_TESTING
+    )
+    add_test(NAME input_runtime_helpers COMMAND zp_input_unit_tests)
     add_executable(zaudio_unit_tests tests/audio/audio_tests.cpp)
     target_include_directories(zaudio_unit_tests PRIVATE runtime)
     target_compile_definitions(zaudio_unit_tests PRIVATE

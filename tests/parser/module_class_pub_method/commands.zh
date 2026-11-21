@@ -1,0 +1,7 @@
+start {
+    class commands {
+        pub fn message(name: string): string {
+            return "Hello, " + name
+        } end fn
+    } end class
+} stop

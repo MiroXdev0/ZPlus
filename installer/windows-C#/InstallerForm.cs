@@ -178,7 +178,7 @@ internal sealed class InstallerForm : Form
 
         var release = new Label
         {
-            Text = "1.3.3   •   STABLE",
+            Text = "1.3.5   •   STABLE",
             Location = new Point(22, 130),
             Size = new Size(180, 34),
             BackColor = Color.FromArgb(30, 48, 62),
@@ -276,7 +276,7 @@ internal sealed class InstallerForm : Form
             "A language, compiler, standard library and development toolchain—ready to install.",
             new Point(0, 61), new Size(580, 48)));
         content.Controls.Add(Body(
-            "Version 1.3.3  •  Stable Release",
+            "Version 1.3.5  •  Stable Release",
             new Point(0, 108), new Size(340, 28), Accent));
         content.Controls.Add(Body(
             "The setup verifies the compiler, standard library and a native Windows build before it reports success.",

@@ -4,7 +4,16 @@ const childProcess = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
-function resolveCompilerPath(configuredPath, env = process.env, platform = process.platform) {
+function resolveCompilerPath(configuredPath, env = process.env, platform = process.platform, candidates = []) {
+    if (!configuredPath) {
+        for (const candidate of candidates) {
+            try {
+                if (fs.statSync(candidate).isFile()) return candidate;
+            } catch {
+                // Keep checking known installation locations before PATH.
+            }
+        }
+    }
     const executable = String(configuredPath || (platform === "win32" ? "zp.exe" : "zp")).trim();
     if (!executable) {
         return platform === "win32" ? "zp.exe" : "zp";
@@ -45,7 +54,8 @@ function executeCompiler(executable, args, options = {}) {
                 cwd: options.cwd,
                 windowsHide: true,
                 timeout: options.timeout || 120000,
-                maxBuffer: options.maxBuffer || 8 * 1024 * 1024
+                maxBuffer: options.maxBuffer || 8 * 1024 * 1024,
+                signal: options.signal
             },
             (error, stdout, stderr) => {
                 const result = {

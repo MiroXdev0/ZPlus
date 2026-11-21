@@ -14,6 +14,8 @@ const grammar = require(path.join(extensionRoot, "syntaxes", "zplusLanguage.json
 const snippets = require(path.join(extensionRoot, "snippets", "zplus.json"));
 const { parseDiagnostics } = require(path.join(extensionRoot, "lib", "diagnostics"));
 const { executeCompiler, resolveCompilerPath } = require(path.join(extensionRoot, "lib", "compiler"));
+const { formatText, formatSelectedLines } = require(path.join(extensionRoot, "lib", "formatter"));
+const { WorkspaceIndex } = require(path.join(extensionRoot, "lib", "workspace-index"));
 
 const compiler = process.env.ZPLUS_COMPILER || (process.platform === "win32"
     ? path.join(projectRoot, "build", "Release", "zp.exe")
@@ -53,25 +55,78 @@ function createVscodeMock() {
     class SignatureHelp {
         constructor() { this.signatures = []; }
     }
+    class SymbolInformation {
+        constructor(name, kind, containerName, location) { Object.assign(this, { name, kind, containerName, location }); }
+    }
+    class WorkspaceEdit {
+        constructor() { this.entries = []; }
+        replace(uri, range, newText) { this.entries.push({ uri, range, newText }); }
+    }
+    class TextEdit {
+        static replace(range, newText) { return { range, newText }; }
+    }
+    class ProcessExecution {
+        constructor(process, args, options) { Object.assign(this, { process, args, options }); }
+    }
+    class Task {
+        constructor(definition, scope, name, source, execution) {
+            Object.assign(this, { definition, scope, name, source, execution });
+        }
+    }
     class MarkdownString {
         constructor(value) { this.value = value; }
     }
-    const registrations = { commands: [], providers: [], diagnosticWrites: [] };
+    const registrations = {
+        commands: [], providers: [], diagnosticWrites: [], testControllers: [], testRuns: [], taskProviders: []
+    };
     const configuration = {};
-    const event = () => ({ dispose() {} });
+    const listeners = new Map();
+    const event = name => handler => {
+        if (typeof handler !== "function") return { dispose() {} };
+        const entries = listeners.get(name) || [];
+        entries.push(handler);
+        listeners.set(name, entries);
+        return {
+            dispose() {
+                const index = entries.indexOf(handler);
+                if (index >= 0) entries.splice(index, 1);
+            }
+        };
+    };
+    const fireLast = (name, value) => {
+        const entries = listeners.get(name) || [];
+        if (entries.length) entries.at(-1)(value);
+    };
     const vscode = {
         Position,
         Range,
+        RelativePattern: class RelativePattern { constructor(base, pattern) { Object.assign(this, { base, pattern }); } },
         CompletionItem,
         DocumentSymbol,
         Diagnostic,
         SignatureInformation,
         ParameterInformation,
         SignatureHelp,
+        SymbolInformation,
+        WorkspaceEdit,
+        TextEdit,
+        ProcessExecution,
+        Task,
+        TaskScope: { Workspace: 1 },
+        TaskGroup: { Build: "build", Test: "test" },
+        EndOfLine: { LF: 1, CRLF: 2 },
         MarkdownString,
+        TestMessage: class TestMessage { constructor(message) { this.message = message; } },
+        TestRunProfileKind: { Run: 1 },
         SnippetString: class SnippetString { constructor(value) { this.value = value; } },
         Hover: class Hover { constructor(contents, range) { Object.assign(this, { contents, range }); } },
-        Location: class Location { constructor(uri, position) { Object.assign(this, { uri, position }); } },
+        Location: class Location {
+            constructor(uri, position) {
+                this.uri = uri;
+                this.position = position;
+                this.range = position instanceof Range ? position : new Range(position, position);
+            }
+        },
         DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2 },
         CompletionItemTag: { Deprecated: 1 },
         CompletionItemKind: {
@@ -110,12 +165,36 @@ function createVscodeMock() {
                 registrations.providers.push({ type: "definition", provider });
                 return event();
             },
+            registerTypeDefinitionProvider: (_, provider) => {
+                registrations.providers.push({ type: "typeDefinition", provider });
+                return event();
+            },
             registerDocumentSymbolProvider: (_, provider) => {
                 registrations.providers.push({ type: "symbols", provider });
                 return event();
             },
             registerSignatureHelpProvider: (_, provider) => {
                 registrations.providers.push({ type: "signature", provider });
+                return event();
+            },
+            registerReferenceProvider: (_, provider) => {
+                registrations.providers.push({ type: "references", provider });
+                return event();
+            },
+            registerRenameProvider: (_, provider) => {
+                registrations.providers.push({ type: "rename", provider });
+                return event();
+            },
+            registerWorkspaceSymbolProvider: provider => {
+                registrations.providers.push({ type: "workspaceSymbols", provider });
+                return event();
+            },
+            registerDocumentFormattingEditProvider: (_, provider) => {
+                registrations.providers.push({ type: "format", provider });
+                return event();
+            },
+            registerDocumentRangeFormattingEditProvider: (_, provider) => {
+                registrations.providers.push({ type: "formatRange", provider });
                 return event();
             }
         },
@@ -124,24 +203,79 @@ function createVscodeMock() {
                 get: (name, fallback) => Object.hasOwn(configuration, name) ? configuration[name] : fallback,
                 update: async (name, value) => { configuration[name] = value; }
             }),
-            onDidChangeTextDocument: event,
-            onDidSaveTextDocument: event,
-            onDidCloseTextDocument: event,
+            onDidChangeTextDocument: event("textChange"),
+            onDidSaveTextDocument: event("save"),
+            onDidCloseTextDocument: event("close"),
+            onDidChangeWorkspaceFolders: event("workspaceFolders"),
+            createFileSystemWatcher: () => ({
+                onDidCreate: event("fileCreate"),
+                onDidChange: event("fileChange"),
+                onDidDelete: event("fileDelete"),
+                dispose() {}
+            }),
+            workspaceFolders: [],
+            textDocuments: [],
+            findFiles: async () => [],
             getWorkspaceFolder: () => undefined
+        },
+        tests: {
+            createTestController(id, label) {
+                const items = [];
+                const controller = {
+                    id,
+                    label,
+                    items: {
+                        replace(next) { items.splice(0, items.length, ...next); },
+                        [Symbol.iterator]() { return items[Symbol.iterator](); }
+                    },
+                    createTestItem(itemId, itemLabel, uri) {
+                        return { id: itemId, label: itemLabel, uri };
+                    },
+                    createRunProfile(name, kind, handler, isDefault) {
+                        controller.runProfile = { name, kind, handler, isDefault };
+                    },
+                    createTestRun(request) {
+                        const run = {
+                            request,
+                            results: { enqueued: [], started: [], passed: [], failed: [], skipped: [] },
+                            output: [], ended: false,
+                            enqueued(item) { this.results.enqueued.push(item); },
+                            started(item) { this.results.started.push(item); },
+                            passed(item) { this.results.passed.push(item); },
+                            failed(item, message) { this.results.failed.push({ item, message }); },
+                            skipped(item) { this.results.skipped.push(item); },
+                            appendOutput(value, location, testId) { this.output.push({ value, location, testId }); },
+                            end() { this.ended = true; }
+                        };
+                        registrations.testRuns.push(run);
+                        return run;
+                    },
+                    dispose() {}
+                };
+                registrations.testControllers.push(controller);
+                return controller;
+            }
+        },
+        tasks: {
+            registerTaskProvider(type, provider) {
+                registrations.taskProviders.push({ type, provider });
+                return event();
+            }
         },
         window: {
             activeTextEditor: undefined,
             createOutputChannel: () => ({ appendLine() {}, show() {}, dispose() {} }),
             createStatusBarItem: () => ({ show() {}, hide() {}, dispose() {} }),
-            onDidChangeActiveTextEditor: event,
+            onDidChangeActiveTextEditor: event("activeEditor"),
             withProgress: async (_, action) => action(),
             showWarningMessage: async () => {},
             showErrorMessage: async () => {},
             showInformationMessage: async () => {},
             showOpenDialog: async () => undefined,
+            showQuickPick: async () => undefined,
             showInputBox: async () => undefined
         },
-        registrations,
+        registrations: Object.assign(registrations, { fireLast }),
         configuration
     };
     return vscode;
@@ -198,7 +332,37 @@ function documentFrom(text, filePath = path.join(os.tmpdir(), "example.zp")) {
 
 test("manifest, grammar, language configuration and snippets are loadable", () => {
     assert.equal(manifest.contributes.languages[0].id, "zplus");
-    assert.equal(manifest.version, "1.1.4");
+    assert.equal(manifest.version, "1.3.4");
+    assert.equal(manifest.name, "zplus-language");
+    assert.equal(manifest.publisher, "Miroxdev0");
+    assert.equal(manifest.license, "SEE LICENSE IN LICENSE.txt");
+    assert.equal(manifest.homepage, "https://zpluse.vercel.app/");
+    assert.equal(Object.hasOwn(manifest, "repository"), false);
+    assert.equal(Object.hasOwn(manifest, "bugs"), false);
+    assert.ok(manifest.description.length > 20);
+    assert.match(manifest.description, /proprietary Z\+/i);
+    const marketplaceText = [
+        manifest.description,
+        fs.readFileSync(path.join(extensionRoot, "README.md"), "utf8"),
+        fs.readFileSync(path.join(extensionRoot, "CHANGELOG.md"), "utf8")
+    ].join("\n");
+    assert.match(marketplaceText, /https:\/\/zpluse\.vercel\.app\//);
+    assert.doesNotMatch(marketplaceText, /github\.com|gitlab\.com|bitbucket\.org/i);
+    assert.doesNotMatch(marketplaceText, /open[ -]?source|free and open/i);
+    assert.ok(manifest.categories.includes("Programming Languages"));
+    assert.ok(manifest.keywords.includes("compiler"));
+    const extensionLicensePath = path.join(extensionRoot, "LICENSE.txt");
+    assert.ok(fs.existsSync(extensionLicensePath));
+    assert.ok(!fs.existsSync(path.join(extensionRoot, "LICENSE")));
+    assert.deepEqual(
+        fs.readFileSync(extensionLicensePath),
+        fs.readFileSync(path.join(projectRoot, "LICENSE.txt")),
+        "extension terms must match the official root Z+ license exactly"
+    );
+    assert.match(fs.readFileSync(extensionLicensePath, "utf8"), /^Z\+ PROPRIETARY SOFTWARE LICENSE/m);
+    assert.deepEqual(manifest.dependencies || {}, {}, "the runtime has no external npm dependencies");
+    assert.deepEqual(manifest.contributes.taskDefinitions[0].properties.command.enum,
+        ["build", "run", "test"]);
     assert.deepEqual(manifest.contributes.languages[0].extensions, [".zp", ".zh"]);
     assert.ok(fs.existsSync(path.join(extensionRoot, manifest.contributes.grammars[0].path)));
     assert.equal(grammar.scopeName, "source.zplus");
@@ -228,6 +392,7 @@ test("manifest, grammar, language configuration and snippets are loadable", () =
         "zplus.checkFile", "zplus.runFile", "zplus.buildFile",
         "zplus.selectCompiler", "zplus.showCompilerVersion",
         "zplus.zbuildBuildProject", "zplus.zbuildRunProject", "zplus.zbuildTestProject",
+        "zplus.zbuildInitProject",
         "zplus.zpmInstall", "zplus.zpmAdd", "zplus.zpmRemove", "zplus.zpmList"
     ]) {
         assert.ok(manifest.contributes.commands.some(item => item.command === command), command);
@@ -268,14 +433,65 @@ test("activation registers commands and editor providers", () => {
             "zplus.checkFile", "zplus.runFile", "zplus.buildFile",
             "zplus.selectCompiler", "zplus.showCompilerVersion",
             "zplus.zbuildBuildProject", "zplus.zbuildRunProject", "zplus.zbuildTestProject",
+            "zplus.zbuildInitProject",
             "zplus.zpmInstall", "zplus.zpmAdd", "zplus.zpmRemove", "zplus.zpmList"
         ]
     );
     assert.deepEqual(
         vscodeMock.registrations.providers.map(item => item.type),
-        ["completion", "hover", "definition", "symbols", "signature"]
+        ["completion", "hover", "definition", "typeDefinition", "symbols", "signature", "references", "rename",
+            "workspaceSymbols", "format", "formatRange"]
     );
+    assert.equal(vscodeMock.registrations.testControllers.at(-1).id, "zplus");
+    assert.equal(vscodeMock.registrations.taskProviders.at(-1).type, "zplus");
     extension.deactivate();
+});
+
+test("editing a Z+ buffer invalidates analysis and clears stale root diagnostics", () => {
+    extension.activate({ subscriptions: [] });
+    const document = documentFrom("start {\n missing\n} stop\n");
+    try {
+        extension.publishDiagnostics(
+            '{"severity":"error","message":"old error","line":2,"column":2}',
+            document
+        );
+        const before = vscodeMock.registrations.diagnosticWrites.length;
+        vscodeMock.configuration.checkWhileTyping = false;
+        vscodeMock.registrations.fireLast("textChange", { document });
+        const writes = vscodeMock.registrations.diagnosticWrites.slice(before);
+        assert.ok(writes.some(write => write.uri.toString() === document.uri.toString() &&
+            write.diagnostics.length === 0));
+    } finally {
+        delete vscodeMock.configuration.checkWhileTyping;
+        extension.deactivate();
+    }
+});
+
+test("newer Test Explorer refreshes supersede pending project scans", async () => {
+    vscodeMock.workspace.workspaceFolders = [];
+    vscodeMock.workspace.findFiles = async () => [];
+    extension.activate({ subscriptions: [] });
+    const firstRoot = path.join(os.tmpdir(), "zplus-old-project");
+    const latestRoot = path.join(os.tmpdir(), "zplus-latest-project");
+    const folder = { uri: vscodeMock.Uri.file(os.tmpdir()) };
+    const pending = [];
+    try {
+        vscodeMock.workspace.workspaceFolders = [folder];
+        vscodeMock.workspace.findFiles = () => new Promise(resolve => pending.push(resolve));
+        const olderRefresh = extension.refreshTestProjects();
+        const latestRefresh = extension.refreshTestProjects();
+        assert.equal(pending.length, 2);
+        pending[1]([vscodeMock.Uri.file(path.join(latestRoot, "zproject.toml"))]);
+        await latestRefresh;
+        pending[0]([vscodeMock.Uri.file(path.join(firstRoot, "zproject.toml"))]);
+        await olderRefresh;
+        const controller = vscodeMock.registrations.testControllers.at(-1);
+        assert.deepEqual([...controller.items].map(item => item.uri.fsPath), [latestRoot]);
+    } finally {
+        vscodeMock.workspace.workspaceFolders = [];
+        vscodeMock.workspace.findFiles = async () => [];
+        extension.deactivate();
+    }
 });
 
 test("ZBuild project discovery walks from the active file to zproject.toml", async () => {
@@ -290,6 +506,214 @@ test("ZBuild project discovery walks from the active file to zproject.toml", asy
     } finally {
         vscodeMock.window.activeTextEditor = undefined;
         await fs.promises.rm(directory, { recursive: true, force: true });
+    }
+});
+
+test("ZBuild project initializer builds documented, path-safe CLI arguments", () => {
+    assert.deepEqual(extension.createZBuildInitArgs(
+        "My-App", "Console", path.join(os.tmpdir(), "projects with spaces", "My-App")
+    ), ["init", "My-App", "--template", "Console", "--path",
+        path.join(os.tmpdir(), "projects with spaces", "My-App")]);
+});
+
+test("ZPBuild discovery honors configuration and prefers local zpbuild binaries", async () => {
+    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "zplus zpbuild path "));
+    const executableName = process.platform === "win32" ? "zpbuild.exe" : "zpbuild";
+    const localExecutable = path.join(directory, "bin", executableName);
+    try {
+        await fs.promises.mkdir(path.dirname(localExecutable));
+        await fs.promises.writeFile(localExecutable, "");
+        vscodeMock.workspace.workspaceFolders = [{ uri: { fsPath: directory } }];
+        delete vscodeMock.configuration.zbuildPath;
+        assert.equal(extension.getZBuildPath(), localExecutable);
+
+        const configured = path.join(directory, "custom tools", executableName);
+        vscodeMock.configuration.zbuildPath = configured;
+        assert.equal(extension.getZBuildPath(), configured);
+    } finally {
+        vscodeMock.workspace.workspaceFolders = [];
+        delete vscodeMock.configuration.zbuildPath;
+        await fs.promises.rm(directory, { recursive: true, force: true });
+    }
+});
+
+test("Test Explorer discovers ZPBuild projects and executes their configured suite", async () => {
+    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "zplus testing api "));
+    const manifestPath = path.join(directory, "zproject.toml");
+    try {
+        await fs.promises.writeFile(manifestPath, "[project]\nname = \"TestApi\"\n");
+        await fs.promises.writeFile(path.join(directory, "test"),
+            "process.stdout.write('configured Z+ tests passed\\n')\n");
+        vscodeMock.workspace.workspaceFolders = [{ uri: vscodeMock.Uri.file(directory) }];
+        vscodeMock.workspace.findFiles = async () => [vscodeMock.Uri.file(manifestPath)];
+        vscodeMock.configuration.zbuildPath = process.execPath;
+        extension.activate({ subscriptions: [] });
+        await extension.refreshTestProjects();
+
+        const controller = vscodeMock.registrations.testControllers.at(-1);
+        const items = [...controller.items];
+        assert.equal(items.length, 1);
+        assert.equal(items[0].uri.fsPath, directory);
+        await controller.runProfile.handler({ include: items, exclude: [] }, {
+            isCancellationRequested: false,
+            onCancellationRequested: () => ({ dispose() {} })
+        });
+
+        const result = vscodeMock.registrations.testRuns.at(-1);
+        assert.deepEqual(result.results.passed, items);
+        assert.equal(result.results.failed.length, 0);
+        assert.equal(result.ended, true);
+        assert.match(result.output.map(entry => entry.value).join(""), /configured Z\+ tests passed/);
+
+        await fs.promises.writeFile(path.join(directory, "test"), "setInterval(() => {}, 1000)\n");
+        let cancellationHandler;
+        const cancellationToken = {
+            isCancellationRequested: false,
+            onCancellationRequested(handler) {
+                cancellationHandler = handler;
+                return { dispose() {} };
+            }
+        };
+        const pendingRun = controller.runProfile.handler({ include: items, exclude: [] }, cancellationToken);
+        setTimeout(() => {
+            cancellationToken.isCancellationRequested = true;
+            cancellationHandler();
+        }, 50);
+        await pendingRun;
+        const cancelled = vscodeMock.registrations.testRuns.at(-1);
+        assert.deepEqual(cancelled.results.skipped, items);
+    } finally {
+        extension.deactivate();
+        vscodeMock.workspace.workspaceFolders = [];
+        vscodeMock.workspace.findFiles = async () => [];
+        delete vscodeMock.configuration.zbuildPath;
+        await new Promise(resolve => setTimeout(resolve, 150));
+        await fs.promises.rm(directory, { recursive: true, force: true });
+    }
+});
+
+test("workspace build tasks launch ZPBuild in project directories through the integrated task API", async () => {
+    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "zplus task project "));
+    const manifestPath = path.join(directory, "zproject.toml");
+    try {
+        await fs.promises.writeFile(manifestPath, "[project]\nname = \"TaskProject\"\n");
+        const folder = { uri: vscodeMock.Uri.file(directory), name: "TaskProject" };
+        vscodeMock.workspace.workspaceFolders = [folder];
+        vscodeMock.workspace.findFiles = async () => [vscodeMock.Uri.file(manifestPath)];
+        vscodeMock.configuration.zbuildPath = process.execPath;
+        extension.activate({ subscriptions: [] });
+
+        const provider = vscodeMock.registrations.taskProviders.at(-1).provider;
+        const tasks = await provider.provideTasks();
+        assert.deepEqual(tasks.map(task => task.definition.command), ["build", "run", "test"]);
+        for (const task of tasks) {
+            assert.equal(task.execution.process, process.execPath);
+            assert.deepEqual(task.execution.args, [task.definition.command]);
+            assert.equal(task.execution.options.cwd, directory);
+        }
+        assert.equal(tasks[0].group, "build");
+        assert.equal(tasks[2].group, "test");
+        assert.equal(provider.resolveTask(tasks[1]).execution.options.cwd, directory);
+    } finally {
+        extension.deactivate();
+        vscodeMock.workspace.workspaceFolders = [];
+        vscodeMock.workspace.findFiles = async () => [];
+        delete vscodeMock.configuration.zbuildPath;
+        await fs.promises.rm(directory, { recursive: true, force: true });
+    }
+});
+
+test("formatter adjusts syntax-aware indentation without touching literals or comments", () => {
+    const source = [
+        "start {",
+        "fn choose() {",
+        "if (true) {",
+        'say("{ keep } // literal") // keep comment text',
+        "/* block comment starts",
+        "        preserve this comment line {",
+        "    */",
+        "} else {",
+        "say('}')",
+        "}",
+        "} end fn",
+        "} stop",
+        ""
+    ].join("\n");
+    const formatted = formatText(source, { tabSize: 4, insertSpaces: true });
+    assert.equal(formatted, [
+        "start {",
+        "    fn choose() {",
+        "        if (true) {",
+        '            say("{ keep } // literal") // keep comment text',
+        "            /* block comment starts",
+        "        preserve this comment line {",
+        "    */",
+        "        } else {",
+        "            say('}')",
+        "        }",
+        "    } end fn",
+        "} stop",
+        ""
+    ].join("\n"));
+    assert.equal(formatText(formatted, { tabSize: 4, insertSpaces: true }), formatted,
+        "formatting should be stable across repeated runs");
+});
+
+test("formatter handles legacy blocks, CRLF input and tab indentation", () => {
+    const source = "start:\r\nfn f():\r\nif true:\r\nsay(1)\r\nelse:\r\nsay(2)\r\nend\r\nend\r\nstop\r\n";
+    const formatted = formatText(source, { tabSize: 2, insertSpaces: false });
+    assert.ok(formatted.includes("\r\n"));
+    assert.equal(formatted, "start:\r\n\tfn f():\r\n\t\tif true:\r\n\t\t\tsay(1)\r\n\t\telse:\r\n\t\t\tsay(2)\r\n\t\tend\r\n\tend\r\nstop\r\n");
+    assert.equal(formatText(formatted, { tabSize: 2, insertSpaces: false }), formatted);
+});
+
+test("selection formatting only changes complete selected lines", () => {
+    const source = "start {\n say(1) \n say(2) \n} stop\n";
+    const partialLine = formatSelectedLines(source, 1, 2, 1, 7, { tabSize: 4 });
+    assert.equal(partialLine, undefined, "a partial one-line selection must not be widened");
+
+    const middleLine = formatSelectedLines(source, 0, 3, 3, 2, { tabSize: 4 });
+    assert.equal(middleLine.startLine, 1);
+    assert.equal(middleLine.endLine, 2);
+    assert.equal(middleLine.text, "    say(1)\n    say(2)");
+    assert.equal(source.split("\n")[0], "start {");
+    assert.equal(source.split("\n")[3], "} stop");
+
+    const fullLine = formatSelectedLines("start {\n say(1) \n} stop", 1, 0, 1, 8, { tabSize: 2 });
+    assert.equal(fullLine.text, "  say(1)");
+});
+
+test("VS Code document and selection formatting providers produce workspace edits", () => {
+    extension.activate({ subscriptions: [] });
+    try {
+        const document = documentFrom("start {\n say(1) \n} stop\n");
+        const documentProvider = vscodeMock.registrations.providers
+            .filter(item => item.type === "format").at(-1).provider;
+        const rangeProvider = vscodeMock.registrations.providers
+            .filter(item => item.type === "formatRange").at(-1).provider;
+        const edits = documentProvider.provideDocumentFormattingEdits(document, {
+            tabSize: 2, insertSpaces: true
+        });
+        assert.equal(edits.length, 1);
+        assert.equal(edits[0].newText, "start {\n  say(1)\n} stop\n");
+
+        const rangeEdit = rangeProvider.provideDocumentRangeFormattingEdits(
+            document, new vscodeMock.Range(1, 0, 1, 8), { tabSize: 4, insertSpaces: true });
+        assert.equal(rangeEdit.length, 1);
+        assert.equal(rangeEdit[0].newText, "    say(1)");
+
+        const partialBoundary = rangeProvider.provideDocumentRangeFormattingEdits(
+            document, new vscodeMock.Range(0, 2, 2, 3), { tabSize: 4, insertSpaces: true });
+        assert.equal(partialBoundary.length, 1);
+        assert.equal(partialBoundary[0].range.start.line, 1);
+        assert.equal(partialBoundary[0].range.end.line, 1);
+        assert.equal(partialBoundary[0].newText, "    say(1)");
+
+        const partialOnly = rangeProvider.provideDocumentRangeFormattingEdits(
+            document, new vscodeMock.Range(1, 2, 1, 6), { tabSize: 4, insertSpaces: true });
+        assert.deepEqual(partialOnly, []);
+    } finally {
+        extension.deactivate();
     }
 });
 
@@ -326,6 +750,42 @@ test("completion and document symbols include local declarations and built-ins",
     assert.ok(completions.includes("count"));
     const symbols = extension.provideDocumentSymbols(document).map(item => item.name);
     assert.deepEqual(symbols, ["greet", "count"]);
+});
+
+test("symbol indexing recognizes current brace-style declarations", () => {
+    const document = documentFrom(
+        "start {\n    pub fn calculate(value: number): number {\n        return value\n    } end fn\n    struct Point {\n    } end struct\n} stop"
+    );
+    const symbols = extension.parseSymbols(document);
+    assert.deepEqual(symbols.map(symbol => symbol.name), ["calculate", "Point"]);
+    assert.equal(symbols[0].type, "number");
+    assert.equal(symbols[0].isPublic, true);
+    assert.equal(symbols[1].kind, "struct");
+});
+
+test("Go to Type Definition resolves local and imported aggregate types", async () => {
+    const local = documentFrom(
+        "start {\nstruct Point {\n} end struct\nlet point: Point\n} stop"
+    );
+    const localTarget = extension.provideTypeDefinition(local, new vscodeMock.Position(3, 5));
+    assert.equal(localTarget.uri.fsPath, local.uri.fsPath);
+    assert.equal(localTarget.position.line, 1);
+
+    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "zplus type definition "));
+    try {
+        const headerPath = path.join(directory, "types.zh");
+        const entryPath = path.join(directory, "main.zp");
+        await fs.promises.writeFile(headerPath,
+            "start {\npub struct Widget {\n} end struct\npub let current: Widget\n} stop\n");
+        await fs.promises.writeFile(entryPath,
+            'use "types.zh"\nstart {\nlet value: Widget\n} stop\n');
+        const entry = documentFrom(await fs.promises.readFile(entryPath, "utf8"), entryPath);
+        const target = extension.provideTypeDefinition(entry, new vscodeMock.Position(2, 5));
+        assert.equal(target.uri.fsPath, headerPath);
+        assert.equal(target.position.line, 1);
+    } finally {
+        await fs.promises.rm(directory, { recursive: true, force: true });
+    }
 });
 
 test("signature help, hover and definition resolve locally declared symbols", () => {
@@ -437,6 +897,177 @@ test("ambiguous public imports are offered only through module qualification", a
     }
 });
 
+test("imported module symbols refresh after invalidation and support two aliases", async () => {
+    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "zplus module cache "));
+    try {
+        const modulePath = path.join(directory, "shared.zh");
+        await fs.promises.writeFile(modulePath, "pub fn older():\nend\n");
+        const document = documentFrom(
+            'use "shared.zh" as first\nuse "shared.zh" as second\n',
+            path.join(directory, "main.zp")
+        );
+        vscodeMock.workspace.textDocuments = [];
+        const first = extension.parseVisibleSymbols(document);
+        assert.ok(first.some(symbol => symbol.moduleAlias === "first" && symbol.name === "older"));
+        assert.ok(first.some(symbol => symbol.moduleAlias === "second" && symbol.name === "older"));
+
+        await fs.promises.writeFile(modulePath, "pub fn newer():\nend\n");
+        const cached = extension.parseVisibleSymbols(document);
+        assert.ok(cached.some(symbol => symbol.name === "older"), "unchanged project results are cached");
+        extension.invalidateLanguageAnalysis(vscodeMock.Uri.file(modulePath));
+        const refreshed = extension.parseVisibleSymbols(document);
+        assert.ok(refreshed.some(symbol => symbol.name === "newer"));
+        assert.ok(!refreshed.some(symbol => symbol.name === "older"));
+    } finally {
+        vscodeMock.workspace.textDocuments = [];
+        await fs.promises.rm(directory, { recursive: true, force: true });
+    }
+});
+
+test("workspace symbols, references and rename include importing project files", async () => {
+    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "zplus workspace index "));
+    try {
+        const modulePath = path.join(directory, "math.zh");
+        const entryPath = path.join(directory, "main.zp");
+        await fs.promises.writeFile(modulePath, "pub fn total(value: number):\n    return value\nend\n");
+        const entryText = 'use "math.zh" as math\nstart:\n    math.total(2)\nstop\n';
+        await fs.promises.writeFile(entryPath, entryText);
+        const module = documentFrom(await fs.promises.readFile(modulePath, "utf8"), modulePath);
+        const entry = documentFrom(entryText, entryPath);
+        vscodeMock.workspace.workspaceFolders = [{ uri: vscodeMock.Uri.file(directory) }];
+        vscodeMock.workspace.textDocuments = [module, entry];
+        vscodeMock.workspace.findFiles = async () => [vscodeMock.Uri.file(modulePath), vscodeMock.Uri.file(entryPath)];
+
+        const symbols = await extension.provideWorkspaceSymbols("tot");
+        assert.ok(symbols.some(symbol => symbol.name === "total"));
+        const references = await extension.provideReferences(
+            module, new vscodeMock.Position(0, 9), { includeDeclaration: true });
+        assert.equal(references.length, 2);
+        assert.ok(references.some(reference => reference.uri.fsPath === entryPath));
+        const edits = await extension.provideRenameEdits(module, new vscodeMock.Position(0, 9), "sumTotal");
+        assert.equal(edits.entries.length, 2);
+        assert.ok(edits.entries.some(edit => edit.uri.fsPath === entryPath && edit.newText === "sumTotal"));
+        await assert.rejects(extension.provideRenameEdits(module, new vscodeMock.Position(0, 9), "not-valid"));
+    } finally {
+        vscodeMock.workspace.workspaceFolders = [];
+        vscodeMock.workspace.textDocuments = [];
+        vscodeMock.workspace.findFiles = async () => [];
+        await fs.promises.rm(directory, { recursive: true, force: true });
+    }
+});
+
+test("references and rename keep same-named public declarations in separate modules", async () => {
+    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "zplus duplicate symbols "));
+    try {
+        const leftPath = path.join(directory, "left.zh");
+        const rightPath = path.join(directory, "right.zh");
+        const entryPath = path.join(directory, "main.zp");
+        await fs.promises.writeFile(leftPath, "pub fn same():\nend\n");
+        await fs.promises.writeFile(rightPath, "pub fn same():\nend\n");
+        const entryText = 'use "left.zh" as left\nuse "right.zh" as right\nstart:\n    left.same()\n    right.same()\nstop\n';
+        await fs.promises.writeFile(entryPath, entryText);
+        const left = documentFrom(await fs.promises.readFile(leftPath, "utf8"), leftPath);
+        const right = documentFrom(await fs.promises.readFile(rightPath, "utf8"), rightPath);
+        const entry = documentFrom(entryText, entryPath);
+        vscodeMock.workspace.workspaceFolders = [{ uri: vscodeMock.Uri.file(directory) }];
+        vscodeMock.workspace.textDocuments = [left, right, entry];
+        vscodeMock.workspace.findFiles = async () => [
+            vscodeMock.Uri.file(leftPath), vscodeMock.Uri.file(rightPath), vscodeMock.Uri.file(entryPath)
+        ];
+
+        const references = await extension.provideReferences(left, new vscodeMock.Position(0, 9), {
+            includeDeclaration: true
+        });
+        assert.equal(references.length, 2);
+        assert.ok(references.some(reference => reference.uri.fsPath === leftPath));
+        assert.ok(references.some(reference => reference.uri.fsPath === entryPath && reference.range.start.line === 3));
+
+        const edits = await extension.provideRenameEdits(left, new vscodeMock.Position(0, 9), "leftOnly");
+        assert.equal(edits.entries.length, 2);
+        assert.ok(edits.entries.every(edit => edit.uri.fsPath !== rightPath));
+        assert.ok(edits.entries.some(edit => edit.uri.fsPath === entryPath &&
+            entryText.slice(entry.offsetAt(edit.range.start), entry.offsetAt(edit.range.end)) === "same"));
+    } finally {
+        vscodeMock.workspace.workspaceFolders = [];
+        vscodeMock.workspace.textDocuments = [];
+        vscodeMock.workspace.findFiles = async () => [];
+        await fs.promises.rm(directory, { recursive: true, force: true });
+    }
+});
+
+test("workspace index bounds file reads, reuses unchanged content, and drops deleted files", async () => {
+    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "zplus index concurrency "));
+    const paths = Array.from({ length: 40 }, (_, index) => path.join(directory, `module-${index}.zh`));
+    let activeReads = 0;
+    let maximumActiveReads = 0;
+    let readCount = 0;
+    const index = new WorkspaceIndex({
+        maxConcurrency: 4,
+        async readFile(uri) {
+            activeReads++;
+            maximumActiveReads = Math.max(maximumActiveReads, activeReads);
+            readCount++;
+            await new Promise(resolve => setTimeout(resolve, 5));
+            try { return await fs.promises.readFile(uri.fsPath, "utf8"); }
+            finally { activeReads--; }
+        }
+    });
+    try {
+        await Promise.all(paths.map(file => fs.promises.writeFile(file, "pub fn value(): number\n")));
+        const folder = { uri: vscodeMock.Uri.file(directory) };
+        vscodeMock.workspace.workspaceFolders = [folder];
+        vscodeMock.workspace.findFiles = async () => paths.map(file => vscodeMock.Uri.file(file));
+        const current = documentFrom("start { } stop", path.join(directory, "main.zp"));
+        const first = await index.documents(vscodeMock, current);
+        assert.equal(first.length, paths.length + 1);
+        assert.ok(maximumActiveReads > 1);
+        assert.ok(maximumActiveReads <= 4);
+
+        await index.documents(vscodeMock, current);
+        assert.equal(readCount, paths.length, "unchanged files should be served from the metadata cache");
+
+        await new Promise(resolve => setTimeout(resolve, 5));
+        await fs.promises.writeFile(paths[0], "pub fn names(): number\n");
+        const updated = await index.documents(vscodeMock, current);
+        assert.ok(updated.some(document => document.getText().includes("fn names")));
+        assert.equal(readCount, paths.length + 1);
+
+        await fs.promises.rm(paths.at(-1));
+        vscodeMock.workspace.findFiles = async () => paths.slice(0, -1).map(file => vscodeMock.Uri.file(file));
+        const afterDelete = await index.documents(vscodeMock, current);
+        assert.equal(afterDelete.length, paths.length);
+        assert.equal(index.cache.size, paths.length - 1);
+    } finally {
+        vscodeMock.workspace.workspaceFolders = [];
+        vscodeMock.workspace.findFiles = async () => [];
+        await fs.promises.rm(directory, { recursive: true, force: true });
+    }
+});
+
+test("workspace index handles a thousand source files with a bounded cache", async () => {
+    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "zplus large workspace "));
+    const paths = Array.from({ length: 1000 }, (_, index) =>
+        path.join(directory, `module-${index}.zh`));
+    const index = new WorkspaceIndex({ maxConcurrency: 12 });
+    try {
+        await Promise.all(paths.map((file, number) =>
+            fs.promises.writeFile(file, `pub fn symbol_${number}():\nend\n`)));
+        vscodeMock.workspace.workspaceFolders = [{ uri: vscodeMock.Uri.file(directory) }];
+        vscodeMock.workspace.textDocuments = [];
+        vscodeMock.workspace.findFiles = async () => paths.map(file => vscodeMock.Uri.file(file));
+        const current = documentFrom("start { } stop", path.join(directory, "main.zp"));
+        const documents = await index.documents(vscodeMock, current);
+        assert.equal(documents.length, 1001);
+        assert.equal(index.cache.size, 1000);
+        assert.ok(documents.some(item => item.getText().includes("symbol_999")));
+    } finally {
+        vscodeMock.workspace.workspaceFolders = [];
+        vscodeMock.workspace.textDocuments = [];
+        vscodeMock.workspace.findFiles = async () => [];
+        await fs.promises.rm(directory, { recursive: true, force: true });
+    }
+});
+
 test("diagnostics are positioned and unknown source positions are not fabricated", () => {
     const document = documentFrom("start:\n    missing\nstop");
     const diagnostics = extension.toVscodeDiagnostics(
@@ -453,13 +1084,15 @@ test("diagnostics are positioned and unknown source positions are not fabricated
 });
 
 test("imported module diagnostics target the reported .zh source file", () => {
+    extension.activate({ subscriptions: [] });
     const root = documentFrom("", path.join(os.tmpdir(), "module root.zp"));
     const modulePath = path.join(os.tmpdir(), "module source.zh");
     const compiledTemporaryRoot = path.join(os.tmpdir(), ".module root.check.zp");
     extension.publishDiagnostics(
-        JSON.stringify({
-            severity: "error", message: "module error", file: modulePath, line: 4, column: 7
-        }),
+        [
+            { severity: "error", message: "entry error", line: 1, column: 1 },
+            { severity: "error", message: "module error", file: modulePath, line: 4, column: 7 }
+        ].map(item => JSON.stringify(item)).join("\n"),
         root,
         compiledTemporaryRoot
     );
@@ -467,6 +1100,13 @@ test("imported module diagnostics target the reported .zh source file", () => {
     assert.equal(write.uri.fsPath, modulePath);
     assert.equal(write.diagnostics[0].range.start.line, 3);
     assert.equal(write.diagnostics[0].range.start.character, 6);
+    const before = vscodeMock.registrations.diagnosticWrites.length;
+    vscodeMock.registrations.fireLast("fileChange", vscodeMock.Uri.file(modulePath));
+    const cleared = vscodeMock.registrations.diagnosticWrites.slice(before);
+    assert.ok(cleared.some(item => item.uri.toString() === root.uri.toString() &&
+        item.diagnostics.length === 0));
+    assert.ok(cleared.some(item => item.uri.fsPath === modulePath && item.diagnostics.length === 0));
+    extension.deactivate();
 });
 
 test("compiler path resolution preserves explicit paths and finds PATH executables", () => {
@@ -475,6 +1115,7 @@ test("compiler path resolution preserves explicit paths and finds PATH executabl
         const executable = path.join(directory, "zp.exe");
         fs.writeFileSync(executable, "");
         assert.equal(resolveCompilerPath(executable), executable);
+        assert.equal(resolveCompilerPath("", process.env, process.platform, [executable]), executable);
         assert.equal(
             resolveCompilerPath("zp", { PATH: directory, PATHEXT: ".EXE" }, "win32").toLowerCase(),
             executable.toLowerCase()
@@ -489,6 +1130,18 @@ test("missing compiler is reported as a launch error", async () => {
     const result = await executeCompiler(missing, ["version"]);
     assert.equal(result.code, 1);
     assert.equal(result.error.code, "ENOENT");
+});
+
+test("compiler process cancellation terminates a superseded check", async () => {
+    const controller = new AbortController();
+    const pending = executeCompiler(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+        signal: controller.signal,
+        timeout: 10000
+    });
+    setTimeout(() => controller.abort(), 50);
+    const result = await pending;
+    assert.equal(result.code, 1);
+    assert.equal(result.error.code, "ABORT_ERR");
 });
 
 test("compiler reports its version", { skip: !hasCompiler }, async () => {
@@ -585,6 +1238,24 @@ test("real compiler emits positioned syntax and semantic diagnostics", {
     }
 });
 
+test("Z+ diagnostic stress fixtures use compiler-accepted syntax and recover across many errors", {
+    skip: !hasCompiler
+}, async () => {
+    const validSource = path.join(extensionRoot, "test", "fixtures", "stress-valid.zp");
+    const invalidSource = path.join(extensionRoot, "test", "fixtures", "stress-invalid.zp");
+    const valid = await executeCompiler(compiler, ["check", validSource, "--diagnostics=json"]);
+    assert.equal(valid.code, 0, valid.stderr);
+
+    const started = process.hrtime.bigint();
+    const invalid = await executeCompiler(compiler, ["check", invalidSource, "--diagnostics=json"]);
+    const elapsedMs = Number(process.hrtime.bigint() - started) / 1e6;
+    const diagnostics = parseDiagnostics(invalid.stderr);
+    assert.notEqual(invalid.code, 0);
+    assert.ok(diagnostics.length >= 30, `expected multiple independent errors, got ${diagnostics.length}`);
+    assert.ok(diagnostics.every(item => item.line >= 2 && item.line <= 37 && item.column > 0));
+    assert.ok(elapsedMs < 30000, `compiler diagnostic stress check took ${elapsedMs.toFixed(0)}ms`);
+});
+
 test("real compiler reports diagnostics from imported .zh files", {
     skip: !hasCompiler
 }, async () => {
@@ -593,7 +1264,7 @@ test("real compiler reports diagnostics from imported .zh files", {
         const moduleFile = path.join(directory, "bad module.zh");
         const entryFile = path.join(directory, "main.zp");
         await fs.promises.writeFile(moduleFile,
-            "fn broken() -> number:\n    return notDeclared\nend\n");
+            "start {\nfn broken() -> number {\n    return notDeclared\n} end fn\n} stop\n");
         await fs.promises.writeFile(entryFile,
             'use "bad module.zh"\nstart:\nstop\n');
 
@@ -602,7 +1273,7 @@ test("real compiler reports diagnostics from imported .zh files", {
         const diagnostic = parseDiagnostics(result.stderr).find(item =>
             item.file && path.resolve(item.file) === path.resolve(moduleFile));
         assert.ok(diagnostic, result.stderr);
-        assert.equal(diagnostic.line, 2);
+        assert.equal(diagnostic.line, 3);
         assert.ok(diagnostic.column > 0);
     } finally {
         await fs.promises.rm(directory, { recursive: true, force: true });
@@ -625,7 +1296,7 @@ test("real compiler executable and source/output paths containing spaces work", 
             await fs.promises.chmod(executable, compilerMode);
         }
         await fs.promises.writeFile(source,
-            'fn main() -> number:\n    say("native output")\n    return 0\nend\n');
+            'start {\nfn main(): number {\n    say("native output")\n    return 0\n} end fn\n} stop\n');
         const built = await executeCompiler(executable, ["build", source, "-o", output, "--diagnostics=json"]);
         assert.equal(built.code, 0, built.stderr);
         assert.ok((await fs.promises.stat(output)).size > 0);

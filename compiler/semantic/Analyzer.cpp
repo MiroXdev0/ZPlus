@@ -481,6 +481,12 @@ bool Analyzer::analyze(
         registerBuiltin(name, std::move(parameters), std::move(result),
                         requiredParameterCount, false);
     };
+    auto declareOptionalPromptBuiltin = [&registerBuiltin](
+        const std::string& name,
+        Type result
+    ) {
+        registerBuiltin(name, {Type::string()}, std::move(result), 0, false);
+    };
     auto declareVariadicBuiltin = [&registerBuiltin](
         const std::string& name,
         std::vector<Type> parameters,
@@ -500,10 +506,11 @@ bool Analyzer::analyze(
     declareVariadicBuiltin("println", {Type::unknown()}, voidType, 0);
     declareVariadicBuiltin("print", {Type::unknown()}, voidType, 0);
     declareBuiltin("time", {}, number);
-    declareBuiltin("read", {}, string);
-    declareBuiltin("read_number", {}, number);
-    declareBuiltin("read_integer", {}, number);
-    declareBuiltin("read_boolean", {}, boolean);
+    declareOptionalPromptBuiltin("read", string);
+    declareOptionalPromptBuiltin("read_number", number);
+    declareOptionalPromptBuiltin("read_integer", number);
+    declareOptionalPromptBuiltin("read_boolean", boolean);
+    declareBuiltin("string", {string}, string);
     declareBuiltin("to_string", {number}, string);
     declareBuiltin("__zgraphics_createWindow", {string, number, number}, number);
     const Type element = Type::typeParameter("T");

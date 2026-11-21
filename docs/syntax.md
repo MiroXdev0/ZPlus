@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This reference describes the language accepted by the Z+ 1.3.3 command-line compiler in this repository. It follows the lexer, parser, semantic analyzer, IR builder, and interpreter—not proposed or aspirational features.
+This reference describes the language accepted by the Z+ 1.3.5 command-line compiler in this repository. It follows the lexer, parser, semantic analyzer, IR builder, and interpreter—not proposed or aspirational features.
 
 The status labels used below mean:
 
@@ -643,6 +643,33 @@ The compiler represents generic array element types internally for built-in
 signatures such as `length(array)`. This does not add user-declared generic
 functions or generic type syntax. `to_string(value)` accepts `number` and
 returns a `string`; other argument types are rejected during semantic analysis.
+
+Terminal input is available without an import. `read`, `read_number`,
+`read_integer`, and `read_boolean` each accept either no arguments or one
+string prompt. Prompts are written to standard output and flushed before input
+is requested. `read` returns a complete line (including spaces and UTF-8 data)
+and returns an empty string at EOF. Typed readers reject malformed input and
+report EOF as a runtime error. Integer input is limited to the exactly
+representable range `-9007199254740991` through `9007199254740991`; number
+input must be finite. `read_boolean` accepts `true` and `false` in any letter
+case, with optional surrounding ASCII whitespace. Empty lines are returned by
+`read` and rejected by the typed readers.
+
+`string(value)` is an identity constructor for values already typed as
+`string`; it does not convert numbers or booleans. For example:
+
+```zp
+start {
+    let age: string = read(string("How old are you: "))
+    say("Your age is " + age)
+
+    let name: string = read()
+    say("Hello, " + name)
+
+    let height: number = read_number("Height in meters? ")
+    let confirmed: boolean = read_boolean("Continue? (true/false) ")
+} stop
+```
 
 ## 11. Comments and Formatting
 

@@ -900,6 +900,13 @@ ZPLUS_GRAPHICS_API const char* zpg_stringData(const char* value) noexcept {
     });
 }
 
+ZPLUS_GRAPHICS_API const char* zpg_stringCopy(const char* value) noexcept {
+    return guard<const char*>([&] {
+        return allocateManagedResult(
+            std::string(checkedString(value, "string")));
+    });
+}
+
 ZPLUS_GRAPHICS_API std::int64_t zpg_json_valid(const char* source) noexcept {
     return guard<std::int64_t>([&] {
         return zplus::json::valid(checkedText(source, "source")) ? 1 : 0;

@@ -4,7 +4,9 @@
 #include <cmath>
 #include <cstdint>
 #include <istream>
+#include <limits>
 #include <mutex>
+#include <ostream>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -20,6 +22,19 @@
 
 namespace zplus::runtime::input {
 
+inline void writePrompt(std::ostream& output, std::string_view prompt) {
+    if (prompt.empty()) return;
+    if (prompt.size() > static_cast<std::size_t>(
+            std::numeric_limits<std::streamsize>::max())) {
+        throw std::length_error("standard input prompt is too large");
+    }
+    output.write(prompt.data(), static_cast<std::streamsize>(prompt.size()));
+    output.flush();
+    if (!output) {
+        throw std::runtime_error("standard output prompt write failed");
+    }
+}
+
 inline void ensureUtf8ConsoleInput() {
 #if defined(_WIN32)
     static std::once_flag initialized;
@@ -33,17 +48,23 @@ inline void ensureUtf8ConsoleInput() {
 #endif
 }
 
-inline std::optional<std::string> readLine(std::istream& stream) {
-    std::string line;
-    if (std::getline(stream, line)) {
+inline bool readLine(std::istream& stream, std::string& line) {
+    line.clear();
+    if (std::getline(stream, line) || (stream.eof() && !line.empty())) {
         if (!line.empty() && line.back() == '\r') line.pop_back();
-        return line;
+        return true;
     }
     if (stream.bad()) {
         throw std::runtime_error("standard input read failed");
     }
-    if (stream.eof()) return std::nullopt;
+    if (stream.eof()) return false;
     throw std::runtime_error("standard input read failed");
+}
+
+inline std::optional<std::string> readLine(std::istream& stream) {
+    std::string line;
+    if (!readLine(stream, line)) return std::nullopt;
+    return line;
 }
 
 inline std::string readRequiredLine(std::istream& stream, const char* function) {

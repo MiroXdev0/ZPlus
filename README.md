@@ -6,7 +6,7 @@
 
 Z+ is a small compiled language with a lexer, parser, semantic analyzer, shared intermediate representation, interpreter, and an x86-64 native backend.
 
-The current compiler release is **1.3.3 Stable**. The Windows x64 per-user
+The current compiler release is **1.3.5 Stable**. The Windows x64 per-user
 installer and release build instructions are documented in
 [installer/inno/README.md](./installer/inno/README.md).
 
@@ -37,8 +37,10 @@ build\Release\zp.exe build main.zp -o main.exe
 `check` validates the complete module graph, `run` executes through the interpreter, and `build` creates a native executable for the host. Native compilation supports only the subset listed in [NATIVE_BACKEND.md](./NATIVE_BACKEND.md) and never falls back to the interpreter.
 
 The `read()`, `read_number()`, `read_integer()`, and `read_boolean()` terminal
-input built-ins are available without imports in the interpreter and native
-Windows programs. Linux native support is implemented but has not been
+input built-ins are available without imports. Each accepts an optional string
+prompt that is flushed before input is read; the zero-argument forms remain
+supported. The interpreter and native Windows programs share line and typed
+conversion behavior. Linux native support is implemented but has not been
 execution-tested in this environment. See
 [the interactive input example](./examples/interactive_input.zp) and
 [SYNTAX.md](./SYNTAX.md#10-built-in-functions) for parsing and EOF behavior.
@@ -48,7 +50,7 @@ available without imports. The interpreter supports them directly; Windows
 x64 native programs support both through the packaged runtime. See the
 [built-in function reference](./SYNTAX.md#10-built-in-functions).
 
-Z+ 1.3.3 supports generic functions, structs, and classes with inferred or
+Z+ 1.3.5 supports generic functions, structs, and classes with inferred or
 explicit type arguments. Concrete specializations are generated for both the
 interpreter IR and Windows x64 native backend. The `zcollections` module
 provides generic `List`, `Stack`, `Queue`, `Set`, `Map`, and `Optional` types;

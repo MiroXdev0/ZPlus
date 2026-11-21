@@ -1,0 +1,5 @@
+start {
+    struct Broken {
+        pub
+    } end struct
+} stop

@@ -51,7 +51,7 @@ if(NOT native_result EQUAL 0 OR NOT "${native_output}" STREQUAL "${expected}")
     message(FATAL_ERROR "native parity mismatch (${native_result})\nexpected:\n${expected}\nactual:\n${native_output}${native_error}")
 endif()
 
-foreach(case unsupported_is malformed_binary_literal invalid_escape expected_token)
+foreach(case unsupported_is malformed_binary_literal invalid_escape expected_token switch_invalid_case_terminator struct_recovery_no_progress enum_recovery_no_progress legacy_switch_recovery_no_progress)
     execute_process(
         COMMAND "${ZP}" check "${SOURCE_DIR}/tests/parser/${case}.zp"
         RESULT_VARIABLE invalid_result
@@ -73,6 +73,22 @@ foreach(case unsupported_is malformed_binary_literal invalid_escape expected_tok
     if(case STREQUAL "invalid_escape" AND
        NOT "${invalid_output}${invalid_error}" MATCHES "unknown escape sequence")
         message(FATAL_ERROR "invalid_escape: missing lexer diagnostic\n${invalid_output}${invalid_error}")
+    endif()
+    if(case STREQUAL "switch_invalid_case_terminator" AND
+       NOT "${invalid_output}${invalid_error}" MATCHES "expected 'case', 'default', or '\}' in switch")
+        message(FATAL_ERROR "switch_invalid_case_terminator: missing switch diagnostic\n${invalid_output}${invalid_error}")
+    endif()
+    if(case STREQUAL "struct_recovery_no_progress" AND
+       NOT "${invalid_output}${invalid_error}" MATCHES "expected struct field name")
+        message(FATAL_ERROR "struct_recovery_no_progress: missing struct diagnostic\n${invalid_output}${invalid_error}")
+    endif()
+    if(case STREQUAL "enum_recovery_no_progress" AND
+       NOT "${invalid_output}${invalid_error}" MATCHES "expected enum member")
+        message(FATAL_ERROR "enum_recovery_no_progress: missing enum diagnostic\n${invalid_output}${invalid_error}")
+    endif()
+    if(case STREQUAL "legacy_switch_recovery_no_progress" AND
+       NOT "${invalid_output}${invalid_error}" MATCHES "expected 'case', 'default', or 'end' in switch")
+        message(FATAL_ERROR "legacy_switch_recovery_no_progress: missing switch diagnostic\n${invalid_output}${invalid_error}")
     endif()
     if(case STREQUAL "expected_token")
         set(diagnostic "${invalid_output}${invalid_error}")
@@ -108,6 +124,38 @@ foreach(case unsupported_is malformed_binary_literal invalid_escape expected_tok
         endif()
     endif()
 endforeach()
+
+execute_process(
+    COMMAND "${ZP}" dependencies
+        "${SOURCE_DIR}/tests/parser/switch_invalid_case_terminator.zp"
+    RESULT_VARIABLE switch_dependencies_result
+    OUTPUT_VARIABLE switch_dependencies_output
+    ERROR_VARIABLE switch_dependencies_error
+    TIMEOUT 20
+)
+if(switch_dependencies_result EQUAL 0 OR
+   NOT "${switch_dependencies_output}${switch_dependencies_error}"
+       MATCHES "expected 'case', 'default', or '}' in switch")
+    message(FATAL_ERROR
+        "switch_invalid_case_terminator: dependencies did not terminate with a diagnostic\n"
+        "${switch_dependencies_output}${switch_dependencies_error}")
+endif()
+
+execute_process(
+    COMMAND "${ZP}" dependencies
+        "${SOURCE_DIR}/tests/parser/module_class_pub_method/main.zp"
+    RESULT_VARIABLE class_dependencies_result
+    OUTPUT_VARIABLE class_dependencies_output
+    ERROR_VARIABLE class_dependencies_error
+    TIMEOUT 20
+)
+if(class_dependencies_result EQUAL 0 OR
+   NOT "${class_dependencies_output}${class_dependencies_error}"
+       MATCHES "expected class field or method")
+    message(FATAL_ERROR
+        "class_pub_method: dependencies did not terminate with a class diagnostic\n"
+        "${class_dependencies_output}${class_dependencies_error}")
+endif()
 
 execute_process(
     COMMAND "${ZP}" check

@@ -1,5 +1,5 @@
 start {
-pub fn message(name: string): string {
+  pub fn message(name: string): string {
     return "Hello, " + name + "!"
-} end fn
+  } end fn
 } stop

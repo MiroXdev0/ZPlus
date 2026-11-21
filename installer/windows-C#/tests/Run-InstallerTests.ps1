@@ -5,7 +5,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $release = (Resolve-Path $ReleaseDirectory).Path
-$setup = Join-Path $release 'ZPlus-1.3.3-Setup.exe'
+$setup = Join-Path $release 'ZPlus-1.3.5-Setup.exe'
 if (-not (Test-Path $setup -PathType Leaf)) {
     throw "Setup executable not found: $setup"
 }
@@ -175,7 +175,7 @@ try {
         throw $checkDetails
     }
     $version = (& $compiler version | Out-String).Trim()
-    if ($LASTEXITCODE -ne 0 -or $version -ne 'Z+ Compiler 1.3.3') {
+    if ($LASTEXITCODE -ne 0 -or $version -ne 'Z+ Compiler 1.3.5') {
         throw "Installed compiler returned an invalid version: '$version'."
     }
     Assert-UserPathContains (Join-Path $firstInstall 'bin') $true
@@ -209,7 +209,7 @@ try {
     $bytes = [IO.File]::ReadAllBytes($tamperedCompiler)
     $bytes[0] = $bytes[0] -bxor 0x01
     [IO.File]::WriteAllBytes($tamperedCompiler, $bytes)
-    $tamperedSetup = Join-Path $tamperedPackage 'ZPlus-1.3.3-Setup.exe'
+    $tamperedSetup = Join-Path $tamperedPackage 'ZPlus-1.3.5-Setup.exe'
     $tamperedExitCode = Invoke-Setup @('--install-dir', $firstInstall, '--quiet') `
         $testLog -Executable $tamperedSetup -AllowFailure
     if ($tamperedExitCode -eq 0) {
@@ -220,7 +220,7 @@ try {
         throw "Corrupted-payload failure did not report the integrity error:`n$failedLog"
     }
     $version = (& $compiler version | Out-String).Trim()
-    if ($LASTEXITCODE -ne 0 -or $version -ne 'Z+ Compiler 1.3.3') {
+    if ($LASTEXITCODE -ne 0 -or $version -ne 'Z+ Compiler 1.3.5') {
         throw 'Failed installation recovery damaged the existing compiler.'
     }
     if (Get-ChildItem (Split-Path $firstInstall -Parent) -Force |

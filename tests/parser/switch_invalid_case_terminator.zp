@@ -1,0 +1,12 @@
+start {
+    while (true) {
+        switch ("exit") {
+            case "exit" {
+                break
+            } end case
+            default {
+                say("unknown")
+            } end default
+        } end switch
+    } end while
+} stop

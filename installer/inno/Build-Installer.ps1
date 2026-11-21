@@ -320,7 +320,36 @@ try {
         $installerVersionInfo.ProductVersion.Trim() -ne $version) {
         throw "The generated installer does not contain Z+ $version Windows version metadata."
     }
+    $installerHash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash
+    $installerName = [IO.Path]::GetFileName($installerPath)
+    $checksumPath = "$installerPath.sha256"
+    [IO.File]::WriteAllText(
+        $checksumPath,
+        "$installerHash  $installerName$([Environment]::NewLine)",
+        [Text.Encoding]::ASCII)
+    $releaseManifest = [ordered]@{
+        product = 'Z+'
+        version = $version
+        platform = 'Windows'
+        architecture = 'x64'
+        compilerVersion = $version
+        zpbuildVersion = $zbuildSemanticVersion
+        zpmVersion = $zpmSemanticVersion
+        installer = [ordered]@{
+            filename = $installerName
+            sha256 = $installerHash
+        }
+    }
+    $manifestName = "ZPlus-$version-Windows-x64-release-manifest.json"
+    $manifestPath = Join-Path $resolvedOutputDirectory $manifestName
+    $manifestJson = $releaseManifest | ConvertTo-Json -Depth 5
+    [IO.File]::WriteAllText(
+        $manifestPath,
+        $manifestJson + [Environment]::NewLine,
+        [Text.UTF8Encoding]::new($false))
     Write-Host "Built Z+ $version installer with ZPBuild $zbuildVersion and $zpmVersion from '$binaryDirectory': $installerPath"
+    Write-Host "SHA-256: $installerHash"
+    Write-Host "Release manifest: $manifestPath"
 }
 catch {
     [Console]::Error.WriteLine("Installer build failed: $($_.Exception.Message)")

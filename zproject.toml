@@ -1,0 +1,15 @@
+
+[tests]
+targets = ["smoke_test"]
+
+[[target]]
+name = "smoke_test"
+type = "test"
+entry = "tests/main.zp"
+
+[targets]
+default = "app"
+
+[target.app]
+type = "executable"
+entry = "src/main.zp"

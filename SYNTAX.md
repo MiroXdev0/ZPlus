@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This reference describes the language accepted by the Z+ 1.3.3 command-line compiler in this repository. It follows the lexer, parser, semantic analyzer, IR builder, and interpreter—not proposed or aspirational features.
+This reference describes the language accepted by the Z+ 1.3.5 command-line compiler in this repository. It follows the lexer, parser, semantic analyzer, IR builder, and interpreter—not proposed or aspirational features.
 
 The status labels used below mean:
 
@@ -657,27 +657,45 @@ Windows x64 native execution supports managed arrays. `to_string` is supported
 by the interpreter and Windows x64 native runtime. Native string conversion
 and concatenation are not supported by the Linux native backend.
 
-Terminal input is available without an import:
+Terminal input is available without an import. Every reader accepts either no
+arguments or one string prompt. A prompt is written to standard output and
+flushed before the runtime requests input; an empty prompt writes nothing.
+The `string(value)` identity constructor accepts only a string and is useful
+when an explicit string expression is desired, as in the first example below.
 
 | Built-in | Return type | Behavior |
 |---|---|---|
-| `read()` | `string` | Reads one complete line, preserving spaces and UTF-8 bytes and removing the line ending. |
-| `read_number()` | `number` | Parses a finite decimal number, including supported exponent notation. |
-| `read_integer()` | `number` | Parses a base-10 integer in the exactly representable range `-9007199254740991` through `9007199254740991`. Z+ currently has one numeric type; this function returns a whole-number `number`. |
-| `read_boolean()` | `boolean` | Accepts `true` or `false`, case-insensitively. |
+| `read()` / `read(prompt: string)` | `string` | Reads one complete line, preserving spaces and UTF-8 bytes and removing the line ending. |
+| `read_number()` / `read_number(prompt: string)` | `number` | Parses a finite decimal number, including supported exponent notation. |
+| `read_integer()` / `read_integer(prompt: string)` | `number` | Parses a base-10 integer in the exactly representable range `-9007199254740991` through `9007199254740991`. Z+ currently has one numeric type; this function returns a whole-number `number`. |
+| `read_boolean()` / `read_boolean(prompt: string)` | `boolean` | Accepts `true` or `false`, case-insensitively. |
 
-Numeric and boolean input may have surrounding ASCII whitespace; other malformed input raises a runtime error instead of producing a default value. `read()` returns the empty string at EOF. The typed readers raise an `end of input` runtime error at EOF; an empty line is still a line and is invalid for each typed reader. A final line without a newline is read normally. The interpreter and native runtimes share conversion rules. Windows interpreter and native execution were tested; Linux native execution is implemented but could not be verified in this environment.
+Numeric and boolean input may have surrounding ASCII whitespace; other
+malformed input raises a runtime error instead of producing a default value.
+Integer overflow and values outside the exactly representable range are
+reported as errors. `read()` returns the empty string at EOF. The typed readers
+raise an `end of input` runtime error at EOF; an empty line is still a line and
+is invalid for each typed reader. A final line without a newline is read
+normally. The interpreter and native runtimes share conversion rules. Windows
+interpreter and native execution were tested; Linux native execution is
+implemented but could not be verified in this environment.
 
 ```zp
 start {
-    say("Enter your username:")
-    let username = read()
+    let age: string = read(string("How old are you: "))
+    say("Your age is " + age)
+
+    let username: string = read()
 
     if username == "" {
         say("You did not enter a username.")
     } else {
         say("Welcome, " + username)
     } end if
+
+    let years: number = read_integer("How many years? ")
+    let height: number = read_number("Height in meters? ")
+    let confirmed: boolean = read_boolean("Continue? (true/false) ")
 } stop
 ```
 

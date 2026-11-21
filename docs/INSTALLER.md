@@ -14,6 +14,6 @@ installer added it. Files not registered with the installer are not removed
 by recursive directory cleanup.
 
 For build requirements and commands, see `installer\inno\README.md` in the
-source repository. The source-tree release build accepts an isolated
-distribution directory with `-BinaryDirectory`; it does not need to overwrite
-the repository's tracked `bin\` distribution.
+source repository. The release workflow stages the complete Release
+distribution and writes the installer, checksum, and release manifest directly
+to the repository-root `bin\` directory.

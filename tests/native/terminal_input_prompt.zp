@@ -1,0 +1,22 @@
+start {
+    let name: string = read(string("Name: "))
+    say(name)
+
+    if read_integer("Age: ") == 42 {
+        say("age input passed")
+    } else {
+        say("age input failed")
+    } end if
+
+    if read_number("Height: ") == 1.75 {
+        say("height input passed")
+    } else {
+        say("height input failed")
+    } end if
+
+    if read_boolean("Continue? ") {
+        say("boolean input passed")
+    } else {
+        say("boolean input failed")
+    } end if
+} stop

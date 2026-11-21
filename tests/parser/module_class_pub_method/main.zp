@@ -1,0 +1,5 @@
+use "commands.zh" as commands
+
+start {
+    say(commands.message("Z+"))
+} stop

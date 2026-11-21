@@ -1,0 +1,5 @@
+start{
+    pub fn message(name: string): string {
+        return "Hello, " + name + "! Welcome to ZShell."
+    } end fn
+} stop

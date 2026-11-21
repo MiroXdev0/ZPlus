@@ -2590,15 +2590,36 @@ static RuntimeValue executeCall(
         );
     }
 
+    if (!function && *callee == "string") {
+        if (instruction.operands.size() != 2) {
+            throw std::runtime_error("string expects exactly one argument");
+        }
+        RuntimeValue value = resolveValue(instruction.operands[1], environment);
+        if (!isString(value)) {
+            throw std::invalid_argument("string expects a string");
+        }
+        return value;
+    }
+
     if (!function && (
         *callee == "read" ||
         *callee == "read_number" ||
         *callee == "read_integer" ||
         *callee == "read_boolean")) {
-        if (instruction.operands.size() != 1) {
-            throw std::runtime_error(*callee + " expects no arguments");
+        if (instruction.operands.size() > 2) {
+            throw std::runtime_error(*callee + " expects at most one prompt argument");
         }
         zplus::runtime::input::ensureUtf8ConsoleInput();
+        std::string_view prompt;
+        RuntimeValue promptStorage;
+        if (instruction.operands.size() == 2) {
+            promptStorage = resolveValue(instruction.operands[1], environment);
+            if (!isString(promptStorage)) {
+                throw std::invalid_argument(*callee + " prompt must be a string");
+            }
+            prompt = stringValue(promptStorage);
+        }
+        zplus::runtime::input::writePrompt(std::cout, prompt);
 
         if (*callee == "read") {
             const std::optional<std::string> line =

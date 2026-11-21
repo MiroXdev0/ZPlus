@@ -1,0 +1,28 @@
+use zargs as args
+use zstring as text
+use "commands/commands.zh" as commands
+
+start {
+    printz("Hello and welcome to ZShell!\n")
+    printz("(c) 2026 Miroslav Alexandrov\n")
+    while (true) {
+        let input: string = read(string("ZShell> "))
+        switch (input) {
+        case "presi" {
+                printz("Presi e gey mazen i ne se kupe\n")
+            } 
+            case "exit" {
+                printz("Exiting ZShell...\n")
+                break
+            } 
+            case "greet" {
+                let name: string = read(string("Enter your name: "))
+                let greeting: string = commands.message(name)
+                printz(greeting + "\n")
+            } 
+            default {
+                printz("Unknown command: " + input + "\n")
+            } 
+        } end switch
+    } end while
+} stop

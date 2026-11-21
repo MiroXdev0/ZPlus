@@ -1,6 +1,6 @@
 start {
-    read("extra")
-    read_number(1)
-    read_integer(1)
-    read_boolean(1)
+    read("prompt", "extra")
+    read_number("prompt", "extra")
+    read_integer("prompt", "extra")
+    read_boolean("prompt", "extra")
 } stop

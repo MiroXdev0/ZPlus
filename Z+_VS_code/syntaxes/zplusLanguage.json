@@ -147,10 +147,6 @@
                 {
                     "name": "keyword.operator.word.zplus",
                     "match": "\\b(?:and|or|not|is)\\b"
-                },
-                {
-                    "name": "invalid.deprecated.zplus",
-                    "match": "\\bprintz\\b"
                 }
             ]
         },

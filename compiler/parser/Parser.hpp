@@ -417,6 +417,7 @@ private:
     ) const;
 
     void synchronize();
+    void synchronizeWithProgress();
 
 private:
 

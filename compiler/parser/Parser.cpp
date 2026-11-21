@@ -315,7 +315,7 @@ Parser::parseProgram() {
 
         } else {
 
-            synchronize();
+            synchronizeWithProgress();
         }
 
         skipNewlines();
@@ -807,7 +807,7 @@ Parser::parseStartBlock() {
         }
         auto child = parseStatement();
         if (child) statement->body.push_back(std::move(child));
-        else synchronize();
+        else synchronizeWithProgress();
         skipNewlines();
     }
     blockSyntaxStack_.pop_back();
@@ -1880,7 +1880,7 @@ Parser::parseUntil(
 
         } else {
 
-            synchronize();
+            synchronizeWithProgress();
         }
 
         skipNewlines();
@@ -1937,7 +1937,7 @@ Parser::parseBracedBody(
         if (statement) {
             statements.push_back(std::move(statement));
         } else {
-            synchronize();
+            synchronizeWithProgress();
         }
         skipNewlines();
     }
@@ -3302,6 +3302,14 @@ Parser::parsePrimary() {
         return identifier;
     }
 
+    if (check(TokenType::StringType) && peek(1).type == TokenType::LeftParen) {
+        advance();
+        auto identifier = std::make_unique<zplus::ast::Identifier>();
+        setLocation(*identifier, token);
+        identifier->name = "string";
+        return identifier;
+    }
+
     if (match(TokenType::Identifier)) {
 
         auto identifier =
@@ -3810,12 +3818,12 @@ Parser::parseSwitchStatement() {
                 setLocation(*caseNode, caseToken);
                 caseNode->value = parseExpression();
                 if (!caseNode->value) {
-                    synchronize();
+                    synchronizeWithProgress();
                     continue;
                 }
                 if (!match(TokenType::LeftBrace)) {
                     error("expected '{' after switch case value");
-                    synchronize();
+                    synchronizeWithProgress();
                     continue;
                 }
                 const Token caseOpening = previous();
@@ -3828,14 +3836,14 @@ Parser::parseSwitchStatement() {
                 statement->hasDefault = true;
                 if (!match(TokenType::LeftBrace)) {
                     error("expected '{' after 'default'");
-                    synchronize();
+                    synchronizeWithProgress();
                     continue;
                 }
                 const Token defaultOpening = previous();
                 statement->defaultBody = parseBracedBody(defaultOpening, "default");
             } else {
                 error("expected 'case', 'default', or '}' in switch");
-                synchronize();
+                synchronizeWithProgress();
             }
             skipNewlines();
         }
@@ -3907,7 +3915,7 @@ Parser::parseSwitchStatement() {
                 "expected 'case', 'default', or 'end' in switch"
             );
 
-            synchronize();
+            synchronizeWithProgress();
         }
 
         skipNewlines();
@@ -3976,7 +3984,7 @@ Parser::parseCase() {
 
         } else {
 
-            synchronize();
+            synchronizeWithProgress();
         }
 
         skipNewlines();
@@ -4052,7 +4060,7 @@ Parser::parseStruct() {
                 "expected struct field name"
             );
 
-            synchronize();
+            synchronizeWithProgress();
             continue;
         }
 
@@ -4080,7 +4088,7 @@ Parser::parseStruct() {
                 parseType();
 
             if (!field->type) {
-                synchronize();
+                synchronizeWithProgress();
                 continue;
             }
         }
@@ -4248,7 +4256,7 @@ Parser::parseClass() {
                     parseType();
 
                 if (!field->type) {
-                    synchronize();
+                    synchronizeWithProgress();
                     continue;
                 }
             }
@@ -4277,7 +4285,7 @@ Parser::parseClass() {
             "expected class field or method"
         );
 
-        synchronize();
+        synchronizeWithProgress();
         skipNewlines();
     }
 
@@ -4365,7 +4373,7 @@ Parser::parseEnum() {
                 "expected enum member"
             );
 
-            synchronize();
+            synchronizeWithProgress();
             continue;
         }
 
@@ -4808,6 +4816,14 @@ bool Parser::isBinaryOperator(
 // ============================================================
 // Synchronization
 // ============================================================
+
+void Parser::synchronizeWithProgress() {
+    const std::size_t before = current_;
+    synchronize();
+    if (current_ == before && !isAtEnd()) {
+        advance();
+    }
+}
 
 void Parser::synchronize() {
 

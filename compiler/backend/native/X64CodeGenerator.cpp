@@ -40,6 +40,7 @@ constexpr char kPendingExceptionGlobal[] = "__zplus_native_pending_exception";
 constexpr char kActiveHandlerSlot[] = "__zp_active_exception_handler";
 constexpr char kCleanupOriginalSlot[] = "__zp_cleanup_original_exception";
 constexpr char kCleanupFirstSlot[] = "__zp_cleanup_first_exception";
+constexpr char kManagedReturnValueSlot[] = "__zp_managed_return_value";
 constexpr char kRemainderLeftSlot[] = "__zp_remainder_left";
 constexpr char kRemainderRightSlot[] = "__zp_remainder_right";
 
@@ -952,7 +953,7 @@ private:
             } else if (isStringValue(value)) {
                 loadValue(value, argument);
                 if (usesManagedMemory_) {
-                    emitImportCall("zpg_stringData", "zgraphics_runtime.dll");
+                    emitNativeStringDataCall();
                     movReg(argument, RAX);
                 }
             } else if (inferredType(value) == "bool" ||
@@ -998,12 +999,30 @@ private:
         return true;
     }
 
+    void emitNativeStringDataCall() {
+        if (windowsAbi_) {
+            emitImportCall("zpg_stringData", "zgraphics_runtime.dll");
+        } else {
+            emitImportCall("zpi_string_data", "libzplus_input_runtime.so");
+        }
+    }
+
     void emitCallInstruction(
         const Instruction& instruction,
         const std::string& functionName
     ) {
         requireOperands(instruction, 1);
         const std::string& callee = instruction.operands[0].name;
+        if (callee == "string" && !module_.findFunction(callee)) {
+            if (instruction.operands.size() != 2 ||
+                !isStringValue(instruction.operands[1])) {
+                throw std::runtime_error(
+                    "native backend: string expects exactly one string argument");
+            }
+            loadValue(instruction.operands[1], RAX);
+            storeResult(instruction);
+            return;
+        }
         if (callee == "say" || callee == "printz" || callee == "printm") {
             emitWriteCall(instruction, functionName);
             return;
@@ -1016,19 +1035,55 @@ private:
             callee == "read" || callee == "read_number" ||
             callee == "read_integer" || callee == "read_boolean";
         if (inputBuiltin) {
-            if (instruction.operands.size() != 1) {
+            if (instruction.operands.size() > 2) {
                 throw std::runtime_error(
-                    "native backend: " + callee + " expects no arguments");
+                    "native backend: " + callee +
+                    " expects at most one prompt argument");
             }
-            const std::string symbol =
-                callee == "read" ? "zpi_read" :
+            std::string symbol =
+                callee == "read"
+                    ? (windowsAbi_ ? "zpi_read_transient" : "zpi_read_managed") :
                 callee == "read_number" ? "zpi_read_number" :
                 callee == "read_integer" ? "zpi_read_integer" :
                 "zpi_read_boolean";
+            if (instruction.operands.size() == 2) {
+                if (!isStringValue(instruction.operands[1])) {
+                    throw std::runtime_error(
+                        "native backend: " + callee + " prompt must be a string");
+                }
+                const std::uint8_t argument = windowsAbi_ ? RCX : RDI;
+                loadValue(instruction.operands[1], argument);
+                if (usesManagedMemory_) {
+                    emitNativeStringDataCall();
+                    movReg(argument, RAX);
+                }
+            }
+            if (instruction.operands.size() == 2) {
+                symbol += "_prompt";
+            }
             emitImportCall(symbol, windowsAbi_
                 ? "zplus_input_runtime.dll"
                 : "libzplus_input_runtime.so");
-            storeResult(instruction);
+            if (callee == "read" && windowsAbi_) {
+                const std::string copyLabel =
+                    "__read_copy_managed_" + std::to_string(uniqueLabel_++);
+                const std::string doneLabel =
+                    "__read_copy_done_" + std::to_string(uniqueLabel_++);
+                loadGlobal(kPendingExceptionGlobal, R10);
+                testRegister(R10);
+                emitJump(0x84, copyLabel);
+                storeResult(instruction);
+                emitJump(0xFF, doneLabel);
+                localLabels_[copyLabel] = code_.size();
+                movReg(RCX, RAX);
+                emitImportCall("zpg_stringCopy", "zgraphics_runtime.dll");
+                storeResult(instruction);
+                usesManagedMemory_ = true;
+                usesZGraphicsRuntime_ = true;
+                localLabels_[doneLabel] = code_.size();
+            } else {
+                storeResult(instruction);
+            }
             return;
         }
         if (callee == "to_string" && !module_.findFunction(callee)) {
@@ -2217,9 +2272,9 @@ private:
             }
             if (usesManagedMemory_) {
                 if (numericReturn) gprMoveFromXmm(RAX, 0);
-                movStoreRspDisp(32, RAX);
-                emitImportCall("zpg_popRoots", "zgraphics_runtime.dll");
-                movLoadRspDisp(RAX, 32);
+                movStore(slot(kManagedReturnValueSlot), RAX);
+                emitManagedFrameExit();
+                movLoad(RAX, slot(kManagedReturnValueSlot));
                 if (numericReturn) xmmMoveFromGpr(0, RAX);
             }
             emit8(0xC9);
@@ -2596,6 +2651,9 @@ private:
             allocateSlot(kRemainderLeftSlot);
             allocateSlot(kRemainderRightSlot);
         }
+        if (usesManagedMemory_) {
+            allocateSlot(kManagedReturnValueSlot);
+        }
         allocateSlot(kActiveHandlerSlot);
         allocateSlot(kCleanupOriginalSlot);
         allocateSlot(kCleanupFirstSlot);
@@ -2699,6 +2757,10 @@ private:
                             callee == "read_integer" || callee == "read_boolean") {
                             usesInputRuntime_ = true;
                         }
+                        if (callee == "read") {
+                            usesManagedMemory_ = true;
+                            if (windowsAbi_) usesZGraphicsRuntime_ = true;
+                        }
                     }
                     if (instruction.opcode.starts_with("cmp_") &&
                         instruction.operands.size() >= 2 &&
@@ -2725,11 +2787,21 @@ private:
         }
         leaRbp(RCX, -static_cast<std::int32_t>(slotBytes));
         movImm(RDX, slots_.size());
-        emitImportCall("zpg_pushRoots", "zgraphics_runtime.dll");
+        if (windowsAbi_) {
+            emitImportCall("zpg_pushRoots", "zgraphics_runtime.dll");
+        } else {
+            movReg(RDI, RCX);
+            movReg(RSI, RDX);
+            emitImportCall("zpi_push_roots", "libzplus_input_runtime.so");
+        }
     }
 
     void emitManagedFrameExit() {
-        emitImportCall("zpg_popRoots", "zgraphics_runtime.dll");
+        if (windowsAbi_) {
+            emitImportCall("zpg_popRoots", "zgraphics_runtime.dll");
+        } else {
+            emitImportCall("zpi_pop_roots", "libzplus_input_runtime.so");
+        }
     }
 
     bool mayClobberXmmTemporaries(
@@ -3310,7 +3382,7 @@ private:
             if (usesManagedMemory_) {
                 movStoreRspDisp(32, RAX);
                 if (!globalOffsets_.empty()) {
-                    emitImportCall("zpg_popRoots", "zgraphics_runtime.dll");
+                    emitManagedFrameExit();
                 }
                 emitImportCall("zpg_memory_shutdown", "zgraphics_runtime.dll");
                 movLoadRspDisp(RCX, 32);
@@ -3344,6 +3416,11 @@ private:
                 emitImportCall(
                     "zpi_set_exception_slot", "libzplus_input_runtime.so");
             }
+            if (usesManagedMemory_ && !globalOffsets_.empty()) {
+                leaRip(RDI, 0);
+                movImm(RSI, globalOffsets_.size());
+                emitImportCall("zpi_push_roots", "libzplus_input_runtime.so");
+            }
             if (module_.findFunction(zplus::ir::kModuleInitializerName)) {
                 emitCall(zplus::ir::kModuleInitializerName);
                 loadGlobal(kPendingExceptionGlobal, RAX);
@@ -3366,6 +3443,15 @@ private:
             emitCall("__zp_write");
             movImm(RAX, 1);
             localLabels_[entryDoneLabel] = code_.size();
+            if (usesManagedMemory_) {
+                movReg(RBX, RAX);
+                if (!globalOffsets_.empty()) {
+                    emitImportCall("zpi_pop_roots", "libzplus_input_runtime.so");
+                }
+                emitImportCall(
+                    "zpi_memory_shutdown", "libzplus_input_runtime.so");
+                movReg(RAX, RBX);
+            }
             movReg(RDI, RAX);
             movImm(RAX, 60);
             emit8(0x0F); emit8(0x05);

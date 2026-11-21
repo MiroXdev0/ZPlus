@@ -1,0 +1,4 @@
+start {
+    let age: string = read(string("How old are you: "))
+    say("Your age is " + age)
+} stop

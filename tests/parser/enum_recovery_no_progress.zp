@@ -1,0 +1,5 @@
+start {
+    enum Broken {
+        pub
+    } end enum
+} stop

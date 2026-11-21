@@ -211,6 +211,25 @@ function(run_input_case name input_text expected_output)
     endif()
 endfunction()
 
+function(run_interpreter_input_case name input_text expected_output)
+    set(source "${SOURCE_DIR}/tests/native/${name}.zp")
+    set(input_file "${WORK_DIR}/${name}.stdin")
+    file(WRITE "${input_file}" "${input_text}")
+    execute_process(
+        COMMAND "${ZP}" run "${source}"
+        INPUT_FILE "${input_file}"
+        RESULT_VARIABLE run_result
+        OUTPUT_VARIABLE run_output
+        ERROR_VARIABLE run_error
+        TIMEOUT 15
+    )
+    if(NOT run_result EQUAL 0 OR NOT "${run_output}" STREQUAL "${expected_output}")
+        message(FATAL_ERROR
+            "${name}: interpreter input mismatch (${run_result})\n"
+            "expected: [${expected_output}]\nactual: [${run_output}]\n${run_error}")
+    endif()
+endfunction()
+
 function(run_input_failure name input_text expected_message)
     set(source "${SOURCE_DIR}/tests/native/${name}.zp")
     set(input_file "${WORK_DIR}/${name}.stdin")
@@ -279,6 +298,25 @@ function(run_input_arity_check)
     endif()
 endfunction()
 
+function(run_input_prompt_type_check)
+    set(source "${SOURCE_DIR}/tests/native/terminal_input_bad_prompt.zp")
+    execute_process(
+        COMMAND "${ZP}" check "${source}"
+        RESULT_VARIABLE check_result
+        OUTPUT_VARIABLE check_output
+        ERROR_VARIABLE check_error
+        TIMEOUT 15
+    )
+    string(REGEX MATCHALL "expects a string" prompt_type_errors
+        "${check_output}${check_error}")
+    list(LENGTH prompt_type_errors prompt_type_error_count)
+    if(check_result EQUAL 0 OR NOT prompt_type_error_count EQUAL 4)
+        message(FATAL_ERROR
+            "terminal input built-ins did not reject all non-string prompts\n"
+            "${check_output}${check_error}")
+    endif()
+endfunction()
+
 set(terminal_input_data
     "Ada Lovelace\npunctuation: !?.,\n\n +42 \n-17\n3.125\n1.25e2\nTrUe\nfAlSe\ntrue\nloop one\nloop two\nUTF-8: Ζ+ 🙂")
 set(terminal_input_expected
@@ -287,12 +325,33 @@ run_input_case(terminal_input "${terminal_input_data}" "${terminal_input_expecte
 run_input_case(terminal_input_line "line with CRLF\r\n" "line with CRLF\n")
 run_input_case(terminal_input_line "final line without newline" "final line without newline\n")
 run_input_case(terminal_input_eof "" "string EOF is empty\n")
+run_input_case(
+    terminal_input_prompt
+    "Ada Lovelace\n42\n1.75\ntrue\n"
+    "Name: Ada Lovelace\nAge: age input passed\nHeight: height input passed\nContinue? boolean input passed\n")
+if(HOST_WINDOWS)
+    run_input_case(
+        terminal_input_prompt_sample
+        "17\n"
+        "How old are you: Your age is 17\n")
+else()
+    run_interpreter_input_case(
+        terminal_input_prompt_sample
+        "17\n"
+        "How old are you: Your age is 17\n")
+endif()
 
 string(REPEAT "x" 131072 terminal_input_large_data)
 run_input_case(
     terminal_input_large
     "${terminal_input_large_data}"
     "${terminal_input_large_data}\n")
+
+string(REPEAT "discarded input line\n" 4999 terminal_input_reassignments)
+run_input_case(
+    terminal_input_gc_stress
+    "held input value\n${terminal_input_reassignments}last input value\n"
+    "held input value\nlast input value\n")
 
 run_input_failure(
     terminal_input_invalid_integer
@@ -301,6 +360,14 @@ run_input_failure(
 run_input_failure(
     terminal_input_invalid_integer
     "+-12\n"
+    "read_integer: invalid integer input")
+run_input_failure(
+    terminal_input_invalid_integer
+    "9007199254740992\n"
+    "read_integer: value is outside the exactly representable number range")
+run_input_failure(
+    terminal_input_invalid_integer
+    "9223372036854775808\n"
     "read_integer: invalid integer input")
 run_input_failure(
     terminal_input_invalid_integer
@@ -316,6 +383,10 @@ run_input_failure(
     "read_number: invalid numeric input")
 run_input_failure(
     terminal_input_invalid_number
+    "1e9999\n"
+    "read_number: invalid numeric input")
+run_input_failure(
+    terminal_input_invalid_number
     ""
     "read_number: end of input")
 run_input_failure(
@@ -327,6 +398,7 @@ run_input_failure(
     ""
     "read_boolean: end of input")
 run_input_arity_check()
+run_input_prompt_type_check()
 
 run_native_interpreter_parity(
     deferred_stack_arguments

@@ -1,15 +1,8 @@
 start {
-    say("What is your name?")
-    let name = read()
-
-    say("How old are you?")
-    let age = read_integer()
-
-    say("Enter a decimal number:")
-    let value = read_number()
-
-    say("Are you a Z+ developer? (true/false)")
-    let answer = read_boolean()
+    let name = read(string("What is your name? "))
+    let age = read_integer("How old are you? ")
+    let value = read_number("Enter a decimal number: ")
+    let answer = read_boolean("Are you a Z+ developer? (true/false) ")
 
     say("Hello, " + name)
     if age >= 0 {
