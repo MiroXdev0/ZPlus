@@ -30,9 +30,9 @@ fn drawWelcome(window: number, logoPath: string) {
 fn drawLicense(window: number, licensePath: string, logoPath: string) {
     layout.frame(window, 1, "License agreement", "Review the Z+ terms before continuing.", logoPath)
     graphics.rectangle(window, 298, 224, 624, 224, "#1D272F", true, 1)
-    graphics.text(window, "Proprietary source code", 326, 252, "#EAF1F4", 17)
-    graphics.text(window, "Z+ source code is protected; all rights are reserved.", 326, 288, "#B8C6CC", 13)
-    graphics.text(window, "Compiled binaries may be used under the end-user terms.", 326, 316, "#B8C6CC", 13)
+    graphics.text(window, "Apache License 2.0", 326, 252, "#EAF1F4", 17)
+    graphics.text(window, "Z+ source is licensed under Apache License 2.0.", 326, 288, "#B8C6CC", 13)
+    graphics.text(window, "Redistribution terms are stated in the included license.", 326, 316, "#B8C6CC", 13)
     graphics.text(window, "Third-party components remain under their own licenses.", 326, 344, "#B8C6CC", 13)
     graphics.text(window, "The complete LICENSE.txt is included in the distribution.", 326, 372, "#91A1AA", 12)
     if file.exists(licensePath) {

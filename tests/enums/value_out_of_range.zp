@@ -1,0 +1,5 @@
+start {
+    enum State {
+        TooLarge = 9007199254740992
+    } end enum
+} stop

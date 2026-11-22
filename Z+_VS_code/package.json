@@ -1,10 +1,10 @@
 {
     "name": "zplus-language",
     "displayName": "Z+ Programming Language",
-    "description": "Official VS Code developer tools for the proprietary Z+ programming language and compiler.",
+    "description": "Official VS Code developer tools for the Z+ programming language and compiler.",
     "version": "1.3.4",
     "publisher": "Miroxdev0",
-    "license": "SEE LICENSE IN LICENSE.txt",
+    "license": "Apache-2.0",
     "homepage": "https://zpluse.vercel.app/",
     "main": "./extension.js",
     "icon": "icons/zplus.icon.png",

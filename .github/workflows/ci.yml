@@ -1,0 +1,49 @@
+name: Build and test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux development dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev libx11-dev
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --config Release --parallel 1
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+  ecosystem-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check website
+        run: |
+          npm ci --prefix website
+          npm run check --prefix website
+          npm test --prefix website
+      - name: Check VS Code extension
+        run: |
+          npm ci --prefix 'Z+_VS_code'
+          npm run check --prefix 'Z+_VS_code'
+          npm test --prefix 'Z+_VS_code'
+      - name: Test web interop tool
+        run: npm test --prefix tools/zplus-web-interop
+
+\n

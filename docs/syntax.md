@@ -188,8 +188,9 @@ start {
 
 Primitive annotations are checked by the analyzer. Structs and classes support
 construction, typed fields, member access, and function arguments/returns in
-the interpreter and Windows x64 native backend. Enums are typed numeric values
-with member access and function argument/return support in those backends.
+the interpreter and Windows x64 native backend. Enums are nominally typed
+numeric values with member access, equality, and function argument/return
+support in those backends.
 Custom aggregates and enum operations are not supported by Linux native code
 generation. `void` is a recognized annotation, not a value type.
 
@@ -474,7 +475,8 @@ Windows x64 native builds support the same operations, including function argume
 
 ```text
 struct Name {
-    field [: type] [= default]
+    field: Type [= literalDefault]
+    inferredField = literalDefault
 } end struct
 
 class Name {
@@ -485,7 +487,7 @@ class Name {
 } end class
 
 enum Name {
-    Member [= numericExpression]
+    Member [= signedIntegerLiteral]
 } end enum
 ```
 
@@ -513,7 +515,7 @@ start {
 } stop
 ```
 
-Structs support positional construction, typed fields, literal defaults, field reads and writes, nested structs, arrays in fields, arrays of structs, and passing/returning instances through functions. Struct values use reference semantics in both the interpreter and Windows x64 native backend. The `is` operator recognizes struct instances in both execution modes. For example:
+Structs are nominal types. Every field needs a declared type or a literal default from which its type can be inferred; an untyped field without a default and an unknown field type are compile-time errors. Structs support positional construction, literal defaults, field reads and writes, nested structs, arrays in fields, arrays of structs, and passing/returning instances through functions. Struct values use reference semantics in both the interpreter and Windows x64 native backend. The `is` operator recognizes struct instances in both execution modes. For example:
 
 ```zp
 start {
@@ -528,7 +530,18 @@ start {
 } stop
 ```
 
-Fields without defaults are required constructor arguments. Constructor arguments fill fields in declaration order, so required fields must precede defaulted fields. Current field defaults must be literals. Assignment, array insertion, and function argument/return passing preserve object identity; mutating an alias changes the same instance. Interpreter structs are traced by the interpreter's managed heap. Windows native structs are tagged managed references in the existing native tracing heap; collection traces references in arrays and struct fields. Struct fields remain public.
+Fields without defaults are required constructor arguments. Constructor arguments fill fields in declaration order, so required fields must precede defaulted fields. Field defaults must be literals. A typed struct variable may omit its initializer. If every field has a default, the declaration constructs a fresh instance from those defaults; otherwise it remains uninitialized until assigned, and field access before assignment reports a runtime error. Assignment, array insertion, and function argument/return passing preserve object identity; mutating an alias changes the same instance, while separate constructor calls create independent instances. Interpreter structs are traced by the interpreter's managed heap. Windows x64 native structs are tagged managed references in the existing native tracing heap. Fields use stable declaration-order slots, so field indices are resolved during compilation; the runtime traces references in arrays and struct fields. Struct fields remain public. In imported modules, a public struct can be constructed unqualified when its name is unambiguous, or through its module alias:
+
+```zp
+use "models.zh" as models
+
+start:
+    let record: Record = models.Record(42)
+    say(record.value)
+stop
+```
+
+The public type annotation uses the unqualified type name; dotted type annotations are not supported.
 
 Classes use typed fields, literal field initializers, implicit positional
 construction, instance methods, and `this` for field access. Class members
@@ -562,11 +575,22 @@ Conflicting or repeated visibility modifiers and duplicate member names are
 errors. Visibility is enforced consistently for interpreter and native
 programs because both pass through semantic analysis. Classes work across
 modules when the class itself is exported; member access follows the same
-rules after import. Enums assign
-successive numeric values unless a member specifies a numeric literal. Enum
-members retain the declared enum type for assignment, comparisons, and
-function parameters/returns. Class and enum interpreter/native behavior is
-covered by regression tests on Windows x64. Inheritance, explicit
+rules after import. Enum members are integer constants: the first omitted
+value is `0`; each later omitted value is one greater than the previous
+member, including an explicitly assigned value. An explicit value must be a
+single signed decimal, binary (`0b`), or hexadecimal (`0x`) integer literal.
+Values must stay in the exactly representable range from `-9007199254740991`
+through `9007199254740991`; fractional values, computed expressions, and
+out-of-range values are rejected during semantic analysis. Equality only
+compares values of the same enum type. At runtime enum values use their
+underlying numeric value (they are not strings), while the compiler preserves
+the enum type for assignments, function calls, and comparisons.
+
+Module enums are private by default. Prefix a declaration with `pub` to expose
+its type and members to importing modules; for example, `states.Mode.Ready`.
+Qualified access to a private imported enum is rejected. Class and enum
+interpreter/native behavior is covered by regression tests on Windows x64.
+Inheritance, explicit
 constructors, and function values are not implemented. Linux native aggregate
 operations remain unsupported.
 
@@ -608,7 +632,7 @@ start {
 
 The default module name comes from the filename stem with non-identifier characters replaced by `_`; directories do not create name components. Bare dotted standard-module names map their components to standard-library directories and use the first component as the default module name (for example, `use zmemory.management` exposes `zmemory`). `as alias` sets an explicit identifier. Distinct modules with conflicting names, duplicate aliases, and repeated use of one file under different names are errors. Public functions, variables/constants, structs, classes, and enums may be referenced as `module.name`. Unambiguous public declarations are also accessible unqualified.
 
-Declarations in `.zh` files are private by default. Prefix declarations with `pub` to expose them outside the module. Private functions and variables cannot be referenced by an importer; private custom types cannot be used from another module. Public custom types are currently referenced by their unqualified type name because dotted type annotations are not implemented. Duplicate declarations and ambiguous public unqualified names are errors.
+Declarations in `.zh` files are private by default. Prefix declarations with `pub` to expose them outside the module. Private functions and variables cannot be referenced by an importer; private custom types cannot be constructed or used from another module. Public custom types can be referenced by their unqualified type name, and struct constructors can also be qualified through the module alias. Dotted type annotations are not implemented. Duplicate declarations and ambiguous public unqualified names are errors.
 
 Imported files require one `start` block containing declarations only; the
 loader extracts declarations from the block and does not execute it. Module
@@ -739,7 +763,7 @@ Keywords are case-sensitive and lowercase. Keyword spellings cannot generally be
 | Literals | `true`, `false`, `null`, `nullptr` |
 | Logical / type relation | `and`, `or`, `not`, `is` |
 
-All listed words are lexed as keywords, but not all have a supported parser construct. `pub` precedes module declarations to make them externally visible; `this` is supported in class methods, while `public`, `private`, and `protected` do not implement member visibility. `as` supports module aliases (and the older import alias syntax). `printz` is a working output built-in; `printm` remains an identifier-based deprecated alias. `repeat`, `number`, and `boolean` are specially allowed as qualified member or function names for the standard library. `stop` is also allowed as a qualified member or function name, so `zaudio.stop(handle)` works despite `stop` closing a `start:` block. Identifiers start with a letter or `_` and continue with letters, digits, or `_`. Matching is case-sensitive (`score` and `Score` are different names).
+All listed words are lexed as keywords, but not all have a supported parser construct. `pub` marks module declarations public and is also a class-member visibility modifier; `private` and `protected` are supported for class members. `public` remains reserved but is not a supported modifier. `this` is supported in class methods. `as` supports module aliases (and the older import alias syntax). `printz` is a working output built-in; `printm` remains an identifier-based deprecated alias. `repeat`, `number`, and `boolean` are specially allowed as qualified member or function names for the standard library. `stop` is also allowed as a qualified member or function name, so `zaudio.stop(handle)` works despite `stop` closing a `start:` block. Identifiers start with a letter or `_` and continue with letters, digits, or `_`. Matching is case-sensitive (`score` and `Score` are different names).
 
 ## 13. Operator Precedence
 

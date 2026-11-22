@@ -1,10 +1,10 @@
 window.ZPlusSite = (() => {
-  const l = (title, explain, code, output, exercise, solution, summary) => ({
-    title, explain, code, output, exercise, solution, summary
+  const l = (title, explain, code, output, exercise, solution, summary, files = []) => ({
+    title, explain, code, output, exercise, solution, summary, files
   });
   const course = [
     { title: "Introduction", lessons: [
-      l("What is Z+?", "Z+ is a general-purpose language with a compiler, interpreter, standard library, and ZBuild. A program is text saved in a source file; the compiler checks that text before it runs.", `start {
+      l("What is Z+?", "Z+ is a general-purpose language with a compiler, interpreter, standard library, and ZPBuild project tool. A program is text saved in a source file; the compiler checks that text before it runs.", `start {
     say("A program is a set of instructions.")
 } stop`, "A program is a set of instructions.", "Change the message to describe one thing you want a computer to do.", `start {
     say("A computer can follow clear instructions.")
@@ -19,7 +19,7 @@ window.ZPlusSite = (() => {
 } stop`, "Hello, Z+!", "Save the example as `hello.zp`, then run `zp run hello.zp`.", `start {
     say("Hello from my first program.")
 } stop`, "A `.zp` file with one `start { ... } stop` block is a complete first program."),
-      l("Understanding the Z+ project structure", "A small project can begin with one source file. Larger projects use `.zh` declaration modules and a `zproject.toml` file for ZBuild. Keep source, assets, and tests in separate folders as the project grows.", `start {
+      l("Understanding the Z+ project structure", "A small project can begin with one source file. Larger projects use `.zh` declaration modules and a `zproject.toml` file for ZPBuild. Keep source, assets, and tests in separate folders as the project grows.", `start {
     say("src/main.zp is a common place for an app entry point.")
 } stop`, "src/main.zp is a common place for an app entry point.", "Create a folder for a project and decide where its entry-point source file will live.", `start {
     say("Keep project files together and name their purpose clearly.")
@@ -85,11 +85,11 @@ window.ZPlusSite = (() => {
     // Tell the user the program has started.
     say("Started")
 } stop`, "Keep comments focused on intent that is not already obvious from the code."),
-      l("Output with say() and printz()", "`say(value)` writes one value and a newline. `printz(value, ...values)` writes arguments consecutively with no separator and no final newline. The interpreter can print more value types than the native backend.", `start {
-    printz("Count: ", 3)
+      l("Output with say() and printz()", "`say(value)` writes one value and a newline. `printz(value, ...values)` writes arguments consecutively with no separator and no final newline. The interpreter accepts more printable value types than native output, which currently accepts strings only.", `start {
+    printz("Count: ", "3")
     say(" done")
-} stop`, "Count: 3 done", "Print a label and number with `printz`, then finish the line with `say`.", `start {
-    printz("Score: ", 12)
+} stop`, "Count: 3 done", "Convert a small number to text in your source and print it between two string arguments.", `start {
+    printz("Score: ", "12")
     say("")
 } stop`, "Use `say` for line-oriented output and `printz` when you need exact concatenation."),
     ]},
@@ -245,7 +245,7 @@ window.ZPlusSite = (() => {
     say(contains(tasks, "write"))
     say(length(tasks))
 } stop`, "Use core array operations for mutation; `zcollections` focuses on numeric-array utilities."),
-      l("Structs and classes", "Structs and classes define named types with fields. A struct is a value-shaped data model; a class can also declare methods. Constructors currently use positional field order and field defaults must be literals.", `start {
+      l("Structs and classes", "Structs and classes define nominal types with fields. A struct groups typed data; a class can also declare instance methods. Both use implicit positional construction and literal field defaults. Struct instances use reference semantics: assigning an instance to another variable preserves its identity.", `start {
     struct Point {
         x: number
         y: number
@@ -277,14 +277,20 @@ start {
 start {
     say(text.upper("hello"))
 } stop`, "A module import keeps related functions under a clear namespace."),
-      l("Creating reusable modules", "A user module is a `.zh` file containing declarations inside a `start` block. Use a relative path from the importing file; declarations are private unless marked `pub`.", `use "greetings.zh" as greetings
+      l("Creating reusable modules", "A user module is a `.zh` file containing declarations inside its declaration-only `start` block. Import it with a relative path from the importing file; declarations are private unless marked `pub`. The two files below form one complete import example.", `use "greetings.zh" as greetings
 start {
     say(greetings.hello())
-} stop`, "If greetings.zh returns Hello, the program prints Hello.", "In a sibling `greetings.zh`, export a zero-argument function named `hello` that returns a string.", `start {
+} stop`, "Hello", "In a sibling `greetings.zh`, export a zero-argument function named `hello` that returns a string.", `start {
     pub fn hello(): string {
         return "Hello"
     } end fn
-} stop`, "Relative modules share code and use explicit `pub` visibility for exported declarations."),
+} stop`, "Relative modules share code and use explicit `pub` visibility for exported declarations.", [
+        { name: "greetings.zh", code: `start {
+    pub fn hello(): string {
+        return "Hello"
+    } end fn
+} stop` }
+      ]),
       l("Strings and text processing", "`zstring` provides text functions such as `upper`, `lower`, `trim`, `split`, `join`, and `replace`. String length is counted in Unicode code points.", `use zstring as text
 start {
     say(text.upper("z plus"))
@@ -293,14 +299,14 @@ start {
 start {
     say(text.trim("  ready  "))
 } stop`, "Call the module functions rather than assuming strings have built-in methods."),
-      l("Math utilities", "`zmath` includes functions such as `abs`, `round`, `sqrt`, `pow`, `min`, and `max`. The interpreter uses floating-point numbers; Windows x64 native currently restricts numeric runtime values to integers.", `use zmath as math
+      l("Math utilities", "`zmath` includes functions such as `abs`, `round`, `sqrt`, `pow`, `min`, and `max`. The core `number` type is double precision. Standard-library functions and backend support vary, so check the module documentation before relying on a target-specific operation.", `use zmath as math
 start {
     say(math.abs(-7))
     say(math.max(3, 9))
 } stop`, "7\n9", "Use `math.min` to print the smaller of 12 and 5.", `use zmath as math
 start {
     say(math.min(12, 5))
-} stop`, "Check backend limits before relying on fractional native math results."),
+} stop`, "The interpreter and Windows x64 native backend support the shown integer-valued results. Check target-specific documentation before relying on other math operations."),
       l("File operations", "`zfile` exposes public functions including `exists`, `read`, `write`, `append`, `readLines`, and `writeLines`. I/O failures raise runtime errors; use `try`/`catch` when recovery is appropriate.", `use zfile as file
 start {
     file.write("note.txt", "first")
@@ -320,39 +326,36 @@ start {
     let full: string = path.join("src", "app.zp")
     say(path.extension(full))
 } stop`, "Use path functions instead of manually concatenating separators."),
-      l("Environment variables", "`zenv` reads and writes process environment values. `exists` distinguishes a missing variable from an existing variable with an empty value. Changes affect only the current process.", `use zenv as env
+      l("Environment variables", "`zenv` reads and writes process environment values. `exists` distinguishes a missing variable from an existing variable with an empty value. Changes affect only the current process, so results depend on the environment that launched the program.", `use zenv as env
 start {
     say(env.exists("PATH"))
-} stop`, "true on a typical configured system", "Check whether a variable named `APP_MODE` exists.", `use zenv as env
+} stop`, "", "Check whether a variable named `APP_MODE` exists.", `use zenv as env
 start {
     say(env.exists("APP_MODE"))
 } stop`, "Treat environment values as external input and check presence before relying on them."),
-      l("Time and dates", "`ztime` provides `now`, date-part helpers, `format`, `parse`, and `sleep`. Its format patterns follow the host C library's time-format conventions.", `use ztime as time
+      l("Time and dates", "`ztime` provides `now`, date-part helpers, `format`, `parse`, and `sleep`. Its format patterns follow the host C library's time-format conventions. Date-part results depend on the current host clock and local timezone.", `use ztime as time
 start {
     let timestamp: number = time.now()
     say(time.year(timestamp))
-} stop`, "The current local year", "Read the current timestamp and print its month.", `use ztime as time
+} stop`, "", "Read the current timestamp and print its month.", `use ztime as time
 start {
     let timestamp: number = time.now()
     say(time.month(timestamp))
 } stop`, "Use the time module for timestamps and formatting rather than guessing date syntax."),
     ]},
     { title: "Input and errors", lessons: [
-      l("Reading terminal input", "`read()` reads a line from standard input as a string. Input can be empty or unavailable, so validate it before using it as meaningful data.", `start {
-    say("What is your name?")
-    let name: string = read()
+      l("Reading terminal input", "`read()` reads one complete line from standard input as a string, preserving spaces. You can pass a string prompt; the runtime writes and flushes it before waiting. `read()` returns an empty string at EOF, so validate it before treating the value as meaningful data.", `start {
+    let name: string = read("What is your name? ")
     say("Hello, " + name)
 } stop`, "The greeting includes the line entered by the user.", "Ask the user for a favorite language and print the response.", `start {
-    say("Favorite language?")
-    let answer: string = read()
+    let answer: string = read("Favorite language? ")
     say(answer)
 } stop`, "A terminal program becomes interactive by reading input and responding to it."),
-      l("Numeric and boolean input", "`read_number`, `read_integer`, and `read_boolean` parse common input types. Invalid input raises a runtime error; it is not silently converted to a valid value.", `start {
-    say("Enter an integer:")
-    let count: number = read_integer()
+      l("Numeric and boolean input", "`read_number`, `read_integer`, and `read_boolean` accept an optional string prompt and parse one complete line. Surrounding ASCII whitespace is accepted. Invalid values, overflow, and EOF raise runtime errors instead of silently becoming a default value.", `start {
+    let count: number = read_integer("Enter an integer: ")
     say(count)
-} stop`, "The number entered by the user", "Read a number and print it back.", `start {
-    let value: number = read_number()
+} stop`, "The integer entered by the user", "Read a number and print it back.", `start {
+    let value: number = read_number("Enter a number: ")
     say(value)
 } stop`, "Select the reader that matches the value you expect and plan for invalid input."),
       l("Handling invalid input", "`try`/`catch` handles a thrown value or interpreter runtime error. The caught `Error` currently exposes its `message` field; custom error subclasses and stable error codes are not implemented.", `start {
@@ -440,15 +443,21 @@ start {
     pub fn hello(): string {
         return "Hello from a module"
     } end fn
-} stop`, "Modules separate implementation while keeping explicit exports."),
-      l("Using ZBuild", "ZBuild provides project commands and templates. Create a project using the installed `zbuild` tool, inspect its `zproject.toml`, then use `zbuild build` or `zbuild run` from the project directory.", `start {
-    say("ZBuild project commands are run in the terminal.")
-} stop`, "ZBuild project commands are run in the terminal.", "Create a Console project with ZBuild and read its generated README and project configuration.", `start {
+} stop`, "Modules separate implementation while keeping explicit exports.", [
+        { name: "greetings.zh", code: `start {
+    pub fn hello(): string {
+        return "Hello from a module"
+    } end fn
+} stop` }
+      ]),
+      l("Using ZPBuild", "ZPBuild provides project commands and templates. Create a project using the installed `zpbuild` tool, inspect its `zproject.toml`, then use `zpbuild build` or `zpbuild run` from the project directory. The `zbuild` command remains a compatibility alias.", `start {
+    say("ZPBuild project commands are run in the terminal.")
+} stop`, "ZPBuild project commands are run in the terminal.", "Create a Console project with ZPBuild and read its generated README and project configuration.", `start {
     say("Keep project configuration next to the source tree.")
-} stop`, "ZBuild commands are CLI commands; do not put them inside Z+ source."),
-      l("Building a release", "A release build uses `zbuild build --release`; packaging uses `zbuild package --release`. Test the program and inspect the package output before sharing it. Native backend support is limited to the documented subset.", `start {
+} stop`, "ZPBuild commands are CLI commands; do not put them inside Z+ source."),
+      l("Building a release", "A release build uses `zpbuild build --release`; packaging uses `zpbuild package --release`. Test the program and inspect the package output before sharing it. Native backend support is limited to the documented subset.", `start {
     say("Test the release build before distributing it.")
-} stop`, "Test the release build before distributing it.", "Build and package a small ZBuild project in release mode, then verify the produced files.", `start {
+} stop`, "Test the release build before distributing it.", "Build and package a small ZPBuild project in release mode, then verify the produced files.", `start {
     say("A release should include the files the program actually needs.")
 } stop`, "A release is a tested artifact, not just a successful compiler invocation."),
     ]},
@@ -479,27 +488,79 @@ start {
 start {
     say(text.trim(" ready "))
 } stop`, "Standard library calls should be grounded in documented, implemented functions."),
-      l("Creating and sharing packages", "The Z+ package registry is live. Use ZPM to search for packages, install dependencies, and publish versioned ZPM archives; see the package documentation for supported workflows.", `use "utilities.zh" as utilities
+      l("Creating and sharing packages", "Use ZPM to search for packages, install dependencies, and publish versioned ZPM archives; see the package documentation for supported workflows.", `use "utilities.zh" as utilities
 start {
     say(utilities.describe())
-} stop`, "A shared module can be imported from a relative source path.", "Prepare a small reusable `.zh` module, document its public functions, and share it with its project configuration.", `start {
+} stop`, "A documented reusable module", "Prepare a small reusable `.zh` module, document its public functions, and share it with its project configuration.", `start {
     pub fn describe(): string {
         return "A documented reusable module"
     } end fn
-} stop`, "The registry accepts ZPM archives; package metadata and source files are checked before publication."),
+} stop`, "The registry accepts ZPM archives; package metadata and source files are checked before publication.", [
+        { name: "utilities.zh", code: `start {
+    pub fn describe(): string {
+        return "A documented reusable module"
+    } end fn
+} stop` }
+      ]),
+    ]},
+    { title: "Types and modules", lessons: [
+      l("Class visibility", "Class fields and methods accept `pub`, `private`, or `protected`. Members without a modifier remain public for compatibility. `private` and `protected` currently permit access only from methods of the declaring class; inheritance, and therefore subclass access to protected members, is not implemented.", `start {
+    class Counter {
+        private value: number = 0
+        pub fn increment() {
+            this.value = this.value + 1
+        } end fn
+        pub fn current(): number {
+            return this.value
+        } end fn
+    } end class
+
+    let counter = Counter()
+    counter.increment()
+    say(counter.current())
+} stop`, "1", "Add a private field and expose a public method that updates it. Read the field only from methods of that class.", `start {
+    class Meter {
+        private value: number = 2
+        pub fn next(): number {
+            this.value = this.value + 1
+            return this.value
+        } end fn
+    } end class
+
+    let meter = Meter()
+    say(meter.next())
+} stop`, "Visibility is checked during semantic analysis before interpretation or native code generation."),
+      l("Enums and typed states", "An enum is a nominal type whose members carry integer values. Omitted values start at zero and then increment the previous member. Explicit values must be signed integer literals, and comparisons require values of the same enum type.", `start {
+    enum State {
+        Ready
+        Running = 4
+        Done
+    } end enum
+
+    let current: State = State.Running
+    say(current == State.Running)
+    say(State.Done)
+} stop`, "true\n5", "Declare an enum with two members and store one member in a variable with the enum type.", `start {
+    enum Direction {
+        North
+        South
+    } end enum
+    let facing: Direction = Direction.South
+    say(facing == Direction.South)
+} stop`, "Enum members are numeric at runtime but retain their enum type during checking."),
     ]},
   ];
 
   const docs = [
     { id: "syntax", title: "Syntax reference", section: "Language", summary: "The executable Z+ syntax accepted by the current compiler.", body: [
-      ["Program structure", "Every executable `.zp` source has one `start { ... } stop` block. Function, namespace, and type declarations belong inside it. Standard and relative modules use file-scope `use` directives."],
+      ["Program structure", "Every executable `.zp` source has one `start { ... } stop` block. Function, namespace, and type declarations belong inside it. Standard and relative modules use file-scope `use` directives.", 'start {\n    say("Hello, Z+!")\n} stop'],
       ["Types and variables", "Use `let` for mutable variables and `const` for initialized immutable variables. Common types include `number`, `string`, `boolean`, and arrays such as `number[]`."],
       ["Blocks and control flow", "Brace blocks use explicit terminators: `} end fn`, `} end if`, `} end while`, `} end for`, and `} stop`. `else if` and `else` remain in the same conditional chain."],
       ["Functions", "Declare `fn name(parameter: type): returnType { ... } end fn`. Parameter and return types follow the current function reference; return types are not inferred."],
       ["Limitations", "Pointers are parsed but are not implemented. Match expressions, inheritance, function values, map/set types, and string interpolation are not implemented."]
     ]},
     { id: "cli", title: "Compiler CLI", section: "Tools", summary: "Check, interpret, and build Z+ programs.", body: [
-      ["Commands", "`zp check file.zp` validates without running. `zp run file.zp` executes in the interpreter. `zp build file.zp -o output.exe` requests native compilation."],
+      ["Commands", "`zp check file.zp` validates without running. `zp run file.zp` executes in the interpreter. `zp build file.zp -o output.exe` requests native compilation.", "zp check hello.zp\nzp run hello.zp\nzp build hello.zp -o hello.exe"],
       ["Options", "`-o <file>` sets the native output path; `--windows-gui` selects the Windows GUI subsystem; `--source-stdin` reads check source from standard input; `--diagnostics=json` emits JSON diagnostics; `-h` and `--help` show command help."],
       ["Version and arguments", "`zp version` reports the compiler version. Program arguments after `--` are passed to `zp run`."],
       ["Backend behavior", "Native compilation does not fall back to interpretation. Unsupported native operations are reported. Supported syntax and runtime features vary by platform."]
@@ -524,8 +585,8 @@ start {
       ["Runtime errors", "`try` requires a `catch`. The caught `Error` value currently exposes a `message` field. Custom error subclasses and stable error categories are not implemented."],
       ["Cleanup", "`defer` accepts one direct named function call and runs registered calls in last-in, first-out order when the scope exits."]
     ]},
-    { id: "zbuild", title: "ZBuild reference", section: "Tools", summary: "Project build, run, test, and package commands.", body: [
-      ["Commands", "`zbuild init [name]` creates a project; `templates` and `template info NAME` inspect templates; `configure` validates a project; `build`, `run`, `test`, `clean`, `rebuild`, `info`, `targets`, `graph`, and `package` manage targets and outputs. `--debug` / `--release`, `--target`, `--jobs`, `--verbose`, and `--clean-first` apply where supported."],
+    { id: "zbuild", title: "ZPBuild reference (legacy URL)", section: "Tools", summary: "Project build, run, test, and package commands; the current URL is `/docs/zpbuild`.", body: [
+      ["Commands", "`zpbuild init [name]` creates a project; `templates` and `template info NAME` inspect templates; `configure` validates a project; `build`, `run`, `test`, `clean`, `rebuild`, `info`, `targets`, `graph`, and `package` manage targets and outputs. `zbuild` remains a compatibility alias. `--debug` / `--release`, `--target`, `--jobs`, `--verbose`, and `--clean-first` apply where supported.", "zpbuild init MyApp\ncd MyApp\nzpbuild build --release\nzpbuild test"],
       ["Configuration", "The root `zproject.toml` supports `[project]`, `[build]`, `[compiler]`, `[platform]`, `[assets]`, `[tests]`, and `[[target]]`. Use executable or test targets with `.zp` entry points; use `.zh` modules for source reuse. The parser accepts a constrained TOML subset, not arbitrary TOML."],
       ["Build behavior", "Incremental signatures include compiler version/hash, target settings, source and reachable module contents, dependency outputs, and assets. Outputs are under `build/<debug|release>/`; package files go in that selected profile."],
       ["Boundaries", "Targets are standalone executables or tests; the compiler has no object, archive, or library-link interface. Local dependencies are locked and validated but are not automatically imported or linked. Use ZPM for package discovery and installation; platform and native-link support remain target-specific."]
@@ -546,20 +607,220 @@ start {
     ]},
     { id: "installation", title: "Installation and verification", section: "Getting started", summary: "Install an official build and confirm the compiler works.", body: [
       ["Official downloads", "The Download page queries the official Z+ GitHub Releases API and links only to published assets. If the feed has no stable release or the API is unavailable, use the Releases page fallback instead of a guessed version or file."],
-      ["Windows setup", "When an official Windows x64 distribution is available, follow its included installation instructions. The Inno Setup source and build instructions are in this repository's `installer/inno` directory."],
-      ["Verify", "Open a new terminal and run `zp version` or `zp --version`, then `zbuild --version`. Validate a source program with `zp check hello.zp` and run it with `zp run hello.zp`."],
+      ["Windows setup", "The published Windows x64 installer is built from the Release distribution with Inno Setup. It installs the command-line tools, required runtime files, standard library, project templates, documentation, and examples. Other platforms are listed only when a release asset is actually available."],
+      ["Verify", "Open a new terminal and run `zp version`, `zpm --version`, and `zpbuild --version`. Validate a source program with `zp check hello.zp` and run it with `zp run hello.zp`."],
       ["Troubleshooting", "If a command is not found, open a fresh terminal and verify the installed `bin` directory is in your user PATH. Keep the distribution's runtime DLLs and standard-library directory in their shipped layout."]
+    ]},
+    { id: "introduction", title: "Introduction to Z+", section: "Getting started", summary: "What the language and its developer tools include today.", body: [
+      ["A language and toolchain", "Z+ is a statically typed programming language with a C++ compiler, an interpreter, and a native code-generation backend. The repository includes the standard library, ZPM package manager, and ZPBuild build system. First-party project materials are licensed under Apache-2.0; third-party components retain their own terms."],
+      ["Designed for readable programs", "Programs use explicit `start` and `stop` boundaries, typed declarations, named functions, and module imports. Z+ supports console programs and project-based workflows; backend support varies by feature and target."],
+      ["Start here", "Install an actual published release, follow the first program guide, and use `zp check` before running a program. The reference labels important interpreter and native backend limits instead of treating them as interchangeable."],
+      ["Source of current version", "Published release versions come from the official release feed. The checked-in compiler may be on a newer development version than the latest stable download; the site distinguishes the two."]
+    ]},
+    { id: "first-program", title: "Your first Z+ program", section: "Getting started", summary: "Create a source file, check it, and run it with the interpreter.", body: [
+      ["Create hello.zp", "The minimal executable has a single `start` block, a call to `say`, and the matching `} stop` terminator.", 'start {\n    say("Hello, Z+!")\n} stop'],
+      ["Check and run", "From the directory containing the file, validate it and then run it with the interpreter. Checking does not execute the program.", "zp check hello.zp\nzp run hello.zp"],
+      ["Build a native executable", "On a target supported by the current compiler and source operations, `zp build` writes a native executable. Native builds do not fall back to the interpreter."],
+      ["Next", "Continue with variables and types, or use the project guide to scaffold a larger multi-file project."]
+    ]},
+    { id: "variables", title: "Variables and types", section: "Language", summary: "Declare mutable values, constants, arrays, and custom types safely.", body: [
+      ["Mutable and immutable values", "`let` declares a mutable local; `const` declares an initialized immutable value. Add a type annotation or let the compiler infer the type from an initializer."],
+      ["Primitive types", "The core source types include `number`, `string`, `boolean`, and `char`. The `number` type is a double in the interpreter and native arithmetic, although some native standard-library functions remain integer-only."],
+      ["Typed arrays", "Use `number[]`, `string[]`, or another supported element type. Arrays are mutable and dynamically sized. The interpreter and Windows x64 native backend support array operations; Linux native builds reject array operations."],
+      ["Type checking", "Assignments, function arguments, returns, array elements, and enum values are checked. Structs and classes are nominal custom types; enum comparisons require matching enum types."]
+    ]},
+    { id: "functions", title: "Functions", section: "Language", summary: "Declare typed functions, pass arguments, and return values.", body: [
+      ["Declaration form", "Functions declare parameter types and use a return annotation after `:`. The body closes with `} end fn`.", 'start {\n    fn add(left: number, right: number): number {\n        return left + right\n    } end fn\n\n    say(add(20, 22))\n} stop'],
+      ["Calling functions", "Call by name with arguments in parameter order. Trailing default arguments are supported in interpreter and native calls. A `void` function may omit a return value."],
+      ["Modules", "A function declared in an imported `.zh` file is private by default. Use `pub fn` to expose it through a module alias."],
+      ["Execution support", "The interpreter supports recursive function calls. Native code generation supports its documented function subset; unsupported operations fail the native build."]
+    ]},
+    { id: "classes", title: "Classes", section: "Language", summary: "Create instances with fields and instance methods.", body: [
+      ["Members and construction", "Classes support typed fields, literal field initializers, implicit positional construction, instance methods, and `this` for field access. There are no explicit constructor declarations."],
+      ["Visibility", "Class fields and methods accept `pub`, `private`, or `protected`. Existing unmodified members remain public for compatibility. Private access is limited to methods of the declaring class; protected is reserved for subclasses, but inheritance is not implemented."],
+      ["Validation", "Duplicate members, repeated or conflicting visibility modifiers, invalid fields, and illegal accesses are rejected during semantic analysis before execution."],
+      ["Backend support", "Class construction, fields, `this`, and instance calls are supported by the interpreter and Windows x64 native backend. Linux native aggregate operations are unsupported."]
+    ]},
+    { id: "visibility", title: "Class visibility modifiers", section: "Language", summary: "Control access to class fields and methods.", body: [
+      ["Modifiers", "`pub` allows callers to access a member, `private` restricts it to methods of the declaring class, and `protected` is reserved for subclass access. No inheritance syntax is implemented yet, so protected subclass access is not currently available."],
+      ["Default", "A class member with no modifier is public. This preserves compatibility with existing classes."],
+      ["Example", "The public method can read and mutate its private field. An external attempt to access that field is a compile-time semantic error."],
+      ["Modules and execution", "The class declaration itself must be exported for use from another module. Visibility checks apply before both interpreter and native execution."]
+    ]},
+    { id: "enums", title: "Enums", section: "Language", summary: "Use nominal enum values with explicit or sequential integer members.", body: [
+      ["Declaration and values", "Enum members have integer values. The first omitted value is zero; subsequent omitted values increment the previous member. Explicit values must be signed decimal, binary, or hexadecimal integer literals within the exact numeric range.", 'start {\n    enum State {\n        Ready\n        Running = 4\n        Done\n    } end enum\n\n    let current: State = State.Running\n    say(current == State.Running)\n} stop'],
+      ["Qualified member access", "Access members through their enum name, such as `State.Ready`. Public enums imported from a module can use an alias, such as `states.State.Ready`."],
+      ["Type safety", "Enum values are not strings or ordinary numbers. Assignments, function arguments and returns, and equality comparisons preserve nominal enum type; values from different enums cannot be compared."],
+      ["Visibility and backend", "Enums declared in modules are private by default. Export with `pub enum`. Enum values and comparisons work in the interpreter and Windows x64 native backend; Linux native aggregate operations are unsupported."]
+    ]},
+    { id: "structs", title: "Structs", section: "Language", summary: "Group typed fields in nominal records with managed reference semantics.", body: [
+      ["Field declarations", "A struct field uses `name: Type` with an optional literal default; a field with a literal default can infer its type. Required fields must precede fields with defaults.", 'start {\n    struct Point {\n        x: number\n        y: number = 0\n    } end struct\n\n    let origin = Point(0)\n    origin.x = 12\n    say(origin.x)\n} stop'],
+      ["Construction", "Call the struct name with positional values in declaration order. Omitted fields use their literal defaults. Unknown field types, duplicate fields, invalid constructor arity, and incompatible values are diagnosed."],
+      ["Nested values and identity", "Structs can contain other structs and supported arrays. Struct values use reference semantics: assignments and function calls preserve object identity, so mutations through aliases are visible."],
+      ["Visibility and backend", "Struct fields are currently public. A module can export a struct with `pub`; access it by an unambiguous public type name or qualify its constructor through the module alias. Runtime values are supported in the interpreter and Windows x64 native backend; Linux native aggregate operations are unsupported."]
+    ]},
+    { id: "interpreter", title: "Interpreter execution", section: "Runtime", summary: "Run source programs directly and understand interpreter-specific behavior.", body: [
+      ["Run a program", "`zp run path/to/main.zp` loads modules, checks the program, and executes it through the interpreter."],
+      ["Input and errors", "The built-ins `read()`, `read_number()`, `read_integer()`, and `read_boolean()` read complete standard-input lines and accept an optional string prompt. Invalid typed input and end of input report runtime errors. `try`/`catch` handles runtime exceptions where supported."],
+      ["Runtime values", "The interpreter uses double-precision numbers, mutable arrays, class and struct instances, and managed tracing for selected heap values. It supports a broader set of operations than some native targets."],
+      ["Standard input", "The process reads from ordinary stdin, so interactive terminals and redirected input can both be used. The prompt is flushed before waiting for input."]
+    ]},
+    { id: "zpm", title: "ZPM package manager", section: "Tools", summary: "Manage local and registry dependencies with integrity-aware lockfiles.", body: [
+      ["Common commands", "`zpm init`, `zpm add`, `zpm install`, `zpm list`, `zpm build`, `zpm test`, `zpm remove`, `zpm pack`, and `zpm publish` support package workflows. See the dedicated ZPM page and the full package guide for details.", "zpm init my-app\nzpm add ..\\my-library\nzpm install --locked\nzpm list"],
+      ["Manifest and lock", "Package metadata lives in `zpm.json`; a project lockfile records the manifest hash, resolved versions, and content hashes. `zpm install --locked` restores the exact graph and refuses lock changes."],
+      ["Sources and storage", "ZPM accepts local directories and `.zpm` archives as well as registry packages. Installed packages live under `z+_packages/`; verified package sources may be restored from the local cache offline."],
+      ["Security", "Package metadata, sources, and archives are validated, and SHA-256 integrity is checked. Installation does not run arbitrary package scripts. The official website registry provides search, version resolution, publishing, and archive download endpoints."]
+    ]},
+    { id: "zpbuild", title: "ZPBuild build system", section: "Tools", summary: "Configure, build, test, and inspect multi-target Z+ projects.", body: [
+      ["Primary command", "Use `zpbuild`; `zbuild` remains a compatibility alias. Commands include `init`, `new`, `configure`, `build`, `plan`, `run`, `check`, `test`, `clean`, `rebuild`, `info`, `targets`, `graph`, and `package`."],
+      ["Configuration", "Projects use `zproject.toml` with project, build, profile, compiler, and target settings. The parser intentionally supports a documented TOML subset, not every TOML feature."],
+      ["Build graph", "ZPBuild plans target dependencies and can execute independent ready targets in parallel. Build signatures include compiler identity, configuration, reachable source/module content, and relevant assets. Cache controls are available on the CLI."],
+      ["Test runner", "Configure test targets and run them with `zpbuild test`. Program and test exit codes propagate to the caller. The compiler remains responsible for Z+ parsing, semantics, and code generation."]
+    ]},
+    { id: "vscode", title: "Visual Studio Code extension", section: "Tools", summary: "Use Z+ syntax support and compiler-backed commands in VS Code.", body: [
+      ["Files and editing", "The extension recognizes `.zp` and `.zh`, provides syntax highlighting and snippets, and includes formatter support based on lexical scanning. The README documents the current feature set."],
+      ["Compiler workflows", "Commands can check, run, and build a file and invoke ZPBuild and ZPM project workflows. Compiler, ZPBuild, and ZPM executable paths are configurable; otherwise, tools are discovered on PATH."],
+      ["Analysis boundaries", "Diagnostics are backed by the compiler. The extension has workspace symbol and source-reference features, but it is not a Language Server Protocol implementation and does not provide a debugger or claim compiler type inference for completion ranking."],
+      ["Distribution status", "The current extension package is version 1.3.4 in this checkout, but no verified Marketplace listing or extension asset appears in the official release feed. The website marks the download unavailable until a valid public asset is published."]
+    ]},
+    { id: "zgraphics", title: "ZGraphics module", section: "Standard library", summary: "Create a native window and draw basic 2D shapes from Z+.", body: [
+      ["API overview", "The `zgraphics` module exposes window creation and lifecycle, titles, positions and sizing, background colors, text and basic shapes, frame updates, keyboard and mouse state, and an event queue."],
+      ["Platforms", "The native Windows backend uses Win32 and GDI. Linux uses X11 for interpreter execution and needs X11 development files at build time and a display at runtime. macOS is not implemented. Linux native linking is not implemented."],
+      ["Runtime requirements", "Windows native applications need `zgraphics_runtime.dll` beside the executable. Keep the executable and runtime DLL together when distributing an application."],
+      ["Limitations", "ZGraphics is a platform layer, not a full GUI toolkit. Invalid handles, dimensions, colors, and frame values raise runtime errors. Consult the module guide for the complete API and limits."]
     ]},
   ];
 
   const wiki = [
-    { id: "architecture", title: "How the compiler works", summary: "From source text to a running Z+ program.", body: "The compiler pipeline tokenizes source, parses an AST, performs semantic analysis, lowers to a shared intermediate representation, then either runs the interpreter or generates native code. Diagnostics should be fixed at their source stage; native code generation is a separate capability from interpreter support." },
-    { id: "project-layout", title: "Organizing projects", summary: "Keep entry points, modules, assets, and tests easy to find.", body: "Begin with a small source tree and keep a clear entry point. Place reusable declaration modules next to the code that imports them, and use relative paths. Larger ZBuild projects use `src/`, `tests/`, and a root `zproject.toml`. Avoid absolute imports so projects remain portable." },
-    { id: "modules", title: "How modules work", summary: "Resolution, visibility, initialization, and cycles.", body: "A relative `.zh` import is resolved from its importer, not the current terminal directory. Modules are loaded depth-first and deduplicated by canonical path. Public declarations require `pub`; circular dependencies fail with a dependency-chain diagnostic." },
-    { id: "contributing", title: "Contributing to Z+", summary: "Build, test, and report changes against the compiler repository.", body: "Read the language and backend references before changing behavior. Configure with CMake, build the target configuration, run the focused tests, and then run the wider CTest suite. Include a small Z+ regression program for language-visible changes and describe platform limitations." },
-    { id: "troubleshooting", title: "Troubleshooting", summary: "Diagnose common installation and compiler problems.", body: "Open a new terminal after a PATH change. Confirm `zp --version` and `zbuild --version`, then run `zp check` before execution. For native failures, check the documented target subset and required runtime DLLs. Include the exact command, compiler version, OS, and diagnostic when reporting a bug." },
-    { id: "faq", title: "Frequently asked questions", summary: "Straight answers about the current Z+ implementation.", body: "Does Z+ have maps and sets? No, not currently. Are all standard modules available natively? No; support varies by platform and function. Is the package registry live? Yes; use ZPM to search, install, and publish packages. Does `zp build` fall back to the interpreter? No. Use the docs to verify a feature before depending on it." },
-    { id: "packages", title: "Publishing Z+ packages", summary: "Build, publish, and install packages with ZPM.", body: "The Z+ registry accepts versioned ZPM archives. Use `zpm init` to create a package, `zpm pack` to produce an archive, and `zpm publish` or the website's Publish page to publish it. Registry archives are limited to 4 MiB; the server validates metadata and archive contents before publication. Use `zpm search` and `zpm add` to discover and install published dependencies." },
+    { id: "syntax", title: "Z+ Syntax", section: "Language reference", summary: "A navigable reference to the syntax and behavior documented in the compiler's SYNTAX.md.", body: [
+      ["Program structure", "An executable `.zp` file contains one `start { ... } stop` block. Declarations belong inside it; `use` directives are at file scope. A `.zh` module has a declaration-only `start` block. Brace blocks require their matching kind-specific terminator, and legacy colon blocks cannot be mixed with brace blocks.", `start {
+    fn greet(name: string): string {
+        return "Hello, " + name
+    } end fn
+
+    say(greet("Z+"))
+} stop`],
+      ["Lexical structure and identifiers", "Keywords are lowercase and case-sensitive. Identifiers start with a letter or underscore and continue with letters, digits, or underscores. The lexer skips `//` line comments and `/* ... */` block comments; block comments are not nested. Newlines separate statements; indentation is not significant."],
+      ["Keywords", "The case-sensitive reserved spellings are `start`, `stop`, `end`, `let`, `const`, `number`, `string`, `char`, `character`, `boolean`, `bool`, `void`, `fn`, `return`, `if`, `else`, `while`, `for`, `repeat`, `break`, `continue`, `try`, `catch`, `throw`, `defer`, `switch`, `case`, `default`, `struct`, `class`, `enum`, `pub`, `public`, `private`, `protected`, `this`, `namespace`, `import`, `use`, `export`, `as`, `say`, `printz`, `true`, `false`, `null`, `nullptr`, `and`, `or`, `not`, and `is`. Reserved does not always mean supported: `public` is not a visibility modifier, legacy `import`/`export` forms do not load files, and `printm` is an identifier-based deprecated alias."],
+      ["Variables and types", "`let name [: type] [= expression]` declares a mutable variable. `const name [: type] = expression` requires an initializer and cannot be reassigned. Primitive type spellings are `number`, `string`, `char`/`character`, `boolean`/`bool`, and `void`; `void` is an annotation, not a value type. Arrays use `T[]`; structs, classes, and enums are nominal custom types.", `start {
+    let count: number = 3
+    const label: string = "items"
+    let names: string[] = ["Ada", "Lin"]
+    say(label + ": " + to_string(count))
+} stop`],
+      ["Literals", "Numbers include decimal, binary (`0b`/`0B`), hexadecimal (`0x`/`0X`), and scientific notation and are represented as IEEE-754 doubles. Signs are unary operators. Strings use double quotes and characters use single quotes. String escapes are `\\n`, `\\t`, `\\r`, `\\b`, `\\f`, `\\v`, `\\a`, `\\0`, `\\\\`, `\\\"`, and `\\'`; physical newlines are not allowed inside literals. `true`, `false`, `null`, and `nullptr` are recognized literals.", `start {
+    say(12.5e2)
+    say(0x10)
+    say("first\\nsecond")
+    say('Z')
+    say(false)
+} stop`],
+      ["Operators and expressions", "Expressions include literals, identifiers, parenthesized expressions, calls, arrays, indexing, member access, unary/binary operations, assignments, and the conditional `?:` expression. Operators are assignment (`=`, `+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `|=`, `^=`, `<<=`, `>>=`); logical (`or`, `||`, `and`, `&&`); bitwise (`&`, `|`, `^`, `~`, `<<`, `>>`); equality (`==`, `!=`); comparison (`<`, `<=`, `>`, `>=`, `is`); arithmetic (`+`, `-`, `*`, `/`, `%`); unary (`+`, `-`, `!`, `not`, `~`, prefix `++`/`--`); postfix `++`/`--`; and call, index, `.`, and `->` access forms. Precedence from low to high is assignment, conditional, logical OR, logical AND, bitwise OR, XOR, AND, equality, comparison/type test, shifts, addition/subtraction, multiplication/division/remainder, prefix unary, chained access/calls/postfix, and primary expressions. Assignment is right-associative; other binary tiers group left-to-right. Logical forms short-circuit. `is` checks struct instances in the interpreter and Windows x64 native backend; it is not general reflection. `as` is not a cast operator.", `start {
+    let total: number = (4 + 2) * 3
+    let valid: boolean = total >= 18 and true
+    let label: string = valid ? "ready" : "check"
+    say(label)
+} stop`],
+      ["Functions", "Functions use `fn name(parameters) [: returnType] { ... } end fn`; the legacy `->` return separator is also accepted. Types are declared explicitly, trailing parameters may have defaults, and a `void` function can omit a return value. Generic functions, structs, and classes support `T: number` and `T: equatable` constraints, with interpreter and Windows x64 native specialization.", `start {
+    fn add(left: number, right: number): number {
+        return left + right
+    } end fn
+
+    say(add(2, 3))
+} stop`],
+      ["Statements and control flow", "Supported statements include `if`/`else if`/`else`, `while`, `repeat(count)`, C-style `for`, range and array `for`, `switch`/`case`/`default`, `break`, and `continue`. Range iteration is inclusive at the start and exclusive at the end. Switch cases do not fall through; `match` is not implemented.", `start {
+    for value in 0..4 {
+        if value == 2 {
+            say("middle")
+        } else {
+            say(value)
+        } end if
+    } end for
+} stop`],
+      ["Error handling and cleanup", "`try` requires one `catch`; the caught `Error` exposes a `message` field. `throw` raises a value. `defer` accepts exactly one direct named function call and runs calls in last-in, first-out order when the lexical scope exits.", `start {
+    try {
+        throw "problem"
+    } catch error {
+        say(error.message)
+    } end try
+} stop`],
+      ["Arrays and collections", "Arrays are mutable, indexed from zero, and typed with `T[]`. Core operations include indexing, `length`, `push`, `insert`, `pop`, `remove`, `contains`, and `clear`. Maps and sets are not implemented. Arrays execute in the interpreter and Windows x64 native backend; Linux native rejects array operations.", `start {
+    let values: number[] = [4, 7]
+    push(values, 9)
+    say(values[2])
+    say(length(values))
+} stop`],
+      ["Structs", "Structs are nominal types with typed fields (`field: Type`) and optional literal defaults. Required fields precede defaulted fields; construction is positional. Nested structs, arrays in fields, and function arguments/returns are supported. Struct instances use reference semantics and fields are public. Interpreter and Windows x64 native support are implemented; Linux native aggregate operations are unsupported.", `start {
+    struct Point {
+        x: number
+        y: number = 0
+    } end struct
+
+    let origin = Point(0)
+    origin.x = 12
+    say(origin.x)
+} stop`],
+      ["Classes and visibility", "Classes support typed fields, literal initializers, implicit positional construction, instance methods, and `this`. The `let` before a class field is optional. Members default to public for compatibility. `pub`, `private`, and `protected` are recognized; private and protected access is currently restricted to methods of the declaring class. Inheritance, subclass access, and explicit constructors are not implemented.", `start {
+    class Counter {
+        private value: number = 0
+        pub fn increment() {
+            this.value = this.value + 1
+        } end fn
+        pub fn current(): number {
+            return this.value
+        } end fn
+    } end class
+
+    let counter = Counter()
+    counter.increment()
+    say(counter.current())
+} stop`],
+      ["Enums", "Enums are nominal types with integer-valued members. The first omitted value is zero; each later omitted value increments the previous value. Explicit values must be signed decimal, binary, or hexadecimal integer literals in the exactly representable range. Enum equality requires matching enum types. Module enums are private by default and can be exported with `pub`.", `start {
+    enum State {
+        Ready
+        Running = 4
+        Done
+    } end enum
+
+    let current: State = State.Running
+    say(current == State.Running)
+    say(State.Done)
+} stop`],
+      ["Modules and imports", "A `use` directive loads a standard-library module or a relative `.zh` file. Paths resolve from the importing file; aliases provide qualified access. Module declarations are private by default and require `pub` to export. Cycles and missing dependencies are diagnosed. A public imported struct can be constructed through an alias, but dotted type annotations are unsupported.", { name: "main.zp", code: `use "greetings.zh" as greetings
+start {
+    say(greetings.hello())
+} stop`, files: [{ name: "greetings.zh", code: `start {
+    pub fn hello(): string {
+        return "Hello"
+    } end fn
+} stop` }] }],
+      ["Built-in functions", "`say(value)` writes one value followed by a newline. `printz(value, ...values)` concatenates arguments without a separator or final newline; deprecated `printm` is an alias. `read()` reads a complete line and accepts an optional prompt; `read_number`, `read_integer`, and `read_boolean` validate and convert input. Array built-ins are listed in the array section. Native output currently accepts strings only."],
+      ["Standard library", "The standard library is a collection of imported modules rather than methods added to primitive values. For example, `zstring` supplies functions such as `trim`, `upper`, `split`, and `replace`; `zfile` handles file I/O; `zpath` handles host paths; and `zjson`, `zhttp`, and `zsqlite` expose structured data, HTTP, and SQLite APIs. Exact signatures and interpreter/native platform coverage are module-specific; see the checked-in `stdlib/README.md`.", `use zstring as text
+start {
+    say(text.upper(text.trim(" z+ ")))
+} stop`],
+      ["Compiler and execution behavior", "`zp check file.zp` validates through parsing, semantic analysis, and IR generation without running. `zp run file.zp` executes with the interpreter. `zp build file.zp` emits native code for the selected platform's supported subset and does not fall back to interpretation. Interpreter support is broader; Linux native support is narrower than Windows x64 for aggregates and some runtime integrations."],
+      ["Unsupported or limited constructs", "Pointer types and some pointer operators are parsed but do not have runtime support. `public` is reserved but unsupported as a modifier; there is no class inheritance, function-value type, match expression, map/set type, string interpolation, or cast operator. Consult the matching sections in the root `SYNTAX.md` for details and current backend tables."]
+    ]},
+    { id: "idea", title: "The Idea Behind Z+", section: "About Z+", summary: "The project’s approach to language design, compiler stages, and execution modes.", body: [
+      ["Why Z+ exists", "The checked-in specification describes what the project implements, but it does not record a detailed origin story or a single founding problem statement. This page therefore focuses on the verifiable idea visible in the language and toolchain: a project-owned language with explicit syntax, compiler diagnostics, an interpreter, and a native code-generation path."],
+      ["A language you can inspect", "Z+ uses explicit `start`/`stop` program boundaries, typed declarations, named functions, and blocks with matching terminators. Types and semantic checks aim to catch invalid operations before execution. Some reserved spellings are unsupported, and the syntax reference calls those out instead of treating every token as a feature."],
+      ["A staged compiler", "The compiler tokenizes source, parses it into an AST, performs semantic analysis, builds intermediate representation, and then either executes through the interpreter or generates native code for a supported subset. The compiler remains the authority for accepted syntax and diagnostics."],
+      ["Two execution paths", "`zp run` executes through the interpreter; `zp build` emits a native executable when the program uses supported operations. The interpreter currently supports a broader set of runtime operations. Native support differs by platform and subsystem, so successful checking is not proof that every target can build the program."],
+      ["The standard library and tools", "The standard library supplies modules for text, files, paths, time, math, JSON, networking, databases, processes, and other areas. ZPM manages packages; ZPBuild coordinates project targets and tests; the VS Code extension provides editor integration. Each tool has its own limitations documented in its reference."],
+      ["Direction", "The project is expanding the language foundations and developer tools while retaining compatibility with existing source where possible. Planned items are not automatically supported: use the syntax and runtime pages for implemented behavior, and treat roadmap material as future work."]
+    ]},
+    { id: "uses", title: "What Is Z+ Used For?", section: "Practical guide", summary: "Where the current compiler and toolchain can be applied, and where their limits matter.", body: [
+      ["Console programs and scripts", "The interpreter can run a `.zp` entry program with terminal input/output, functions, conditions, loops, arrays, error handling, and standard-library calls. This is suitable for learning, automation, and console utilities whose dependencies are supported by the interpreter.", `start {
+    let name: string = read("Name: ")
+    say("Hello, " + name)
+} stop`],
+      ["Native executables", "`zp build` generates a native executable for supported source operations. Basic typed functions, expressions, control flow, strings, and other documented subsets can be compiled; arrays and aggregate types have target-specific limits. Verify the actual target by building and running the produced executable."],
+      ["Modular applications", "Relative `.zh` modules, explicit `pub` exports, and ZPBuild project targets support splitting a program into files. ZPM can resolve and install package dependencies, but package installation does not mean every package operation is natively supported by every target."],
+      ["Programs using the standard library", "Use modules such as `zfile`, `zpath`, `zstring`, `zjson`, and `zhttp` when their documented APIs fit the task. Check module-specific platform notes: Windows x64 is the broader native target, while Linux native support remains narrower for aggregates and some runtime integrations."],
+      ["Current limitations", "Z+ does not currently provide class inheritance, maps/sets, function values, string interpolation, or a native fallback through the interpreter. ZGraphics is a basic platform drawing layer rather than a complete GUI framework. Treat graphics, audio, physics, and other platform integrations according to their documented status and test them on the target system."],
+      ["Choosing a project", "Z+ is usable today for learning the language, console utilities, modular applications, interpreter-driven scripts, and native executables within the supported subset. For production use, validate the full application on its intended OS, runtime dependencies, and backend; no benchmark or cross-language performance guarantee is implied."]
+    ]}
   ];
 
   const zts = {
@@ -569,8 +830,8 @@ start {
     summary: "Generate a typed TypeScript-facing client for JSON APIs served by Z+.",
     body: [
       ["Status and scope", "ZTS is an experimental interoperability workflow, not a new language mode or a TypeScript compiler. It uses existing TypeScript and npm tooling together with the Z+ web interoperability generator. The generator produces a JavaScript Fetch client and a matching `.d.ts` declaration file from an OpenAPI JSON contract."],
-      ["Version and changelog", "ZTS has no separate stable release or binary. The private generator package is version 0.1.0 and experimental. Initial changelog: generate a Fetch ES module and matching TypeScript declarations from supported OpenAPI 3.0/3.1 JSON. No standalone ZTS compiler or downloadable binary is published."],
-      ["Install and generate", "The generator is not published to npm. From a frontend project beside a checkout of this repository, install `../Z-lang-release/tools/zplus-web-interop` as a development dependency, then run `npx zplus-web-interop generate api/openapi.json --out src/generated`. The generator writes `zplus-api.js` and `zplus-api.d.ts`; it refuses to overwrite either unless `--force` is supplied."],
+      ["Version and changelog", "ZTS has no separate stable release or binary. The generator is experimental and unpublished. Its documented first version generates a Fetch ES module and matching TypeScript declarations from supported OpenAPI 3.0/3.1 JSON. No standalone ZTS compiler or downloadable binary is published."],
+      ["Install and generate", "The generator is not currently published to npm or offered as a download on this website. No installation link is provided until an official distributable is available. Its documented interface generates `zplus-api.js` and `zplus-api.d.ts` and refuses to overwrite either unless `--force` is supplied."],
       ["Typed operations and shared data", "OpenAPI `components.schemas` become TypeScript types. Supported schemas include local references, objects, arrays, primitives, literal enums, nullable types, and oneOf/anyOf/allOf compositions. Path, query, and header parameters and JSON request bodies become typed operation inputs. This provides shared contract types, but does not inspect Z+ source or prove that server routes match the contract."],
       ["Call a Z+ API", "Import `createClient` from `./generated/zplus-api.js`, create a client with `baseUrl`, then call `await api.getGreeting({ path: { name: \"Ada\" }, query: { locale: \"en\" } })`. Responses are checked by TypeScript through the generated declaration. Non-2xx responses reject with `ApiError`; network, abort, and invalid JSON failures are not converted into successful empty values."],
       ["Connect the Z+ server", "ZWeb provides JSON request/response helpers, route matching, and explicit CORS configuration. Serve the OpenAPI contract and implement each described route with the existing `serverNext`, `routeMatch`, and `serverRespondJson` APIs. For browser cookie sessions, configure Fetch `credentials: \"include\"` and matching credential-aware CORS at the trusted deployment boundary."],
@@ -585,8 +846,8 @@ start {
     summary: "Use a generated ES module client with native JavaScript Fetch and browser tools.",
     body: [
       ["Status and scope", "ZJS is an experimental JavaScript interoperability workflow, not a JavaScript runtime or a backend language. It generates an ES module that calls JSON endpoints implemented by a Z+ server. The generated client uses the standard Fetch API and has no runtime dependency."],
-      ["Version and changelog", "ZJS has no separate stable release or binary. The private generator package is version 0.1.0 and experimental. Initial changelog: generate an ES module Fetch client from supported OpenAPI 3.0/3.1 JSON. No standalone ZJS runtime or downloadable binary is published."],
-      ["Install and generate", "The generator is not published to npm. Install the local package from a repository checkout with `npm install --save-dev ../Z-lang-release/tools/zplus-web-interop`, then run `npx zplus-web-interop generate api/openapi.json --out src/generated`. Import the generated client from `./generated/zplus-api.js` in an existing ES module or npm application."],
+      ["Version and changelog", "ZJS has no separate stable release or binary. The generator is experimental and unpublished. Its documented first version generates an ES module Fetch client from supported OpenAPI 3.0/3.1 JSON. No standalone ZJS runtime or downloadable binary is published."],
+      ["Install and generate", "The generator is not currently published to npm or offered as a download on this website. No installation link is provided until an official distributable is available. When the generator is available in a developer environment, its command is `zplus-web-interop generate api/openapi.json --out src/generated`; import the generated client from `./generated/zplus-api.js`."],
       ["Use JavaScript modules", "Create a client with `createClient({ baseUrl: \"https://api.example.test\" })` and call generated operations with `await api.getGreeting({ path: { name: \"Ada\" } })`. Use the caller's existing JavaScript module system, bundler, and npm packages; this tool does not rewrite or bundle the rest of the application."],
       ["Promises, browser APIs, and errors", "Generated operations return Promises and accept an optional `AbortSignal`. Use browser-native DOM, events, WebSocket, and other Web APIs directly. The generated client does not polyfill browser APIs or add a Z+ WebSocket feature. HTTP error responses reject with `ApiError`, including status, body, and the original response."],
       ["Authentication and transport", "Supply bearer headers through the client's `headers` option, or select `credentials: \"include\"` for same-origin or explicitly CORS-enabled cookie sessions. Never put private credentials in browser bundles. The browser may use HTTPS through a trusted host or reverse proxy; the current Z+ `zhttp` client itself only accepts `http://` URLs."],

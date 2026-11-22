@@ -1,5 +1,6 @@
 {
   "name": "zplus-official-website",
+  "license": "Apache-2.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -7,6 +8,7 @@
   },
   "scripts": {
     "start": "node server.mjs",
+    "check": "node --check app.js && node --check content.js && node --check ecosystem-content.js && node --check release-notes.js && node --check server.mjs",
     "test": "node --test",
     "test:client": "node tests/registry-client-e2e.mjs"
   },

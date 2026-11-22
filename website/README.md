@@ -1,6 +1,8 @@
-# Z+ official website
+# Official Z+ website
 
-The website preserves the existing static home page, downloads, learning course, technical reference, wiki, examples, and release information. The package portal is integrated into the same responsive interface. Page content lives in `content.js`; route rendering and package UI live in `app.js`; presentation is in `styles.css`. The `/api/registry` function and SQL migration add the package registry without replacing the existing static server.
+The official website is a static single-page application with a local Node development server. It presents the Z+ language, implementation-aware documentation, real release downloads, the learning course, examples, and the live package registry. The toolchain has dedicated compiler, ZPM, ZPBuild, VS Code, and ZGraphics pages. Existing registry, account, package publishing, and course progress workflows remain in the same app. First-party website source is licensed under Apache-2.0; bundled third-party code retains its own notices.
+
+The page shell and metadata are in `index.html`; learning/reference content is in `content.js`; product facts are in `ecosystem-content.js`; client routing, release handling, and registry UI live in `app.js`; presentation is in `styles.css`. The package registry API and database migrations remain in `api/`, `lib/`, and `migrations/`.
 
 ## Run locally
 
@@ -12,7 +14,7 @@ node website\server.mjs
 
 Open `http://localhost:8000`. Set the `PORT` environment variable to use another port. `_redirects` supplies a Netlify rewrite; `404.html` recovers deep links on static hosts that serve a root-level 404 page. Deploy the contents of this directory at the domain root and configure host fallback/rewrite behavior for `index.html`.
 
-No build step or external client service is used. Release information is fetched from the public GitHub Releases API for `MiroXdev0/ZPluse-release`; release-note HTML is sanitized in the browser with the locally served DOMPurify 3.4.18 bundle. The bundled sanitizer is tracked alongside its npm dependency and should be refreshed from `node_modules/dompurify/dist/purify.min.js` when updating that dependency. The official Releases page is shown as a fallback. Progress is stored in this browser's local storage.
+There is no client-side compile/build step. Release information is fetched from the official GitHub Releases API; only uploaded assets from the official release repository are linked. Release-note HTML continues to render as HTML and is sanitized in the browser with the locally served DOMPurify 3.4.18 bundle. The bundled sanitizer is tracked alongside its npm dependency and should be refreshed from `node_modules/dompurify/dist/purify.min.js` when updating that dependency. The official Releases page is shown as a fallback. Course progress is stored in this browser's local storage.
 
 The shared transparent logo artwork is maintained in the repository's `logo/` directory. The website header uses the dark-surface artwork; the favicon selects the corresponding light or dark artwork from the visitor's color-scheme preference.
 
@@ -72,7 +74,7 @@ publishing, and archive download. CLI login returns a revocable bearer token;
 the browser uses an HttpOnly session cookie. Passwords are stored as scrypt
 hashes. Account email verification and password recovery are not provided.
 
-Run `npm install` and `npm test` from this directory. The tests use PGlite and
+Run `npm install`, `npm run check`, and `npm test` from this directory. The tests use PGlite and
 a private-storage adapter mock. `npm run test:client -- ..\build\Release\zpm.exe
 ..\build\Release\zpbuild.exe ..\build\Release\zp.exe` exercises the ZPM client
 against an isolated local registry. These tests do not deploy the site or
@@ -84,7 +86,11 @@ no `npm run build` script.
 
 ## Accuracy and scope
 
-The learning course has 52 numbered lessons. The syntax, examples, backend limits, and module behavior are grounded in the repository's current `docs/syntax.md`, `MODULES.md`, `docs/ZBUILD.md`, and `stdlib/README.md`. The reference identifies features that are not implemented rather than presenting them as available. Examples are intended to be checked with `zp check`; interpreter/native support can differ.
+The learning course has 54 numbered lessons. The documentation sidebar covers getting started, language syntax, types, functions, classes and visibility, enums, structs, modules, errors, both execution modes, standard-library use, CLI, ZPM, ZPBuild, the VS Code extension, and ZGraphics. Technical content is grounded in the checked-in `SYNTAX.md`, `MODULES.md`, `docs/ZBUILD.md`, `stdlib/README.md`, extension README/metadata, and ZGraphics guide. Backend limits and unavailable downloads are called out. The Wiki has three destinations: the Z+ Syntax reference, The Idea Behind Z+, and What Is Z+ Used For? Its technical reference is organized from the root compiler `SYNTAX.md`, then checked against implementation and tests where the specification notes limitations. Every lesson links back to the syntax reference; multi-file examples display their companion `.zh` source.
+
+The downloads page reads published release information from the official release API and distinguishes the Windows x64 installer from unavailable platform or extension packages. Page titles, descriptions, Open Graph tags, canonical URLs, `robots.txt`, and `sitemap.xml` support sharing and indexing.
+
+`npm run check` verifies JavaScript syntax. `npm test` covers the registry, release-note sanitizer, website routes, metadata, documentation filtering, clipboard behavior, download assets, and mobile navigation. There is no automated browser-based visual-diff or accessibility scanner in this project yet; do a manual viewport review before deployment.
 
 The existing static interface and its content remain the website foundation; the small Vercel function is limited to registry API routes.
 

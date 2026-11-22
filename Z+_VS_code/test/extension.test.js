@@ -335,12 +335,12 @@ test("manifest, grammar, language configuration and snippets are loadable", () =
     assert.equal(manifest.version, "1.3.4");
     assert.equal(manifest.name, "zplus-language");
     assert.equal(manifest.publisher, "Miroxdev0");
-    assert.equal(manifest.license, "SEE LICENSE IN LICENSE.txt");
+    assert.equal(manifest.license, "Apache-2.0");
     assert.equal(manifest.homepage, "https://zpluse.vercel.app/");
     assert.equal(Object.hasOwn(manifest, "repository"), false);
     assert.equal(Object.hasOwn(manifest, "bugs"), false);
     assert.ok(manifest.description.length > 20);
-    assert.match(manifest.description, /proprietary Z\+/i);
+    assert.doesNotMatch(manifest.description, /proprietary/i);
     const marketplaceText = [
         manifest.description,
         fs.readFileSync(path.join(extensionRoot, "README.md"), "utf8"),
@@ -359,7 +359,7 @@ test("manifest, grammar, language configuration and snippets are loadable", () =
         fs.readFileSync(path.join(projectRoot, "LICENSE.txt")),
         "extension terms must match the official root Z+ license exactly"
     );
-    assert.match(fs.readFileSync(extensionLicensePath, "utf8"), /^Z\+ PROPRIETARY SOFTWARE LICENSE/m);
+    assert.match(fs.readFileSync(extensionLicensePath, "utf8"), /Apache License\s+Version 2\.0/m);
     assert.deepEqual(manifest.dependencies || {}, {}, "the runtime has no external npm dependencies");
     assert.deepEqual(manifest.contributes.taskDefinitions[0].properties.command.enum,
         ["build", "run", "test"]);

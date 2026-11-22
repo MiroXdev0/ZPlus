@@ -4,12 +4,23 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="dark">
-    <meta name="description" content="Discover, download, learn, and build with the Z+ programming language.">
+    <meta name="theme-color" content="#101112">
+    <meta name="description" content="The official home of Z+: language documentation, compiler downloads, developer tools, and practical guides.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Z+">
+    <meta property="og:title" content="Z+ — A language, from first program to real projects">
+    <meta property="og:description" content="Learn Z+ syntax, study practical examples, and explore official developer tools.">
+    <meta property="og:url" content="https://zpluse.vercel.app/">
+    <meta property="og:image" content="https://zpluse.vercel.app/assets/favicon-dark.png">
+    <meta property="og:image:alt" content="Z+ programming language emblem">
+    <meta name="twitter:card" content="summary">
+    <link rel="canonical" href="https://zpluse.vercel.app/">
     <title>Z+ — A language, from first program to real projects</title>
     <link rel="icon" type="image/png" href="/assets/favicon-light.png" sizes="512x512" media="(prefers-color-scheme: light)">
     <link rel="icon" type="image/png" href="/assets/favicon-dark.png" sizes="512x512" media="(prefers-color-scheme: dark)">
     <link rel="stylesheet" href="/styles.css">
     <script defer src="/content.js"></script>
+    <script defer src="/ecosystem-content.js"></script>
     <script defer src="/vendor/purify.min.js"></script>
     <script defer src="/release-notes.js"></script>
     <script defer src="/app.js"></script>
@@ -18,7 +29,7 @@
     <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-header">
       <a class="brand" href="/" aria-label="Z+ home"><img class="brand-logo" src="/assets/zplus-logo-dark.png" alt=""><span class="brand-word">Language</span></a>
-      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-nav">Menu</button>
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" aria-label="Open navigation">Menu</button>
       <nav id="primary-nav" class="primary-nav" aria-label="Main navigation">
         <a href="/download">Download</a>
         <a href="/learn">Learn</a>
@@ -30,8 +41,8 @@
         <a href="/packages">Packages</a>
         <a href="/dashboard">Account</a>
       </nav>
-      <label class="site-search"><span class="sr-only">Search Z+ resources</span><span aria-hidden="true">⌕</span><input id="site-search" type="search" placeholder="Search resources" autocomplete="off"></label>
-      <div id="search-results" class="search-results" role="listbox" aria-label="Search results" hidden></div>
+      <label class="site-search"><span class="sr-only">Search Z+ resources</span><span aria-hidden="true">⌕</span><input id="site-search" type="search" placeholder="Search resources" autocomplete="off" aria-controls="search-results" aria-expanded="false"></label>
+      <div id="search-results" class="search-results" role="listbox" aria-label="Search results" aria-live="polite" hidden></div>
     </header>
     <main id="main" tabindex="-1"></main>
     <footer id="site-footer" class="site-footer"></footer>

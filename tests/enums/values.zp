@@ -1,0 +1,26 @@
+start {
+    enum State {
+        Idle,
+        Running = 4,
+        Finished,
+        Negative = -2,
+        Binary = 0b101,
+        Hex = 0x10,
+        AfterHex
+    } end enum
+
+    fn echo(value: State) -> State {
+        return value
+    } end fn
+
+    let state: State = State.Idle
+    say(state == State.Idle)
+    state = echo(State.Running)
+    say(state == State.Running)
+    say(state != State.Finished)
+    say(State.Finished)
+    say(State.Negative)
+    say(State.Binary)
+    say(State.Hex)
+    say(State.AfterHex)
+} stop

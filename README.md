@@ -1,16 +1,20 @@
-<p align="center">
-  <img src="logo/Z%2B%20Emblem%20-%20for%20ligth%20theme.png" width="460" alt="Z+ emblem">
-</p>
-
 # Z+
 
-Z+ is a small compiled language with a lexer, parser, semantic analyzer, shared intermediate representation, interpreter, and an x86-64 native backend.
+Z+ is a statically typed programming language implemented in C++20. The compiler includes a lexer, parser, semantic analyzer, shared intermediate representation, interpreter, and an x86-64 native backend. The compiler and first-party materials in this repository are licensed under Apache License 2.0; third-party components retain their own licenses. See [LICENSE](./LICENSE) and [NOTICE](./NOTICE).
 
-The current compiler release is **1.3.5 Stable**. The Windows x64 per-user
-installer and release build instructions are documented in
-[installer/inno/README.md](./installer/inno/README.md).
+The compiler source version in this checkout is **1.4.0**. The latest stable release metadata may describe an earlier version; consult the official [release page](https://github.com/MiroXdev0/ZPluse-release/releases) before downloading binaries.
 
-## Build
+## Capabilities
+
+- Typed variables, functions, control flow, arrays, classes, visibility modifiers, enums, structs, and constrained generics.
+- Interpreter execution and native x86-64 compilation. Supported features differ by operating system and backend; see [NATIVE_BACKEND.md](./NATIVE_BACKEND.md) and [SYNTAX.md](./SYNTAX.md).
+- File-based `.zh` modules and `use` imports.
+- Standard library modules for text, files, paths, math, time, JSON, HTTP, SQLite, graphics, audio, physics, and other integrations. Availability depends on platform and dependencies.
+- ZPBuild project build orchestration and ZPM package tooling.
+
+## Build from source
+
+Requirements: CMake 3.20 or newer, a C++20 compiler, Git, and platform development libraries. Linux builds require libcurl and X11 development files. CMake fetches pinned Box2D and miniaudio source versions during configuration, so the first configure requires network access. Windows builds use the Visual Studio C++ toolchain. Optional installer and distribution tools have their own requirements documented under `installer/`.
 
 ```powershell
 cmake -S . -B build
@@ -18,69 +22,39 @@ cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-The CTest suite includes the root `test.zp` feature tour. It runs under the
-interpreter on every host and compares interpreter/native output on Windows x64.
+On single-configuration generators, omit `--config Release` from build and test commands. The compiler is `build\Release\zp.exe` on Windows Visual Studio builds and `build/zp` on Linux. ZPM and ZPBuild targets are `zpm` and `zpbuild`; `zbuild` is retained as a compatibility alias.
 
-The compiler executable is `build\Release\zp.exe` on Windows Visual Studio builds and `build\zp` on Linux.
-Every successful Release build also synchronizes that executable to `bin\zp.exe` on Windows or `bin/zp` on Linux. Debug builds skip the copy. The synchronization runs after the compiler target succeeds and replaces the destination only with the Release artifact.
+## Run a program
 
-The standalone Z+ project build system is ZPBuild 1.0.0, invoked as `zpbuild` (`zpbuild.exe` on Windows); `zbuild` remains available as a compatibility alias. It supports compiler-resolved dependency tracking, incremental target builds, bounded parallel execution, build planning, and persistent cache inspection. ZPM 1.0.0 adds local package management and is copied alongside the compiler and build tools on Release builds. See [ZBUILD.md](./docs/ZBUILD.md) for project builds and [ZPM.md](./docs/ZPM.md) for the local package workflow and online-registry limitations.
-
-## Use the compiler
-
-```powershell
-build\Release\zp.exe check main.zp
-build\Release\zp.exe run main.zp
-build\Release\zp.exe build main.zp -o main.exe
-```
-
-`check` validates the complete module graph, `run` executes through the interpreter, and `build` creates a native executable for the host. Native compilation supports only the subset listed in [NATIVE_BACKEND.md](./NATIVE_BACKEND.md) and never falls back to the interpreter.
-
-The `read()`, `read_number()`, `read_integer()`, and `read_boolean()` terminal
-input built-ins are available without imports. Each accepts an optional string
-prompt that is flushed before input is read; the zero-argument forms remain
-supported. The interpreter and native Windows programs share line and typed
-conversion behavior. Linux native support is implemented but has not been
-execution-tested in this environment. See
-[the interactive input example](./examples/interactive_input.zp) and
-[SYNTAX.md](./SYNTAX.md#10-built-in-functions) for parsing and EOF behavior.
-
-The generic `length(array)` and numeric `to_string(number)` built-ins are
-available without imports. The interpreter supports them directly; Windows
-x64 native programs support both through the packaged runtime. See the
-[built-in function reference](./SYNTAX.md#10-built-in-functions).
-
-Z+ 1.3.5 supports generic functions, structs, and classes with inferred or
-explicit type arguments. Concrete specializations are generated for both the
-interpreter IR and Windows x64 native backend. The `zcollections` module
-provides generic `List`, `Stack`, `Queue`, `Set`, `Map`, and `Optional` types;
-see [the syntax reference](./SYNTAX.md#generic-declarations-and-types) and
-[standard-library documentation](./stdlib/README.md#zcollections-as-collections).
-
-## Modules
-
-Import `.zh` declarations with a module-relative `use`. Modules are private by default; `pub` exposes declarations. Use the filename-derived module name or an explicit alias:
-
-```zp
-use "stdlib/math/math.zh" as math
-
+```zplus
 start {
-    say(math.clamp(22, 0, 10))
+    say("Hello, Z+!")
 } stop
 ```
 
-Paths are resolved relative to the file containing each `use`, not the process working directory. Imports can nest and repeated references to the same canonical file load it once. Absolute module paths are denied. `.zh` files must have one `start` block containing declarations only; the loader extracts those declarations without executing the block. See [MODULES.md](./MODULES.md) for graph behavior, visibility, diagnostics, and limitations.
+Save as `hello.zp`, then:
 
-## Standard library
+```text
+zp check hello.zp
+zp run hello.zp
+zp build hello.zp -o hello
+```
 
-The standard library in [stdlib/](./stdlib/) includes math, strings,
-collections, file/path/system APIs, JSON, HTTP, SQLite, graphics, audio,
-physics, and installer integrations. Backend and platform support varies by
-module; see [stdlib/README.md](./stdlib/README.md) for the API inventory and
-limitations.
+`check` validates the module graph, `run` uses the interpreter, and `build` emits a native executable only for the selected platform’s supported subset. Native compilation does not fall back to interpretation.
 
-## ZGraphics
+## Modules and tools
 
-The `zgraphics` module provides real Win32/GDI windows and drawing on Windows, and X11 windows through the interpreter on Linux. On Windows, `zp build` links calls to the packaged native runtime and places `zgraphics_runtime.dll` beside the generated executable. Distribute both files together. Linux native graphics linking, native controls, and callbacks are not implemented. See [ZGraphics/README.md](./ZGraphics/README.md) and the runnable-source examples in [examples/zgraphics/](./examples/zgraphics/).
+Import relative `.zh` modules with `use`, for example `use "helpers.zh" as helpers`. Module paths resolve relative to the importing file. Public exports use `pub`. See [MODULES.md](./MODULES.md).
 
-The VS Code extension is in [Z+_VS_code](./Z+_VS_code); compiler syntax details are in [SYNTAX.md](./SYNTAX.md).
+- [Language syntax](./SYNTAX.md) and [standard library](./stdlib/README.md)
+- [ZPBuild](./docs/ZBUILD.md) and [ZPM](./docs/ZPM.md)
+- [ZGraphics](./ZGraphics/README.md)
+- [Windows installer](./installer/inno/README.md)
+
+## Contributing
+
+Read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening a pull request. Bug reports and feature proposals should include a minimal source example, the exact command, operating system, backend, compiler version, and observed versus expected result. Security issues should follow [SECURITY.md](./SECURITY.md).
+
+## License
+
+First-party Z+ source, documentation, tests, examples, and tools in this repository are offered under Apache License 2.0. Third-party dependencies, embedded resources, and historical release payloads may carry separate terms; consult [NOTICE](./NOTICE) and the applicable per-component notices. Z+ names and logos remain trademarks and are not licensed by Apache-2.0.

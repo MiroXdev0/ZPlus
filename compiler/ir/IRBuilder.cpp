@@ -1295,6 +1295,24 @@ void IRBuilder::buildVariable(
                 }
             }
         );
+    } else if (target.type.kind == zplus::semantic::TypeKind::Custom) {
+        const StructType* structure = module.findStructType(target.type.name);
+        if (structure && std::all_of(
+                structure->fields.begin(), structure->fields.end(),
+                [](const StructField& field) { return field.hasDefault; })) {
+            Instruction instruction{"struct_new", nextTemporary()};
+            instruction.resultType = target.type;
+            instruction.genericTypeArguments = target.type.arguments;
+            Value structType{structure->name};
+            structType.type = target.type;
+            instruction.operands.push_back(std::move(structType));
+            for (const StructField& field : structure->fields) {
+                instruction.operands.push_back(field.defaultValue);
+            }
+            const Value value{instruction.result};
+            currentBlock->emit(std::move(instruction));
+            currentBlock->emit(Instruction{"store", {}, {target, value}});
+        }
     }
 
     if (statement.isConst) {
@@ -2874,31 +2892,17 @@ void IRBuilder::buildEnum(
     }
 
     module.types.push_back(typeName);
-    double nextValue = 0.0;
     for (const auto& member : statement.values) {
         if (!member) continue;
-
-        double numericValue = nextValue;
-        if (member->value) {
-            const zplus::ast::Literal* literal =
-                as<zplus::ast::Literal>(member->value.get());
-            double sign = 1.0;
-            if (const auto* unary =
-                    as<zplus::ast::UnaryExpression>(member->value.get())) {
-                if (unary->operatorType == zplus::TokenType::Minus) {
-                    sign = -1.0;
-                }
-                literal = as<zplus::ast::Literal>(unary->operand.get());
-            }
-            if (!literal || literal->kind != zplus::ast::Literal::Kind::Number ||
-                !zplus::numeric::parseLiteral(literal->value, numericValue)) {
-                throw std::runtime_error(
-                    "enum values must be numeric literals");
-            }
-            numericValue *= sign;
+        if (!member->resolvedValue) {
+            throw std::runtime_error(
+                "enum member has no semantically resolved integer value");
         }
 
-        Value value{std::to_string(numericValue), Value::Kind::Number};
+        const double numericValue =
+            static_cast<double>(*member->resolvedValue);
+        Value value{std::to_string(*member->resolvedValue), Value::Kind::Number};
+        value.type = zplus::semantic::Type::custom(canonicalName);
         value.numericValue = numericValue;
         value.hasNumericValue = true;
         const std::string memberName = statement.name + "." + member->name;
@@ -2907,7 +2911,6 @@ void IRBuilder::buildEnum(
             module.enumConstants[statement.moduleName + "." + memberName] = value;
             module.enumConstants[canonicalName + "." + member->name] = value;
         }
-        nextValue = numericValue + 1.0;
     }
 }
 

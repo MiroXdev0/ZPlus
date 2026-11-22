@@ -1,0 +1,6 @@
+start {
+    enum State {
+        Ready
+    } end enum
+    let numericValue: number = State.Ready
+} stop

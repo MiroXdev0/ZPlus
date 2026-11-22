@@ -1,0 +1,26 @@
+Z+ Programming Language
+Copyright 2026 Miroslav Aleksandrov
+
+First-party source and materials in this repository are licensed under the
+Apache License, Version 2.0. The license is in LICENSE.
+
+Third-party components are not relicensed by this notice. Relevant source or
+distribution notices include:
+
+- Box2D and miniaudio: pinned upstream sources fetched by CMake; distribution
+  notices and license texts are kept under release/windows/payload/
+  THIRD-PARTY-NOTICES/ and installer/windows-C#/ where applicable.
+- stb_vorbis: its upstream source identifies the code as public domain; see
+  release/windows/payload/THIRD-PARTY-NOTICES/stb_vorbis-NOTICE.txt.
+- SQLite: the release distribution carries the upstream public-domain notice
+  at release/windows/payload/THIRD-PARTY-NOTICES/SQLite-LICENSE.txt.
+- DOMPurify and bundled regenerator-runtime: the website vendor bundle retains
+  its upstream license comments; dependency licenses are also recorded in
+  website/package-lock.json.
+- The Windows setup bundles .NET components under Microsoft's terms; see
+  release/windows/LICENSE-DOTNET.txt and
+  release/windows/THIRD-PARTY-NOTICES-DOTNET.txt.
+
+Historical release artifacts and payloads retain the license files shipped
+with those releases. Their contents are not changed by the current source
+license declaration.

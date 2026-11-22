@@ -889,6 +889,21 @@ if(BUILD_TESTING)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/classes/run_class_system.cmake"
     )
     add_test(
+        NAME enum_support
+        COMMAND ${CMAKE_COMMAND}
+            "-DZP=$<TARGET_FILE:zp>"
+            "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/enum-test-output"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/enums/run_enum_tests.cmake"
+    )
+    add_test(
+        NAME struct_support
+        COMMAND ${CMAKE_COMMAND}
+            "-DZP=$<TARGET_FILE:zp>"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/struct-test-output"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/structs/run_struct_tests.cmake"
+    )
+    add_test(
         NAME standard_library_integration
         COMMAND ${CMAKE_COMMAND}
             -DZP=$<TARGET_FILE:zp>

@@ -1,7 +1,8 @@
 Z+ Windows Release — Third-Party Notices
 
-Z+ is proprietary software. The following separately licensed materials are
-included in or distributed with the Windows x64 compiler/runtime and setup:
+The first-party Z+ compiler and runtime are licensed under Apache-2.0. The
+following separately licensed materials are included in or distributed with
+the Windows x64 compiler/runtime and setup:
 
 1. Box2D v3.1.1 — physics runtime
    The upstream MIT license is included as
@@ -32,6 +33,6 @@ included in or distributed with the Windows x64 compiler/runtime and setup:
    The compiler and runtimes link to Windows system libraries. Windows itself
    and its system components remain governed by their own Microsoft terms.
 
-These components are not owned by Miroslav Aleksandrov. Their respective
-licenses apply independently and are not changed by LICENSE.txt. See the
+These components retain their respective independent licenses, which are not
+changed by the Z+ Apache-2.0 license. See the
 named files in THIRD-PARTY-NOTICES/ and the release-root .NET notices.

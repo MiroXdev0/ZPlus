@@ -1,0 +1,5 @@
+start {
+    enum First { One } end enum
+    enum Second { One } end enum
+    say(First.One == Second.One)
+} stop

@@ -1,0 +1,42 @@
+name: Bug report
+description: Report a reproducible problem in Z+ or its tools.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: For security vulnerabilities, use the private reporting instructions in SECURITY.md instead.
+  - type: input
+    id: component
+    attributes:
+      label: Component and version
+      placeholder: Compiler 1.4.0, ZPM 1.0.0, ZPBuild 1.0.0
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system and architecture
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include source code and the exact command.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Diagnostics or logs
+      render: text
+    validations:
+      required: false

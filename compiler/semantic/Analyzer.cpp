@@ -1,7 +1,10 @@
 #include "Analyzer.hpp"
 
 #include <algorithm>
+#include <charconv>
+#include <cstdint>
 #include <sstream>
+#include <string_view>
 #include <utility>
 
 namespace zplus::semantic {
@@ -27,6 +30,53 @@ bool hasTypeParameter(const Type& type) {
         if (hasTypeParameter(parameter)) return true;
     }
     return type.returnType && hasTypeParameter(*type.returnType);
+}
+
+constexpr std::int64_t kMaxExactEnumValue = 9007199254740991LL;
+
+bool parseEnumInteger(
+    const zplus::ast::Expression& expression,
+    std::int64_t& value
+) {
+    const zplus::ast::Literal* literal = as<zplus::ast::Literal>(&expression);
+    bool negative = false;
+    if (const auto* unary = as<zplus::ast::UnaryExpression>(&expression)) {
+        if (unary->operatorType != zplus::TokenType::Minus &&
+            unary->operatorType != zplus::TokenType::Plus) {
+            return false;
+        }
+        negative = unary->operatorType == zplus::TokenType::Minus;
+        literal = as<zplus::ast::Literal>(unary->operand.get());
+    }
+    if (!literal || literal->kind != zplus::ast::Literal::Kind::Number) {
+        return false;
+    }
+
+    const std::string_view spelling = literal->value;
+    int base = 10;
+    std::size_t prefixLength = 0;
+    if (spelling.size() > 2 && spelling[0] == '0' &&
+        (spelling[1] == 'x' || spelling[1] == 'X')) {
+        base = 16;
+        prefixLength = 2;
+    } else if (spelling.size() > 2 && spelling[0] == '0' &&
+               (spelling[1] == 'b' || spelling[1] == 'B')) {
+        base = 2;
+        prefixLength = 2;
+    }
+    if (prefixLength == spelling.size()) return false;
+
+    std::uint64_t magnitude = 0;
+    const char* begin = spelling.data() + prefixLength;
+    const char* end = spelling.data() + spelling.size();
+    const auto parsed = std::from_chars(begin, end, magnitude, base);
+    if (parsed.ec != std::errc{} || parsed.ptr != end ||
+        magnitude > static_cast<std::uint64_t>(kMaxExactEnumValue)) {
+        return false;
+    }
+    value = static_cast<std::int64_t>(magnitude);
+    if (negative) value = -value;
+    return true;
 }
 
 } // namespace
@@ -2370,6 +2420,18 @@ void Analyzer::analyzeStruct(
     pushGenericTypeParameters(statement.genericParameters, declaredTypeName);
     std::unordered_set<std::string> fieldNames;
     bool optionalFieldSeen = false;
+    const auto hasUnknownNominalType = [this](
+        const auto& self, const Type& type) -> bool {
+        if (type.kind == TypeKind::Custom && type.name != "Error" &&
+            !userTypes_.contains(type.name)) {
+            return true;
+        }
+        if (type.elementType && self(self, *type.elementType)) return true;
+        for (const Type& argument : type.arguments) {
+            if (self(self, argument)) return true;
+        }
+        return false;
+    };
     for (const auto& field :
          statement.fields) {
 
@@ -2394,6 +2456,12 @@ void Analyzer::analyzeStruct(
 
             const Type fieldType = resolveType(*field->type);
             field->resolvedType = fieldType;
+            if (hasUnknownNominalType(hasUnknownNominalType, fieldType)) {
+                error(*field->type,
+                      "unknown type '" + typeName(fieldType) +
+                          "' for struct field '" + field->name + "'",
+                      zplus::DiagnosticCategory::Type);
+            }
             if (field->defaultValue) {
                 const Type defaultType = expressionType(*field->defaultValue);
                 if (!isAssignable(fieldType, defaultType)) {
@@ -2408,6 +2476,14 @@ void Analyzer::analyzeStruct(
             }
         } else if (field->defaultValue) {
             field->resolvedType = expressionType(*field->defaultValue);
+            if (!as<zplus::ast::Literal>(field->defaultValue.get())) {
+                error(*field,
+                      "struct field defaults must currently be literals");
+            }
+        } else {
+            error(*field, "struct field '" + field->name +
+                              "' requires a type or default value",
+                  zplus::DiagnosticCategory::Type);
         }
     }
     popGenericTypeParameters();
@@ -2494,6 +2570,7 @@ void Analyzer::analyzeEnum(
 ) {
 
     std::unordered_set<std::string> memberNames;
+    std::int64_t nextValue = 0;
     for (const auto& value :
          statement.values) {
 
@@ -2504,36 +2581,27 @@ void Analyzer::analyzeEnum(
         }
 
         if (value->value) {
-
-            Type valueType =
-                expressionType(
-                    *value->value
-                );
-
-            if (
-                !isNumeric(valueType) &&
-                !isUnknown(valueType)
-            ) {
-
-                error(
-                    *value,
-                    "enum value must be numeric"
-                );
+            std::int64_t explicitValue = 0;
+            if (!parseEnumInteger(*value->value, explicitValue)) {
+                error(*value,
+                      "enum values must be integer literals in the exactly "
+                      "representable range -9007199254740991 through "
+                      "9007199254740991",
+                      zplus::DiagnosticCategory::Type);
+                value->resolvedValue = 0;
+                continue;
             }
-
-            const auto* literal = as<zplus::ast::Literal>(value->value.get());
-            const auto* signedLiteral =
-                as<zplus::ast::UnaryExpression>(value->value.get());
-            const auto* signedNumber = signedLiteral &&
-                    (signedLiteral->operatorType == zplus::TokenType::Minus ||
-                     signedLiteral->operatorType == zplus::TokenType::Plus)
-                ? as<zplus::ast::Literal>(signedLiteral->operand.get())
-                : nullptr;
-            if ((!literal || literal->kind != zplus::ast::Literal::Kind::Number) &&
-                (!signedNumber ||
-                 signedNumber->kind != zplus::ast::Literal::Kind::Number)) {
-                error(*value, "enum values must be numeric literals");
-            }
+            value->resolvedValue = explicitValue;
+            nextValue = explicitValue + 1;
+        } else if (nextValue > kMaxExactEnumValue) {
+            error(*value,
+                  "automatic enum value exceeds the exactly representable "
+                  "integer range",
+                  zplus::DiagnosticCategory::Type);
+            value->resolvedValue = 0;
+        } else {
+            value->resolvedValue = nextValue;
+            ++nextValue;
         }
     }
 }
@@ -3487,13 +3555,25 @@ Type Analyzer::typeOfCall(
 
     const auto* calleeIdentifier =
         as<zplus::ast::Identifier>(expression.callee.get());
-    if (calleeIdentifier) {
+    const auto* qualifiedRecordMember =
+        as<zplus::ast::MemberExpression>(expression.callee.get());
+    const auto* moduleQualifier = qualifiedRecordMember
+        ? as<zplus::ast::Identifier>(qualifiedRecordMember->object.get())
+        : nullptr;
+    const bool qualifiedRecordCall =
+        qualifiedRecordMember && moduleQualifier;
+    if (calleeIdentifier || qualifiedRecordCall) {
         const std::string sourceModule =
             moduleNameForFile(expression.location.sourceFile);
-        std::string structKey = calleeIdentifier->name;
-        if (!sourceModule.empty()) {
+        const std::string recordName = calleeIdentifier
+            ? calleeIdentifier->name
+            : qualifiedRecordMember->member;
+        std::string structKey = qualifiedRecordCall
+            ? moduleQualifier->name + "::" + recordName
+            : recordName;
+        if (calleeIdentifier && !sourceModule.empty()) {
             const std::string localKey =
-                sourceModule + "::" + calleeIdentifier->name;
+                sourceModule + "::" + recordName;
             if (structDeclarations_.contains(localKey) ||
                 classDeclarations_.contains(localKey)) {
                 structKey = localKey;
@@ -3611,6 +3691,17 @@ Type Analyzer::typeOfCall(
         const auto structure = structDeclarations_.find(structKey);
         if (structure != structDeclarations_.end()) {
             const auto& declaration = *structure->second;
+            if (!declaration.isPublic &&
+                declaration.moduleName != sourceModule) {
+                error(expression,
+                      "struct '" + declaration.name + "' is private to module '" +
+                          declaration.moduleName + "'",
+                      zplus::DiagnosticCategory::Type);
+                return Type::unknown();
+            }
+            if (qualifiedRecordCall) {
+                qualifiedRecordMember->resolvedName = structKey;
+            }
             const auto type = userTypes_.find(structKey);
             const Type declarationType = type == userTypes_.end()
                 ? Type::custom(structKey)
@@ -3642,8 +3733,20 @@ Type Analyzer::typeOfCall(
             return result;
         }
 
+        if (calleeIdentifier) {
+            const auto privateType = privateTypeOwners_.find(recordName);
+            if (privateType != privateTypeOwners_.end() &&
+                privateType->second != sourceModule) {
+                error(*calleeIdentifier,
+                      "struct '" + recordName + "' is private to module '" +
+                          privateType->second + "'",
+                      zplus::DiagnosticCategory::Type);
+                return Type::unknown();
+            }
+        }
+
         const auto klass = classDeclarations_.find(structKey);
-        if (klass != classDeclarations_.end()) {
+        if (calleeIdentifier && klass != classDeclarations_.end()) {
             const auto& declaration = *klass->second;
             const std::string canonicalName = declaration.moduleName.empty()
                 ? declaration.name
@@ -4110,6 +4213,14 @@ Type Analyzer::typeOfMember(
             (void)key;
             if (candidate && candidate->moduleName == moduleIdentifier->name &&
                 candidate->name == expression.member) {
+                if (!candidate->isPublic &&
+                    candidate->moduleName != sourceModule) {
+                    error(expression,
+                          "type '" + candidate->name + "' is private to module '" +
+                              candidate->moduleName + "'",
+                          zplus::DiagnosticCategory::Type);
+                    return Type::unknown();
+                }
                 return Type::custom(candidate->moduleName + "::" + candidate->name);
             }
         }
