@@ -692,7 +692,7 @@ start {
   ];
 
   const wiki = [
-    { id: "syntax", title: "Z+ Syntax", section: "Language reference", summary: "A navigable reference to the syntax and behavior documented in the compiler's SYNTAX.md.", body: [
+    { id: "syntax", title: "Z+ Syntax", section: "Language reference", summary: "A navigable reference to the syntax and behavior documented in docs/syntax.md and verified against the compiler.", body: [
       ["Program structure", "An executable `.zp` file contains one `start { ... } stop` block. Declarations belong inside it; `use` directives are at file scope. A `.zh` module has a declaration-only `start` block. Brace blocks require their matching kind-specific terminator, and legacy colon blocks cannot be mixed with brace blocks.", `start {
     fn greet(name: string): string {
         return "Hello, " + name
@@ -800,7 +800,7 @@ start {
     say(text.upper(text.trim(" z+ ")))
 } stop`],
       ["Compiler and execution behavior", "`zp check file.zp` validates through parsing, semantic analysis, and IR generation without running. `zp run file.zp` executes with the interpreter. `zp build file.zp` emits native code for the selected platform's supported subset and does not fall back to interpretation. Interpreter support is broader; Linux native support is narrower than Windows x64 for aggregates and some runtime integrations."],
-      ["Unsupported or limited constructs", "Pointer types and some pointer operators are parsed but do not have runtime support. `public` is reserved but unsupported as a modifier; there is no class inheritance, function-value type, match expression, map/set type, string interpolation, or cast operator. Consult the matching sections in the root `SYNTAX.md` for details and current backend tables."]
+      ["Unsupported or limited constructs", "Pointer types and some pointer operators are parsed but do not have runtime support. `public` is reserved but unsupported as a modifier; there is no class inheritance, function-value type, match expression, map/set type, string interpolation, or cast operator. Consult the matching sections in `docs/syntax.md` and the native backend guide for details and current backend tables."]
     ]},
     { id: "idea", title: "The Idea Behind Z+", section: "About Z+", summary: "The project’s approach to language design, compiler stages, and execution modes.", body: [
       ["Why Z+ exists", "The checked-in specification describes what the project implements, but it does not record a detailed origin story or a single founding problem statement. This page therefore focuses on the verifiable idea visible in the language and toolchain: a project-owned language with explicit syntax, compiler diagnostics, an interpreter, and a native code-generation path."],

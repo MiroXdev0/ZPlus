@@ -108,9 +108,11 @@ Copy-NonemptyTree -SourceDirectory (Join-Path $root 'stdlib') -DestinationDirect
 
 $docsDestination = Join-Path $payloadDir 'docs'
 New-Item -ItemType Directory -Path $docsDestination -Force | Out-Null
-foreach ($name in @('README.md', 'SYNTAX.md', 'MODULES.md', 'NATIVE_BACKEND.md')) {
+foreach ($name in @('README.md', 'MODULES.md', 'NATIVE_BACKEND.md')) {
     Copy-Item -LiteralPath (Join-Path $root $name) -Destination $docsDestination
 }
+Copy-Item -LiteralPath (Join-Path $root 'docs\syntax.md') `
+    -Destination (Join-Path $docsDestination 'SYNTAX.md')
 Copy-NonemptyTree -SourceDirectory (Join-Path $root 'docs') -DestinationDirectory $docsDestination
 Copy-NonemptyTree -SourceDirectory (Join-Path $root 'examples') -DestinationDirectory (Join-Path $payloadDir 'examples')
 Copy-Item -LiteralPath (Join-Path $root 'LICENSE.txt') -Destination $payloadDir

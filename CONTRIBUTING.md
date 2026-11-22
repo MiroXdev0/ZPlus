@@ -27,7 +27,7 @@ the maintainer can review it before accepting the contribution.
 - `zbuild/`, `zpm/`: build system and package manager.
 - `ZGraphics/`: graphics layer.
 - `tests/`: compiler, runtime, backend, integration, and tool tests.
-- `docs/`, `SYNTAX.md`, `MODULES.md`: language and tool documentation.
+- `docs/`, `MODULES.md`, `NATIVE_BACKEND.md`: language and tool documentation, including [`docs/syntax.md`](docs/syntax.md).
 - `website/`, `Z+_VS_code/`: official website and editor integration.
 
 ## Build and test

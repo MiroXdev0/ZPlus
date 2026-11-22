@@ -308,7 +308,7 @@ try {
         -Destination (Join-Path $documentationLogoDirectory 'Z+ Emblem - for ligth theme.png')
     foreach ($document in @(
         @{ Source = 'README.md'; Destination = 'PROJECT-README.md' },
-        @{ Source = 'SYNTAX.md'; Destination = 'LANGUAGE-SYNTAX.md' },
+        @{ Source = 'docs\syntax.md'; Destination = 'LANGUAGE-SYNTAX.md' },
         @{ Source = 'MODULES.md'; Destination = 'MODULES.md' },
         @{ Source = 'NATIVE_BACKEND.md'; Destination = 'NATIVE_BACKEND.md' }
         @{ Source = 'docs\ZPM.md'; Destination = 'ZPM.md' }
