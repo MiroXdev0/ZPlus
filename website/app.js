@@ -1,5 +1,6 @@
 (() => {
   const { course, docs, wiki, examples, zts, zjs } = window.ZPlusSite;
+  const products = window.ZPlusProducts;
   const main = document.querySelector("#main");
   const footer = document.querySelector("#site-footer");
   const search = document.querySelector("#site-search");
@@ -18,6 +19,7 @@
   }];
   const progressKey = "zplus-learning-progress-v1";
   let releaseRequest;
+  let releaseViewSequence = 0;
   let registrySearchTimer;
   let registrySearchSequence = 0;
   let publishSelectionSequence = 0;
@@ -33,8 +35,10 @@
     }))
   );
   const lessonById = new Map(lessons.map(lesson => [lesson.id, lesson]));
+  const productList = Object.values(products);
   const contentIndex = [
     ...docs.map(item => ({ title: item.title, summary: item.summary, href: `/docs/${item.id}`, type: "Documentation" })),
+    ...productList.map(item => ({ title: item.title, summary: item.summary, href: `/${item.id}`, type: "Ecosystem" })),
     ...wiki.map(item => ({ title: item.title, summary: item.summary, href: `/wiki/${item.id}`, type: "Wiki" })),
     { title: zts.title, summary: zts.summary, href: "/zts", type: "Web interoperability" },
     { title: zjs.title, summary: zjs.summary, href: "/zjs", type: "Web interoperability" },
@@ -61,13 +65,13 @@
   }
 
   function highlighted(code) {
-    const token = /(\/\/[^\n]*|"(?:\\.|[^"\\])*"|\b(?:start|stop|let|const|fn|return|if|else|while|for|in|end|repeat|try|catch|throw|use|as|pub|struct|class|true|false|and|or|not)\b|\b\d+(?:\.\d+)?\b)/g;
+    const token = /(\/\/[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:start|stop|let|const|fn|return|if|else|while|for|in|end|repeat|try|catch|throw|use|as|pub|private|protected|struct|class|enum|namespace|this|switch|case|default|break|continue|true|false|and|or|not)\b|\b\d+(?:\.\d+)?\b)/g;
     let result = "";
     let offset = 0;
     for (const match of code.matchAll(token)) {
       result += escapeHtml(code.slice(offset, match.index));
       const value = match[0];
-      const kind = value.startsWith("//") ? "comment" : value.startsWith('"') ? "string" : /^\d/.test(value) ? "number" : "keyword";
+      const kind = value.startsWith("//") ? "comment" : value.startsWith('"') || value.startsWith("'") ? "string" : /^\d/.test(value) ? "number" : "keyword";
       result += `<span class="syntax-${kind}">${escapeHtml(value)}</span>`;
       offset = match.index + value.length;
     }
@@ -75,7 +79,47 @@
   }
 
   function codeBlock(code, label = "Z+") {
-    return `<div class="code-frame"><div class="code-toolbar"><span>${escapeHtml(label)}</span><button class="copy-code" type="button" data-copy="${escapeHtml(code)}">Copy</button></div><pre><code>${highlighted(code)}</code></pre></div>`;
+    return `<div class="code-frame"><div class="code-toolbar"><span>${escapeHtml(label)}</span><button class="copy-code" type="button" data-copy="${escapeHtml(code)}" aria-label="Copy ${escapeHtml(label)} code">Copy</button></div><pre><code>${highlighted(code)}</code></pre></div>`;
+  }
+
+  function codeExample(sample, label) {
+    if (typeof sample === "string") return codeBlock(sample, label);
+    if (!sample || typeof sample.code !== "string") return "";
+    return `${codeBlock(sample.code, sample.name || label)}${(sample.files || []).map(file => codeBlock(file.code, file.name)).join("")}`;
+  }
+
+  async function copyCode(button) {
+    const value = button.dataset.copy || "";
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const field = document.createElement("textarea");
+        field.value = value;
+        field.setAttribute("readonly", "");
+        field.style.position = "fixed";
+        field.style.opacity = "0";
+        document.body.append(field);
+        field.select();
+        const copied = document.execCommand("copy");
+        field.remove();
+        if (!copied) throw new Error("Clipboard access is unavailable in this browser.");
+      }
+      button.textContent = "Copied";
+      button.setAttribute("aria-label", "Code copied to clipboard");
+      setTimeout(() => {
+        if (button.isConnected) {
+          button.textContent = "Copy";
+          button.setAttribute("aria-label", "Copy code sample");
+        }
+      }, 1400);
+    } catch (error) {
+      button.textContent = "Copy failed";
+      button.setAttribute("aria-label", error.message || "Could not copy code");
+      setTimeout(() => {
+        if (button.isConnected) button.textContent = "Copy";
+      }, 2200);
+    }
   }
 
   function path() {
@@ -153,7 +197,7 @@
 } stop`)}<div class="terminal-line"><span>›</span> zp run hello.zp <b>·</b> Hello, world!</div></div>
     </section>
     <section class="section-block">
-      <div class="section-heading"><p class="eyebrow">The language</p><h2>Small steps, real tools.</h2><p>Z+ brings its compiler, interpreter, native backend, standard library, and ZBuild into one development workflow.</p></div>
+      <div class="section-heading"><p class="eyebrow">The language</p><h2>Small steps, real tools.</h2><p>Z+ brings its compiler, interpreter, native backend, standard library, and ZPBuild into one development workflow.</p></div>
       <div class="feature-grid">
         <article class="feature"><span class="feature-index">01</span><h3>Explicit structure</h3><p>Readable brace blocks pair with named terminators, and types help catch mistakes before a program runs.</p></article>
         <article class="feature"><span class="feature-index">02</span><h3>Two execution paths</h3><p>Run source through the interpreter or build a native executable for supported constructs and platforms.</p></article>
@@ -161,7 +205,7 @@
       </div>
     </section>
     <section class="section-block split-section">
-      <div><p class="eyebrow">Made to explore</p><h2>Start with one file.<br>Keep going from there.</h2><p>Follow a 52-lesson course from the first instruction to modules, file-backed apps, and release builds. Each step includes real Z+ syntax and a small exercise.</p>${buttonLink("/learn", "Explore the course", "text-link")}</div>
+      <div><p class="eyebrow">Made to explore</p><h2>Start with one file.<br>Keep going from there.</h2><p>Follow a ${lessons.length}-lesson course from the first instruction to modules, file-backed apps, and release builds. Each step includes real Z+ syntax and a small exercise.</p>${buttonLink("/learn", "Explore the course", "text-link")}</div>
       <div class="project-list">
         ${examples.slice(1, 5).map((item, index) => `<a href="/examples#${item.id}"><span>0${index + 1}</span><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.summary)}</small></div><b>↗</b></a>`).join("")}
       </div>
@@ -383,20 +427,26 @@
     </article>`;
   }
 
-  async function downloadPage() {
-    main.innerHTML = `<section class="page-hero compact"><p class="eyebrow">Official builds</p><h1>Download Z+</h1><p>Release information and downloads come directly from the official GitHub Releases API. This page never guesses an asset URL.</p></section><div id="release-content">${loadingPanel("Checking the official release feed…")}</div>`;
+  async function downloadPage(historyOnly = false) {
+    const route = historyOnly ? "/releases" : "/download";
+    const sequence = ++releaseViewSequence;
+    const heading = historyOnly ? "Published releases" : "Downloads";
+    main.innerHTML = `<section class="page-hero compact"><p class="eyebrow">Official release assets</p><h1>${heading}</h1><p>Version history and downloads come directly from the official GitHub Releases API. A download appears only when an asset is actually published.</p></section>${historyOnly ? "" : downloadProducts()}<div id="release-content">${loadingPanel("Checking the official release feed…")}</div>`;
     try {
       const releases = (await fetchReleases()).sort(compareReleasesNewestFirst);
+      if (sequence !== releaseViewSequence || path() !== route) return;
+      const target = main.querySelector("#release-content");
+      if (!target) return;
       const stable = releases.filter(release => !release.prerelease);
-      const target = document.querySelector("#release-content");
-      const howTo = `<section class="install-guide"><div><p class="eyebrow">After downloading</p><h2>Install, then verify.</h2><ol><li>Download the Windows installer or distribution archive published with a stable release.</li><li>Run the installer, or extract the complete archive and follow its included installation instructions.</li><li>Open a new PowerShell window and run <code>zp --version</code>.</li><li>Check and run a source file with <code>zp check hello.zp</code> and <code>zp run hello.zp</code>.</li></ol></div>${codeBlock(`start {
-    say("Z+ is ready.")
-} stop`, "hello.zp")}</section>`;
+      const helloCode = ["start {", "    say(\"Z+ is ready.\")", "} stop"].join("\n");
+      const howTo = historyOnly ? "" : `<section class="install-guide"><div><p class="eyebrow">After downloading</p><h2>Install, then verify.</h2><ol><li>Choose a published asset that matches your operating system and architecture.</li><li>Run the Windows x64 setup or follow the included platform instructions when another distribution is published.</li><li>Open a new terminal and run <code>zp version</code>, <code>zpm --version</code>, and <code>zpbuild --version</code>.</li><li>Check and run a source file with <code>zp check hello.zp</code> and <code>zp run hello.zp</code>.</li></ol></div>${codeBlock(helloCode, "hello.zp")}</section>`;
       if (!releases.length) {
         target.innerHTML = `<div class="state-panel state-warning"><span class="state-icon">!</span><div><h2>No releases are currently available.</h2><p>The official GitHub API returned no published releases. No version or download link has been guessed.</p><a class="button button-primary" href="${releasesUrl}" target="_blank" rel="noreferrer">Open official Releases ↗</a></div></div>${howTo}`;
         return;
       }
       const latestStable = stable[0] || null;
+      const downloadVersion = document.querySelector("#download-compiler-version");
+      if (downloadVersion) downloadVersion.textContent = latestStable ? `Latest published stable: ${latestStable.tag_name}.` : "No stable compiler release is currently published.";
       const selectedRelease = latestStable || releases[0];
       const latestLabel = latestStable
         ? `<p class="latest-stable"><span class="live-dot"></span><span>Latest stable</span><strong>${escapeHtml(latestStable.tag_name)}</strong></p>`
@@ -417,8 +467,9 @@
       select.addEventListener("change", showSelectedRelease);
       showSelectedRelease();
     } catch (error) {
+      if (sequence !== releaseViewSequence || path() !== route) return;
       console.warn("Unable to load official Z+ releases.", error);
-      const target = document.querySelector("#release-content");
+      const target = main.querySelector("#release-content");
       if (target) target.innerHTML = `<div class="state-panel state-warning"><span class="state-icon">!</span><div><h2>Release information is unavailable.</h2><p>${escapeHtml(error.message)} Check the official Releases page for current downloads; no version or asset link has been guessed.</p><a class="button button-primary" href="${releasesUrl}" target="_blank" rel="noreferrer">Open official Releases ↗</a></div></div>`;
     }
   }
@@ -436,7 +487,7 @@
     const progress = getProgress();
     const percentage = Math.round(progress.size / lessons.length * 100);
     const currentLesson = lessons.find(lesson => !progress.has(lesson.id)) || lessons[0];
-    return `<section class="page-hero compact"><p class="eyebrow">Z+ learning path · 52 lessons</p><h1>Learn Z+, one idea at a time.</h1><p>A guided course from first program to native builds, grounded in the language the compiler actually accepts.</p><div class="hero-actions">${buttonLink(`/learn/${currentLesson.id}`, progress.size ? "Continue learning" : "Begin lesson one")} ${buttonLink("/docs", "Open the reference", "button button-secondary")}</div></section>
+    return `<section class="page-hero compact"><p class="eyebrow">Z+ learning path · ${lessons.length} lessons</p><h1>Learn Z+, one idea at a time.</h1><p>A guided course from first program to native builds, grounded in the language the compiler actually accepts.</p><div class="hero-actions">${buttonLink(`/learn/${currentLesson.id}`, progress.size ? "Continue learning" : "Begin lesson one")} ${buttonLink("/wiki/syntax", "Open Z+ Syntax", "button button-secondary")}</div></section>
       <section class="course-overview"><div class="progress-card"><div class="progress-ring" style="--progress:${percentage}%"><span>${percentage}%</span></div><div><strong>Your progress</strong><p>${progress.size} of ${lessons.length} lessons complete. Progress is saved in this browser; no account is needed.</p></div></div>
         <div class="module-grid">${course.map((module, index) => {
           const first = lessons.find(lesson => lesson.moduleIndex === index);
@@ -460,16 +511,56 @@
       <p class="eyebrow">LESSON ${String(lesson.number).padStart(2, "0")} · ${escapeHtml(lesson.module)}</p><h1>${escapeHtml(lesson.title)}</h1>
       <div class="lesson-objective"><strong>By the end, you can</strong><p>${inlineMarkup(lesson.explain.split(".")[0])}.</p></div>
       <section class="lesson-section"><h2>Understand the idea</h2><p>${inlineMarkup(lesson.explain)}</p></section>
-      <section class="lesson-section"><h2>Example</h2>${codeBlock(lesson.code)}<p class="code-explanation">This example demonstrates the concept from the lesson. Read it from the entry block inward and notice how each statement contributes to the result.</p>${lesson.output ? `<div class="expected-output"><span>EXPECTED OUTPUT</span><pre>${escapeHtml(lesson.output)}</pre></div>` : ""}</section>
+      <section class="lesson-section"><h2>Example</h2>${codeBlock(lesson.code, "main.zp")}${(lesson.files || []).map(file => codeBlock(file.code, file.name)).join("")}<p class="code-explanation">This example demonstrates the concept from the lesson. Read it from the entry block inward and notice how each statement contributes to the result. Use <code>zp check</code> to validate it, then <code>zp run</code> for the interpreter output.</p>${lesson.output ? `<div class="expected-output"><span>EXPECTED OUTPUT</span><pre>${escapeHtml(lesson.output)}</pre></div>` : ""}</section>
       <section class="exercise-card"><p class="eyebrow">YOUR TURN</p><h2>Exercise</h2><p>${inlineMarkup(lesson.exercise)}</p><details><summary>Reveal one solution</summary>${codeBlock(lesson.solution)}<p>Try changing the values and checking the behavior yourself.</p></details></section>
       <section class="lesson-summary"><p class="eyebrow">TAKEAWAY</p><p>${inlineMarkup(lesson.summary)}</p></section>
+      <p class="lesson-reference">${link("/wiki/syntax", "Open the Z+ Syntax reference →")} · ${link("/wiki/uses", "See what Z+ is used for →")}</p>
       <div class="lesson-completion"><label><input id="lesson-complete" type="checkbox" ${progress.has(id) ? "checked" : ""}> <span>Mark this lesson complete</span></label><span id="save-status" role="status">Saved on this device</span></div>
       <nav class="lesson-pager" aria-label="Lesson navigation">${previous ? link(`/learn/${previous.id}`, `← Previous <small>${escapeHtml(previous.title)}</small>`, "pager-link") : `<span></span>`}${link("/learn", "Course overview", "pager-overview")}${next ? link(`/learn/${next.id}`, `Next lesson → <small>${escapeHtml(next.title)}</small>`, "pager-link pager-next") : link("/learn", "Finish course →", "pager-link pager-next")}</nav>
     </article></div>`;
   }
 
-  function referenceIndex(items, base, label) {
-    return `<section class="page-hero compact"><p class="eyebrow">${label}</p><h1>${label === "Technical reference" ? "Documentation" : label}</h1><p>${label === "Technical reference" ? "Precise reference for syntax, modules, tools, and runtime limits." : "Practical explanations of how Z+ is designed and used."} Search across both sections from the bar above.</p></section><div class="article-grid">${items.map(item => `<a class="article-card" href="${base}/${item.id}"><p class="eyebrow">${escapeHtml(item.section || "GUIDE")}</p><h2>${escapeHtml(item.title)}</h2><p>${escapeHtml(item.summary)}</p><span>Read article →</span></a>`).join("")}</div>`;
+  function wikiIndexPage() {
+    return `<section class="page-hero compact"><p class="eyebrow">Z+ Wiki</p><h1>Choose a place to begin.</h1><p>Look up the language, understand the project’s approach, or see what the current toolchain can be used for.</p></section><nav class="article-grid wiki-destinations" aria-label="Z+ Wiki destinations">${wiki.map((item, index) => `<a class="article-card" href="/wiki/${item.id}"><p class="eyebrow">0${index + 1} · ${escapeHtml(item.section)}</p><h2>${escapeHtml(item.title)}</h2><p>${escapeHtml(item.summary)}</p><span>Open destination →</span></a>`).join("")}</nav>`;
+  }
+
+  const docsGroups = [
+    { title: "Start here", ids: ["introduction", "installation", "first-program"] },
+    { title: "Language", ids: ["syntax", "variables", "functions", "classes", "visibility", "enums", "structs", "modules", "errors"] },
+    { title: "Runtime", ids: ["interpreter", "native", "standard-library", "builtins", "zgraphics"] },
+    { title: "Tools", ids: ["cli", "zpm", "zpbuild", "vscode"] }
+  ];
+  const docsOrder = docsGroups.flatMap(group => group.ids.map(id => docs.find(item => item.id === id)).filter(Boolean));
+
+  function docsNavigation(activeId = "") {
+    return `<aside class="docs-sidebar" aria-label="Documentation navigation"><label class="docs-search"><span aria-hidden="true">⌕</span><input type="search" id="docs-search" placeholder="Filter documentation" aria-label="Filter documentation"></label><div id="docs-tree">${docsGroups.map(group => `<section class="docs-group"><h2>${escapeHtml(group.title)}</h2><ul>${group.ids.map(id => docs.find(item => item.id === id)).filter(Boolean).map(item => `<li><a href="/docs/${item.id}" data-doc-link class="${item.id === activeId ? "active" : ""}" ${item.id === activeId ? 'aria-current="page"' : ""}>${escapeHtml(item.title)}</a></li>`).join("")}</ul></section>`).join("")}</div><p id="docs-search-empty" class="docs-search-empty" hidden>No matching guides. Try a shorter term.</p><a class="docs-backlink" href="/docs">All documentation</a></aside>`;
+  }
+
+  function documentationPage(item = null) {
+    const current = item ? docsOrder.indexOf(item) : -1;
+    const previous = current > 0 ? docsOrder[current - 1] : null;
+    const next = current >= 0 ? docsOrder[current + 1] : null;
+    const mainContent = item ? `<article class="docs-article"><div class="breadcrumbs">${link("/", "Home")} <span>/</span> ${link("/docs", "Documentation")} <span>/</span> ${escapeHtml(item.section || "Guide")}</div><header><p class="eyebrow">${escapeHtml(item.section || "Documentation")}</p><h1>${escapeHtml(item.title)}</h1><p class="article-lede">${escapeHtml(item.summary)}</p></header><div class="docs-prose">${item.body.map(([heading, text, sample]) => `<section id="${slug(heading)}"><h2>${escapeHtml(heading)}</h2><p>${inlineMarkup(text)}</p>${sample ? codeBlock(sample, item.title) : ""}</section>`).join("")}</div><div class="related-links"><strong>Continue</strong>${link("/learn", `${lessons.length}-lesson course`)}${link("/examples", "Runnable examples")}${link("/ecosystem", "Toolchain overview")}</div><nav class="docs-pager" aria-label="Documentation pages">${previous ? link(`/docs/${previous.id}`, `← ${escapeHtml(previous.title)}`) : "<span></span>"}${next ? link(`/docs/${next.id}`, `${escapeHtml(next.title)} →`) : "<span></span>"}</nav></article>`
+      : `<section class="docs-index"><p class="eyebrow">Documentation · Language & tools</p><h1>Build a working picture of Z+.</h1><p class="article-lede">A practical guide to the language, its runtime, and the tools that take a project from source to release.</p><div class="docs-start"><a href="/docs/first-program"><span>START HERE</span><strong>Your first program</strong><small>Write, check, and run a Z+ file →</small></a><a href="/docs/syntax"><span>LANGUAGE REFERENCE</span><strong>Syntax reference</strong><small>Declarations, blocks, types, and expressions →</small></a></div>${docsGroups.map(group => `<section class="docs-index-group"><div><p class="eyebrow">${escapeHtml(group.title)}</p><h2>${escapeHtml(group.title === "Start here" ? "Get oriented" : group.title)}</h2></div><div>${group.ids.map(id => docs.find(doc => doc.id === id)).filter(Boolean).map(doc => `<a href="/docs/${doc.id}"><strong>${escapeHtml(doc.title)}</strong><span>${escapeHtml(doc.summary)}</span><b aria-hidden="true">↗</b></a>`).join("")}</div></section>`).join("")}</section>`;
+    return `<div class="docs-layout">${docsNavigation(item?.id || "")}${mainContent}</div>`;
+  }
+
+  function ecosystemPage(product) {
+    if (!product) return notFound();
+    return `<section class="product-heading"><div><p class="eyebrow">${escapeHtml(product.eyebrow)}</p><h1>${escapeHtml(product.title)}</h1><p class="article-lede">${escapeHtml(product.summary)}</p></div><div class="product-status"><span class="status-square"></span>${escapeHtml(product.status || "Current implementation details")}</div></section><div class="product-content">${product.sections.map((section, index) => `<section class="product-section"><div class="product-section-number">${String(index + 1).padStart(2, "0")}</div><div><h2>${escapeHtml(section.heading)}</h2><p>${inlineMarkup(section.text)}</p>${section.code ? codeBlock(section.code, product.title) : ""}${section.href ? link(section.href, "Read the guide →", "text-link") : ""}${section.action ? link(section.action.href, section.action.label, "button button-secondary") : ""}</div></section>`).join("")}<div class="product-related"><p class="eyebrow">Keep exploring</p>${link("/ecosystem", "Z+ ecosystem overview")} ${link("/docs", "Documentation index")} ${link("/download", "Downloads & releases")}</div></div>`;
+  }
+
+  function ecosystemIndexPage() {
+    return `<section class="page-hero compact"><p class="eyebrow">Official Z+ developer tools</p><h1>The ecosystem around Z+.</h1><p>Each component has a clear role. Follow its guide for the supported workflows and current platform limits.</p></section><section class="ecosystem-index">${productList.map((product, index) => `<a href="/${product.id}" class="ecosystem-index-card"><span>${String(index + 1).padStart(2, "0")} / ${escapeHtml(product.eyebrow)}</span><h2>${escapeHtml(product.title)}</h2><p>${escapeHtml(product.summary)}</p><b>Open guide →</b></a>`).join("")}</section><section class="ecosystem-index-links">${link("/zts", "ZTS experimental interoperability →")} ${link("/zjs", "ZJS experimental interoperability →")} ${link("/packages", "Browse the package registry →")}</section>`;
+  }
+
+  function downloadProducts() {
+    return `<section class="download-products"><div class="section-heading"><p class="eyebrow">Current distribution</p><h2>Tools and availability.</h2><p>Versions and assets come from checked-in release metadata and the official release feed. An unavailable item has no download link.</p></div><div class="download-product-grid">
+      <article><span class="availability-pill">Release feed</span><h3>Z+ Compiler</h3><p id="download-compiler-version">Latest stable version is loading from official releases.</p><p>Windows x64 installer when present in the selected release. Interpreter and native target support are documented separately.</p>${link("/releases", "View published releases →")}</article>
+      <article><span class="availability-pill">Bundled with distribution</span><h3>ZPM <small>1.0.0</small></h3><p>Package manager supplied in the Windows compiler distribution, with local and registry workflows.</p>${link("/zpm", "ZPM guide →")}</article>
+      <article><span class="availability-pill">Bundled with distribution</span><h3>ZPBuild <small>1.0.0</small></h3><p>Project build and test tool supplied alongside the compiler. <code>zbuild</code> remains a compatibility alias.</p>${link("/zpbuild", "ZPBuild guide →")}</article>
+      <article><span class="availability-pill unavailable-pill">No verified public asset</span><h3>VS Code extension <small>1.3.4</small></h3><p>The checkout identifies version 1.3.4, but no official Marketplace listing or release asset is currently verified.</p>${link("/vscode", "Extension details →")}</article>
+    </div><p class="platform-note"><strong>Platform availability:</strong> the official release feed currently publishes Windows x64 setup assets. This page does not imply an official Linux or macOS installer.</p></section>`;
   }
 
   function articlePage(item, kind, all, base, extraRelated = []) {
@@ -479,14 +570,14 @@
     const next = all[index + 1];
     const sections = item.body;
     return `<article class="article-page"><div class="breadcrumbs">${link("/", "Home")} <span>/</span> ${link(base, kind)} <span>/</span> ${escapeHtml(item.title)}</div><div class="article-layout"><div><p class="eyebrow">${escapeHtml(item.section || kind)}</p><h1>${escapeHtml(item.title)}</h1><p class="article-lede">${escapeHtml(item.summary)}</p>
-      ${sections.map(([heading, text], sectionIndex) => `<section id="${slug(heading)}"><h2>${escapeHtml(heading)}</h2><p>${inlineMarkup(text)}</p>${kind === "Documentation" && sectionIndex === 0 ? `<p>${link("/learn", "Follow the step-by-step learning course")} · ${link("/examples", "Browse runnable examples")}</p>` : ""}</section>`).join("")}
-      <div class="related-links"><strong>Related</strong>${link("/learn", "Learn Z+")}${link("/examples", "Examples")}${link(kind === "Wiki" ? "/docs" : "/wiki", kind === "Wiki" ? "Technical documentation" : "Wiki guides")}${extraRelated.map(item => link(item.href, item.label)).join("")}</div>
+      ${sections.map(([heading, text, sample], sectionIndex) => `<section id="${slug(heading)}"><h2>${escapeHtml(heading)}</h2><p>${inlineMarkup(text)}</p>${sample ? codeExample(sample, heading) : ""}${kind === "Documentation" && sectionIndex === 0 ? `<p>${link("/learn", "Follow the step-by-step learning course")} · ${link("/examples", "Browse runnable examples")}</p>` : ""}</section>`).join("")}
+      <div class="related-links"><strong>Related</strong>${link("/learn", "Learn Z+")}${link("/examples", "Examples")}${link(kind === "Wiki" ? "/docs" : "/wiki/syntax", kind === "Wiki" ? "Tool documentation" : "Z+ Syntax reference")}${extraRelated.map(item => link(item.href, item.label)).join("")}</div>
       <nav class="article-pager">${previous ? link(`${base}/${previous.id}`, `← ${escapeHtml(previous.title)}`) : "<span></span>"}${next ? link(`${base}/${next.id}`, `${escapeHtml(next.title)} →`) : "<span></span>"}</nav>
       </div><aside class="table-of-contents"><strong>ON THIS PAGE</strong><ol>${sections.map(([heading]) => `<li><a href="#${slug(heading)}">${escapeHtml(heading)}</a></li>`).join("")}</ol></aside></div></article>`;
   }
 
   function examplesPage() {
-    return `<section class="page-hero compact"><p class="eyebrow">Learn by reading code</p><h1>Z+ examples</h1><p>Small programs and patterns based on implemented syntax and public APIs. The multi-file entry expects the sibling module described in its card.</p></section><div class="examples-grid">${examples.map(item => `<article class="example-card" id="${item.id}"><div class="example-heading"><div><p class="eyebrow">EXAMPLE</p><h2>${escapeHtml(item.title)}</h2></div><a href="/learn" aria-label="Learn more">↗</a></div><p>${escapeHtml(item.summary)}</p>${codeBlock(item.code)}${item.id === "modules" ? `<p class="example-note">Sibling file <code>greetings.zh</code> must export <code>pub fn hello(): string</code>.</p>` : ""}</article>`).join("")}</div>`;
+    return `<section class="page-hero compact"><p class="eyebrow">Learn by reading code</p><h1>Z+ examples</h1><p>Small programs and patterns based on implemented syntax and public APIs. Multi-file examples include their companion source files.</p></section><div class="examples-grid">${examples.map(item => `<article class="example-card" id="${item.id}"><div class="example-heading"><div><p class="eyebrow">EXAMPLE</p><h2>${escapeHtml(item.title)}</h2></div><a href="/learn" aria-label="Learn more">↗</a></div><p>${escapeHtml(item.summary)}</p>${codeBlock(item.code, "main.zp")}${(item.relatedFiles || []).map(file => codeBlock(file.code, file.name)).join("")}</article>`).join("")}</div>`;
   }
 
   function packagesPage() {
@@ -923,11 +1014,16 @@
 
   function render() {
     const route = path();
+    main.classList.remove("page-enter");
+    void main.offsetWidth;
+    main.classList.add("page-enter");
     document.querySelectorAll(".primary-nav a").forEach(anchor => {
       const active = route === anchor.pathname || (anchor.pathname === "/learn" && route.startsWith("/learn/")) ||
         (anchor.pathname === "/docs" && route.startsWith("/docs/")) || (anchor.pathname === "/wiki" && route.startsWith("/wiki/")) ||
         (anchor.pathname === "/zts" && route === "/zts") || (anchor.pathname === "/zjs" && route === "/zjs") ||
-        (anchor.pathname === "/packages" && route.startsWith("/packages")) ||
+        (anchor.pathname === "/compiler" && route === "/compiler") || (anchor.pathname === "/ecosystem" && route === "/ecosystem") ||
+        (anchor.pathname === "/releases" && ["/download", "/releases"].includes(route)) ||
+        (anchor.pathname === "/packages" && (route.startsWith("/packages") || route === "/publish" || route === "/dashboard")) ||
         (anchor.pathname === "/dashboard" && ["/dashboard", "/publish", "/login", "/register"].includes(route));
       anchor.classList.toggle("nav-active", active);
       if (active) anchor.setAttribute("aria-current", "page");
@@ -939,7 +1035,17 @@
       document.title = "Z+ — A language, from first program to real projects";
     } else if (route === "/download") {
       downloadPage();
-      document.title = "Download Z+";
+      document.title = "Downloads — Z+";
+    } else if (route === "/releases") {
+      downloadPage(true);
+      document.title = "Published releases — Z+";
+    } else if (route === "/ecosystem") {
+      main.innerHTML = ecosystemIndexPage();
+      document.title = "Z+ ecosystem — Compiler, ZPM, ZPBuild and more";
+    } else if (["compiler", "zpm", "zpbuild", "vscode", "zgraphics"].includes(route.slice(1)) && route.split("/").length === 2) {
+      const product = products[route.slice(1)];
+      main.innerHTML = ecosystemPage(product);
+      document.title = `${product.title} — Z+`;
     } else if (route === "/learn") {
       main.innerHTML = learnDashboard();
       document.title = "Learn Z+ — Course";
@@ -949,19 +1055,18 @@
       main.innerHTML = lessonPage(id);
       document.title = lesson ? `${lesson.title} — Learn Z+` : "Lesson not found — Z+";
     } else if (route === "/docs") {
-      main.innerHTML = referenceIndex(docs, "/docs", "Technical reference");
-      document.title = "Documentation — Z+";
+      main.innerHTML = documentationPage();
+      document.title = "Documentation — Z+ Language and Tools";
     } else if (route.startsWith("/docs/")) {
       const item = docs.find(article => article.id === route.slice(6));
-      main.innerHTML = articlePage(item, "Documentation", docs, "/docs");
+      main.innerHTML = item ? documentationPage(item) : notFound();
       document.title = item ? `${item.title} — Z+ Documentation` : "Not found — Z+";
     } else if (route === "/wiki") {
-      main.innerHTML = referenceIndex(wiki, "/wiki", "Wiki & guides");
-      document.title = "Wiki — Z+";
+      main.innerHTML = wikiIndexPage();
+      document.title = "Z+ Wiki — Syntax, ideas, and uses";
     } else if (route.startsWith("/wiki/")) {
-      const wikiArticles = wiki.map(entry => ({ ...entry, body: entry.body.split(/\n\n+/).map(paragraph => ["Guide", paragraph]) }));
-      const item = wikiArticles.find(article => article.id === route.slice(6));
-      main.innerHTML = articlePage(item, "Wiki", wikiArticles, "/wiki");
+      const item = wiki.find(article => article.id === route.slice(6));
+      main.innerHTML = articlePage(item, "Wiki", wiki, "/wiki");
       document.title = item ? `${item.title} — Z+ Wiki` : "Not found — Z+";
     } else if (route === "/zts") {
       main.innerHTML = articlePage(zts, "ZTS", [zts], "/zts", [{ href: "/zjs", label: "ZJS JavaScript guide" }]);
@@ -1003,24 +1108,38 @@
       main.innerHTML = notFound();
       document.title = "Not found — Z+";
     }
-    const description = route === "/" ? "Discover Z+, download the compiler, and follow a complete course from first program to real projects."
-      : route === "/download" ? "Get published Z+ releases directly from the official GitHub Releases feed."
-      : route === "/learn" ? "Follow 52 lessons to learn the implemented Z+ language, with examples and exercises."
+    const descriptions = {
+      "/": "The official Z+ language website: learn the language, explore developer tools, and find the latest published compiler release.",
+      "/download": "See actual Z+ compiler release assets, platform availability, and versions of bundled developer tools.",
+      "/releases": "Browse published Z+ releases and read their original, sanitized release notes.",
+      "/docs": "A navigable guide to Z+ syntax, types, modules, runtime behavior, ZPM, ZPBuild, and editor tooling.",
+      "/wiki": "Explore the Z+ language syntax reference, the ideas behind Z+, and practical uses of the current toolchain.",
+      "/ecosystem": "Explore the Z+ compiler, ZPM package manager, ZPBuild, VS Code extension, and ZGraphics.",
+      "/compiler": products.compiler.summary,
+      "/zpm": products.zpm.summary,
+      "/zpbuild": products.zpbuild.summary,
+      "/vscode": products.vscode.summary,
+      "/zgraphics": products.zgraphics.summary,
+      "/learn": "Follow 54 lessons to learn implemented Z+ syntax, with examples and exercises.",
+      "/examples": "Read runnable Z+ examples for functions, files, modules, arrays, and more.",
+      "/packages": "Browse and inspect packages published to the Z+ package registry."
+    };
+    const description = descriptions[route] || (route.startsWith("/docs/") ? docs.find(item => item.id === route.slice(6))?.summary
       : route.startsWith("/learn/") ? lessonById.get(route.slice(7))?.explain
-      : route.startsWith("/docs/") ? docs.find(item => item.id === route.slice(6))?.summary
       : route.startsWith("/wiki/") ? wiki.find(item => item.id === route.slice(6))?.summary
+      : route.startsWith("/packages") ? "Browse and publish Z+ packages through the official package registry."
       : route === "/zts" ? zts.summary
       : route === "/zjs" ? zjs.summary
-      : route === "/docs" ? "Technical reference for Z+ syntax, modules, tools, and runtime support."
-      : route === "/wiki" ? "Guides to Z+ architecture, modules, projects, and contributing."
-      : route === "/examples" ? "Real Z+ source examples for functions, files, modules, and collections."
-      : route === "/login" ? "Sign in to your Z+ package registry account."
-      : route === "/register" ? "Create a Z+ package registry developer account."
-      : route === "/dashboard" ? "Manage your Z+ packages and view publication history."
+      : route === "/wiki" ? "Guides to Z+ architecture, modules, and project workflows."
       : route === "/publish" ? "Publish a validated ZPM package archive to the Z+ registry."
-      : route.startsWith("/packages") ? "Browse, install, and publish source-backed Z+ packages."
-      : "Find Z+ language documentation, examples, and learning resources.";
-    document.querySelector('meta[name="description"]').setAttribute("content", description);
+      : route === "/dashboard" ? "Manage your Z+ packages and view publication history."
+      : "Official Z+ documentation, examples, and developer tools.");
+    const metaDescription = description || "Official Z+ documentation, examples, and developer tools.";
+    document.querySelector('meta[name="description"]').setAttribute("content", metaDescription);
+    document.querySelector('meta[property="og:title"]').setAttribute("content", document.title);
+    document.querySelector('meta[property="og:description"]').setAttribute("content", metaDescription);
+    document.querySelector('meta[property="og:url"]').setAttribute("content", `https://zpluse.vercel.app${route}`);
+    document.querySelector('link[rel="canonical"]').setAttribute("href", `https://zpluse.vercel.app${route}`);
     document.querySelector("#primary-nav").classList.remove("nav-open");
     document.querySelector(".menu-toggle").setAttribute("aria-expanded", "false");
     main.focus({ preventScroll: true });
@@ -1039,12 +1158,14 @@
     const query = search.value.trim().toLowerCase();
     if (query.length < 2) {
       searchResults.hidden = true;
+      search.setAttribute("aria-expanded", "false");
       searchResults.innerHTML = "";
       return;
     }
     const results = contentIndex.filter(item => `${item.title} ${item.summary} ${item.type}`.toLowerCase().includes(query)).slice(0, 8);
     searchResults.innerHTML = results.length ? results.map(item => `<a role="option" href="${item.href}"><span>${escapeHtml(item.type)}</span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.summary)}</small></a>`).join("") : `<p class="search-empty">No matching Z+ pages. Try a topic such as arrays, modules, or errors.</p>`;
     searchResults.hidden = false;
+    search.setAttribute("aria-expanded", "true");
   }
 
   async function submitRegistryAuth(form) {
@@ -1210,15 +1331,7 @@
       searchResults.hidden = true;
     }
     const copy = event.target.closest(".copy-code");
-    if (copy) {
-      navigator.clipboard.writeText(copy.dataset.copy).then(() => {
-        copy.textContent = "Copied";
-        setTimeout(() => { copy.textContent = "Copy"; }, 1200);
-      }).catch(error => {
-        console.warn("Unable to copy the code sample.", error);
-        copy.textContent = "Copy failed";
-      });
-    }
+    if (copy) void copyCode(copy);
     const logout = event.target.closest("[data-registry-logout]");
     if (logout) {
       logout.disabled = true;
@@ -1279,6 +1392,21 @@
   });
 
   document.addEventListener("input", event => {
+    if (event.target.id === "docs-search") {
+      const query = event.target.value.trim().toLowerCase();
+      let visible = 0;
+      document.querySelectorAll("[data-doc-link], .docs-index-group a").forEach(anchor => {
+        const matches = !query || anchor.textContent.toLowerCase().includes(query);
+        anchor.hidden = !matches;
+        if (matches) visible += 1;
+      });
+      document.querySelectorAll(".docs-index-group").forEach(group => {
+        group.hidden = !group.querySelector("a:not([hidden])");
+      });
+      const empty = document.querySelector("#docs-search-empty");
+      if (empty) empty.hidden = visible > 0;
+      return;
+    }
     if (event.target.matches("[data-confirm-password]")) {
       const password = event.target.form.elements.password.value;
       event.target.setCustomValidity(event.target.value === password ? "" : "Passwords do not match.");
@@ -1313,6 +1441,7 @@
     const nav = document.querySelector("#primary-nav");
     const open = nav.classList.toggle("nav-open");
     event.currentTarget.setAttribute("aria-expanded", String(open));
+    event.currentTarget.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
   });
   search.addEventListener("input", updateSearch);
   search.addEventListener("keydown", event => {

@@ -1,0 +1,6 @@
+start {
+    enum State {
+        Ready
+    } end enum
+    say(State.Missing)
+} stop

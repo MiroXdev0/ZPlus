@@ -1,0 +1,5 @@
+start {
+    enum State {
+        Ready = 1 + 1
+    } end enum
+} stop

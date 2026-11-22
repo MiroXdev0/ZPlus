@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /login
+Disallow: /register
+Disallow: /publish
+
+Sitemap: https://zpluse.vercel.app/sitemap.xml

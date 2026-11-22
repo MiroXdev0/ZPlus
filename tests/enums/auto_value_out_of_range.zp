@@ -1,0 +1,6 @@
+start {
+    enum State {
+        Last = 9007199254740991,
+        Overflow
+    } end enum
+} stop

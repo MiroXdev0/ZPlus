@@ -1328,6 +1328,8 @@ struct EnumValue final : Node {
     std::string name;
 
     Expr value;
+
+    std::optional<std::int64_t> resolvedValue;
 };
 
 

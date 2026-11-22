@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyCopyrightAttribute("Copyright (c) Miroslav Aleksandrov")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.3.5.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.3.5+222c700b88e076e34f507739266a6a38ad21ec0e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.3.5+65e9d2f400fc203b7ec6340474b19f1b44cf4bbc")]
 [assembly: System.Reflection.AssemblyProductAttribute("Z+ Programming Language")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ZPlus-1.3.5-Setup")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.3.5.0")]
