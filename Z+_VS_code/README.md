@@ -1,8 +1,8 @@
 # Official Z+ Developer Tools for Visual Studio Code
 
-Z+ is a proprietary programming language and compiler developed by the Z+ project. This extension provides official developer tools for `.zp` programs and `.zh` modules, backed by the Z+ compiler. Visit the [official Z+ website](https://zpluse.vercel.app/) for product information and official resources.
+Z+ is a statically typed programming language and compiler developed by the Z+ project. This extension provides official developer tools for `.zp` programs and `.zh` modules, backed by the Z+ compiler. Visit the [official Z+ website](https://zpluse.vercel.app/) for product information and official resources.
 
-This extension and the Z+ materials are governed by the proprietary terms in `LICENSE.txt`. The license text preserves the separate terms that apply to third-party materials.
+This extension is licensed under Apache License 2.0. Third-party materials retain their own licenses; see `LICENSE.txt` and `NOTICE`.
 
 ## Installation
 
@@ -14,7 +14,7 @@ code --install-extension .\bin\zpluse-language-1.3.4.vsix
 
 ## Requirements and compiler setup
 
-The extension requires the proprietary Z+ compiler. See the [official Z+ website](https://zpluse.vercel.app/) for current compiler distribution information, then make `zp` (or `zp.exe`) available on `PATH`. The extension uses the compiler directly; it does not simulate checking, interpretation, or native compilation.
+The extension requires the Z+ compiler. See the [official Z+ website](https://zpluse.vercel.app/) for current compiler distribution information, then make `zp` (or `zp.exe`) available on `PATH`. The extension uses the compiler directly; it does not simulate checking, interpretation, or native compilation.
 
 If the executable is not on `PATH`, set **Z+: Compiler Path** (`zplus.compilerPath`) to its full path, or run **Z+: Select Compiler**. Paths containing spaces are supported.
 

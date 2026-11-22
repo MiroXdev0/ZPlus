@@ -304,7 +304,7 @@ internal sealed class InstallerForm : Form
         content.Controls.Add(licenseText);
         licenseBox = new CheckBox
         {
-            Text = "I have read and accept the Z+ Proprietary Software License.",
+            Text = "I have read the Apache License, Version 2.0.",
             Location = new Point(0, 453),
             Size = new Size(610, 32),
             ForeColor = TextPrimary,
