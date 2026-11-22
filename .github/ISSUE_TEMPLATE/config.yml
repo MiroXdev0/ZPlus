@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability reporting
+    url: https://github.com/MiroXdev0/Z-lang-release/security/advisories/new
+    about: Report vulnerabilities privately. See SECURITY.md for alternate contact.
+  - name: Z+ documentation
+    url: https://zpluse.vercel.app/
+    about: Check the language and tool documentation before opening a question.
