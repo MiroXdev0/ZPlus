@@ -1,5 +1,0 @@
-start {
-pub fn unused(): number {
-    return 7
-} end fn
-} stop

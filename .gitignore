@@ -9,6 +9,7 @@ build-release-1.3.3/
 *.vscode/
 *.dll
 node_modules/
+*.exe
 
 # Local Neon project links and credentials.
 .neon
