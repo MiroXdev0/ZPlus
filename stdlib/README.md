@@ -22,7 +22,7 @@ Terminal input is provided by compiler built-ins rather than a standard-module
 import. `read()`, `read_number()`, `read_integer()`, and `read_boolean()` accept
 an optional string prompt, which is flushed before input is read. Their
 behavior, EOF handling, and examples are documented in the
-[built-in function reference](../SYNTAX.md#10-built-in-functions).
+[built-in function reference](../docs/syntax.md#10-built-in-functions).
 
 ## Implemented modules
 

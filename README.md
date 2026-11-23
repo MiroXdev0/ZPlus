@@ -7,7 +7,7 @@ The compiler source version in this checkout is **1.4.0**. The latest stable rel
 ## Capabilities
 
 - Typed variables, functions, control flow, arrays, classes, visibility modifiers, enums, structs, and constrained generics.
-- Interpreter execution and native x86-64 compilation. Supported features differ by operating system and backend; see [NATIVE_BACKEND.md](./NATIVE_BACKEND.md) and [SYNTAX.md](./SYNTAX.md).
+- Interpreter execution and native x86-64 compilation. Supported features differ by operating system and backend; see [NATIVE_BACKEND.md](./NATIVE_BACKEND.md) and the [language syntax reference](./docs/syntax.md).
 - File-based `.zh` modules and `use` imports.
 - Standard library modules for text, files, paths, math, time, JSON, HTTP, SQLite, graphics, audio, physics, and other integrations. Availability depends on platform and dependencies.
 - ZPBuild project build orchestration and ZPM package tooling.
@@ -46,7 +46,7 @@ zp build hello.zp -o hello
 
 Import relative `.zh` modules with `use`, for example `use "helpers.zh" as helpers`. Module paths resolve relative to the importing file. Public exports use `pub`. See [MODULES.md](./MODULES.md).
 
-- [Language syntax](./SYNTAX.md) and [standard library](./stdlib/README.md)
+- [Language syntax](./docs/syntax.md) and [standard library](./stdlib/README.md)
 - [ZPBuild](./docs/ZBUILD.md) and [ZPM](./docs/ZPM.md)
 - [ZGraphics](./ZGraphics/README.md)
 - [Windows installer](./installer/inno/README.md)

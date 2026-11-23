@@ -30,7 +30,7 @@ back to interpretation.
 | VS Code extension | `Z+_VS_code/` provides compiler-backed checks, completion, hover, signature help, definition navigation, snippets, and module-aware editor behavior. | Editor support follows the compiler's implemented syntax and cannot make incomplete runtime features executable. |
 | Host integration | The only existing C ABI is the ZGraphics-specific adapter in `runtime/graphics/NativeApi.cpp`. | A general, stable C embedding API and host-function registration interface are not implemented. Nodren-specific SDK and host integration are explicitly out of scope. |
 
-The public syntax reference, `SYNTAX.md`, documents accepted-but-incomplete
+The public syntax reference, `docs/syntax.md`, documents accepted-but-incomplete
 constructs and is the current support matrix. Do not infer executable support
 from successful parsing, semantic analysis, or IR generation alone.
 

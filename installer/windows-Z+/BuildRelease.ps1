@@ -131,7 +131,8 @@ try {
     New-Item -ItemType Directory -Path $docs, $examples | Out-Null
     Copy-NonemptyTree -SourceDirectory (Join-Path $repositoryRoot 'docs') -DestinationDirectory $docs
     Copy-NonemptyTree -SourceDirectory (Join-Path $repositoryRoot 'examples') -DestinationDirectory $examples
-    Copy-Item -LiteralPath (Join-Path $repositoryRoot 'SYNTAX.md') -Destination $docs
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot 'docs\syntax.md') `
+        -Destination (Join-Path $docs 'SYNTAX.md')
     Copy-Item -LiteralPath (Join-Path $repositoryRoot 'LICENSE.txt') -Destination $payload
     $notices = Join-Path $repositoryRoot 'release\windows\THIRD-PARTY-NOTICES.txt'
     Copy-Item -LiteralPath $notices -Destination $payload
