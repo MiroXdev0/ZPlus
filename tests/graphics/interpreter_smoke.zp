@@ -1,23 +1,23 @@
-use zgraphics
+use zp.graphics
 
 start {
 
-    let app = zgraphics.createWindow("ZGraphics runtime test", 320, 240)
-    zgraphics.background(app, "#152030")
-    zgraphics.text(app, "Interpreter smoke test", 12, 12, "#FFFFFF", 18)
-    zgraphics.line(app, 0, 0, 30, 30, "#00FF00", 2)
-    zgraphics.rectangle(app, 40, 40, 30, 20, "#FF0000", true, 1)
-    zgraphics.circle(app, 100, 100, 15, "#0000FF", false, 2)
-    say(zgraphics.numberText(12))
-    zgraphics.setPosition(app, 24, 36)
-    zgraphics.resize(app, 320, 240)
-    zgraphics.setTargetFPS(app, 0)
-    zgraphics.update(app)
-    if zgraphics.isOpen(app) and zgraphics.deltaTimeMs(app) >= 0 and not zgraphics.keyDown(app, 65) {
+    let app = graphics.createWindow("ZGraphics runtime test", 320, 240)
+    graphics.background(app, "#152030")
+    graphics.text(app, "Interpreter smoke test", 12, 12, "#FFFFFF", 18)
+    graphics.line(app, 0, 0, 30, 30, "#00FF00", 2)
+    graphics.rectangle(app, 40, 40, 30, 20, "#FF0000", true, 1)
+    graphics.circle(app, 100, 100, 15, "#0000FF", false, 2)
+    say(graphics.numberText(12))
+    graphics.setPosition(app, 24, 36)
+    graphics.resize(app, 320, 240)
+    graphics.setTargetFPS(app, 0)
+    graphics.update(app)
+    if graphics.isOpen(app) and graphics.deltaTimeMs(app) >= 0 and not graphics.keyDown(app, 65) {
         say("ZGraphics input and frame APIs passed")
     } else {
         say("ZGraphics input and frame APIs failed")
     } end if
-    zgraphics.close(app)
+    graphics.close(app)
     say("ZGraphics interpreter integration passed")
 } stop

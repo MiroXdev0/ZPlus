@@ -40,9 +40,9 @@ jobs:
           npm test --prefix website
       - name: Check VS Code extension
         run: |
-          npm ci --prefix 'Z+_VS_code'
-          npm run check --prefix 'Z+_VS_code'
-          npm test --prefix 'Z+_VS_code'
+          npm ci --prefix 'ZPlus_VS_code_extension'
+          npm run check --prefix 'ZPlus_VS_code_extension'
+          npm test --prefix 'ZPlus_VS_code_extension'
       - name: Test web interop tool
         run: npm test --prefix tools/zplus-web-interop
 

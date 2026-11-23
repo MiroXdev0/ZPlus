@@ -630,7 +630,7 @@ start {
 
 `use` is a module-loading statement. Relative paths are resolved from the directory of the file containing the statement; both `/` and `\` separators are normalized. Quoted paths support spaces. The target must exist and have a `.zh` extension. Absolute paths (including drive-qualified and UNC paths) are rejected. Dependencies are traversed depth-first in source order; canonical paths identify modules and repeated references load once. A cycle fails with a dependency-chain diagnostic.
 
-The default module name comes from the filename stem with non-identifier characters replaced by `_`; directories do not create name components. Bare dotted standard-module names map their components to standard-library directories and use the first component as the default module name (for example, `use zmemory.management` exposes `zmemory`). `as alias` sets an explicit identifier. Distinct modules with conflicting names, duplicate aliases, and repeated use of one file under different names are errors. Public functions, variables/constants, structs, classes, and enums may be referenced as `module.name`. Unambiguous public declarations are also accessible unqualified.
+The default module name comes from the filename stem with non-identifier characters replaced by `_`; directories do not create name components. Canonical standard-library names use `zp.<library>[.<module>...]` and resolve beneath the configured standard-library directory (for example, `use zp.memory.management` exposes `memory`). `as alias` sets an explicit identifier. Legacy names such as `zmemory.management` still resolve temporarily, retain their old alias, and emit a deprecation warning; the old bare `math` name resolves the helper API at `zp.math.legacy`. Distinct modules with conflicting names, duplicate aliases, and repeated use of one file under different names are errors. Public functions, variables/constants, structs, classes, and enums may be referenced as `module.name`. Unambiguous public declarations are also accessible unqualified.
 
 Declarations in `.zh` files are private by default. Prefix declarations with `pub` to expose them outside the module. Private functions and variables cannot be referenced by an importer; private custom types cannot be constructed or used from another module. Public custom types can be referenced by their unqualified type name, and struct constructors can also be qualified through the module alias. Dotted type annotations are not implemented. Duplicate declarations and ambiguous public unqualified names are errors.
 
@@ -651,8 +651,8 @@ See [MODULES.md](./MODULES.md) for the module loader's resolution and validation
 Standard module names resolve from the configured compiler `stdlib/` directory:
 
 ```zp
-use zmath as math
-use zstring as text
+use zp.math as math
+use zp.string as text
 
 start {
     let result: number = math.sqrt(144) + math.pow(2, 3)
@@ -671,12 +671,12 @@ multiple distinct aliases are not supported.
 
 ### Managed memory
 
-`use zmemory.management` exposes `heapUsed()`, `heapObjects()`, `collect()`,
+`use zp.memory.management` exposes `heapUsed()`, `heapObjects()`, `collect()`,
 `collectionCount()`, and `setThreshold(bytes)`. The interpreter automatically
 manages arrays and dynamically concatenated strings with a tracing collector.
 Windows x64 native programs manage arrays and dynamic strings through the
 packaged runtime. Linux native memory support is unavailable. See
-[memory-management.md](./docs/memory-management.md) for ownership, roots,
+[memory-management.md](./memory-management.md) for ownership, roots,
 thresholds, and limitations.
 
 ## 10. Built-in Functions
@@ -763,7 +763,7 @@ Keywords are case-sensitive and lowercase. Keyword spellings cannot generally be
 | Literals | `true`, `false`, `null`, `nullptr` |
 | Logical / type relation | `and`, `or`, `not`, `is` |
 
-All listed words are lexed as keywords, but not all have a supported parser construct. `pub` marks module declarations public and is also a class-member visibility modifier; `private` and `protected` are supported for class members. `public` remains reserved but is not a supported modifier. `this` is supported in class methods. `as` supports module aliases (and the older import alias syntax). `printz` is a working output built-in; `printm` remains an identifier-based deprecated alias. `repeat`, `number`, and `boolean` are specially allowed as qualified member or function names for the standard library. `stop` is also allowed as a qualified member or function name, so `zaudio.stop(handle)` works despite `stop` closing a `start:` block. Identifiers start with a letter or `_` and continue with letters, digits, or `_`. Matching is case-sensitive (`score` and `Score` are different names).
+All listed words are lexed as keywords, but not all have a supported parser construct. `pub` marks module declarations public and is also a class-member visibility modifier; `private` and `protected` are supported for class members. `public` remains reserved but is not a supported modifier. `this` is supported in class methods. `as` supports module aliases (and the older import alias syntax). `printz` is a working output built-in; `printm` remains an identifier-based deprecated alias. `repeat`, `number`, and `boolean` are specially allowed as qualified member or function names for the standard library. `stop` is also allowed as a qualified member or function name, so `audio.stop(handle)` works despite `stop` closing a `start:` block. Identifiers start with a letter or `_` and continue with letters, digits, or `_`. Matching is case-sensitive (`score` and `Score` are different names).
 
 ## 13. Operator Precedence
 
@@ -800,7 +800,7 @@ Bitwise operators follow the tiers shown above. The parser does not recognize `a
 | Strings and concatenation | Supported | Executable |
 | Binary, hexadecimal, decimal, scientific numeric literals | Supported | Parsed and represented as doubles; Windows x64 native execution supports fractions and IEEE-754 division/comparison |
 | Arrays and indexing | Parsed, semantically checked | Nested arrays, indexing, mutation, and length execute in the interpreter and Windows x64 native backend and are tracing-GC managed; Linux native compilation rejects them |
-| Managed memory | `use zmemory.management` and public APIs | Interpreter arrays/dynamic strings and Windows x64 native arrays/dynamic strings use mark-and-sweep; other interpreter strings remain value-owned |
+| Managed memory | `use zp.memory.management` and public APIs | Interpreter arrays/dynamic strings and Windows x64 native arrays/dynamic strings use mark-and-sweep; other interpreter strings remain value-owned |
 | Structs | Parsed, semantically checked | Interpreter and Windows x64 runtime values; Linux native unsupported |
 | Classes | Braced declarations inside `start`; typed fields and methods checked | Interpreter and Windows x64: construction, fields, `this`, instance calls |
 | Enums | Braced declarations inside `start`; numeric members and type checks | Interpreter and Windows x64: member values, comparisons, function arguments/returns |
@@ -808,8 +808,8 @@ Bitwise operators follow the tiers shown above. The parser does not recognize `a
 | Member access and `->` | Struct/class fields and class methods are checked | Struct/class fields and methods execute in the interpreter and Windows x64 native backend; arbitrary member operations and `->` are unsupported |
 | Pointer types and address-of | Parsed; pointer types accepted | Address-of fails IR generation; no runtime pointers |
 | `use` with `.zh` declarations | Parsed by compiler and extension; imported declarations belong in the module's declaration-only `start` block | Canonical-path dependency graph; public/private visibility, aliases, qualified function/variable/constant access; globals initialize in interpreter and native supported scalar subset |
-| `zaudio` standard module | `use zaudio` and its documented API pass checking | Interpreter and native Windows x64 integrations are tested; native Linux x86-64 imports and runtime staging are implemented but not validated on Linux |
-| `zphysics` standard module | `use zphysics` and its documented API pass checking | Box2D engine and Windows native runtime are implemented; Linux native execution is not validated |
+| `zp.audio` standard module | `use zp.audio` and its documented API pass checking | Interpreter and native Windows x64 integrations are tested; native Linux x86-64 imports and runtime staging are implemented but not validated on Linux |
+| `zp.physics` standard module | `use zp.physics` and its documented API pass checking | Box2D engine and Windows native runtime are implemented; Linux native execution is not validated |
 | `import`, `export`, namespaces | Parsed and analyzed | Legacy `import` does not load files; `export` wraps declarations; namespace functions use qualified names |
 | `pub` | Parsed for module functions, variables/constants, structs, classes, and enums | Enforced for imported references |
 | `public`, `private`, `protected`, `this` | `this` is supported in class methods; visibility modifiers are supported on class fields and methods | Non-public access is checked semantically; protected subclass access awaits inheritance |
@@ -820,43 +820,43 @@ Bitwise operators follow the tiers shown above. The parser does not recognize `a
 
 ### ZGraphics module
 
-The standard-library module `zgraphics` provides numeric window handles and module functions for creating/showing windows, drawing text and basic shapes, and receiving basic native events. The calls are accepted by the parser and semantic analyzer, then dispatched by the interpreter or, on Windows x64, the packaged native graphics runtime.
+The standard-library module `zp.graphics` provides numeric window handles and module functions for creating/showing windows, drawing text and basic shapes, and receiving basic native events. The calls are accepted by the parser and semantic analyzer, then dispatched by the interpreter or, on Windows x64, the packaged native graphics runtime.
 
 ```zp
-use zgraphics
+use zp.graphics
 
 start {
-    let app = zgraphics.createWindow("Z+ graphics", 640, 360)
-    zgraphics.background(app, "#18202B")
-    zgraphics.text(app, "Close this window to exit", 24, 28, "#FFFFFF", 24)
-    zgraphics.show(app)
-    zgraphics.run(app)
+    let app = graphics.createWindow("Z+ graphics", 640, 360)
+    graphics.background(app, "#18202B")
+    graphics.text(app, "Close this window to exit", 24, 28, "#FFFFFF", 24)
+    graphics.show(app)
+    graphics.run(app)
 } stop
 ```
 
-This opens a real desktop window when run with `zp run` or built as a native Windows x64 program. Native builds package `zgraphics_runtime.dll` beside the output executable; both files must remain together. Linux native graphics linking is not implemented. Basic drawing calls include `line`, `rectangle`, and `circle`. `pollEvent` returns immediately with an event code or `0`; `waitEvent` blocks. Event details are read through `eventX`, `eventY`, `eventKey`, and `eventText`. Event codes are `1` for close, `2`/`3` for mouse down/up, `4` for mouse move, `5` for key down, and `6` for text input. See [ZGraphics/README.md](./ZGraphics/README.md) for the complete API and platform limitations. There are no object methods, native controls, or function callbacks.
+This opens a real desktop window when run with `zp run` or built as a native Windows x64 program. Native builds package `zgraphics_runtime.dll` beside the output executable; both files must remain together. Linux native graphics linking is not implemented. Basic drawing calls include `line`, `rectangle`, and `circle`. `pollEvent` returns immediately with an event code or `0`; `waitEvent` blocks. Event details are read through `eventX`, `eventY`, `eventKey`, and `eventText`. Event codes are `1` for close, `2`/`3` for mouse down/up, `4` for mouse move, `5` for key down, and `6` for text input. See [ZPGraphics/README.md](../ZPGraphics/README.md) for the complete API and platform limitations. There are no object methods, native controls, or function callbacks.
 
 ### Audio module
 
-The standard-library module `zaudio` provides music and sound-effect playback through miniaudio. Music streams from WAV, OGG Vorbis, or MP3 files; sound effects support overlapping instances. Handles are numeric IDs rather than ZMemory-managed objects, so release them explicitly with `unload()` or `unloadAll()`.
+The standard-library module `zp.audio` provides music and sound-effect playback through miniaudio. Music streams from WAV, OGG Vorbis, or MP3 files; sound effects support overlapping instances. Handles are numeric IDs rather than ZMemory-managed objects, so release them explicitly with `unload()` or `unloadAll()`.
 
 ```zp
-use zaudio
+use zp.audio
 
-zaudio.initialize()
-let music = zaudio.loadMusic("assets/theme.ogg")
-let effect = zaudio.loadSound("assets/jump.wav")
+audio.initialize()
+let music = audio.loadMusic("assets/theme.ogg")
+let effect = audio.loadSound("assets/jump.wav")
 
-zaudio.setLooping(music, true)
-zaudio.setVolume(music, 0.7)
-zaudio.play(music)
-zaudio.play(effect)
-zaudio.pause(music)
-zaudio.resume(music)
-zaudio.stop(effect)
-zaudio.stop(music)
-zaudio.unloadAll()
-zaudio.shutdown()
+audio.setLooping(music, true)
+audio.setVolume(music, 0.7)
+audio.play(music)
+audio.play(effect)
+audio.pause(music)
+audio.resume(music)
+audio.stop(effect)
+audio.stop(music)
+audio.unloadAll()
+audio.shutdown()
 ```
 
 The API also includes `initialized`, `isPlaying`, `isPaused`, `isStopped`, `getVolume`, `isLooping`, playback-position and duration queries, master volume and mute controls, device enumeration/selection, and resource release. Volume is clamped to `[0.0, 1.0]`; invalid handles, unsupported/corrupt files, and unavailable devices report runtime errors. Unloading an active handle stops it before releasing its playback resources. Audio work is performed by miniaudio's device thread; Z+ code is not invoked from its callback.
@@ -865,24 +865,24 @@ Interpreter and native Windows x64 integration tests pass. ZBuild detects audio 
 
 ### ZPhysics module
 
-The standard-library module `zphysics` wraps Box2D 3.1.1 for fixed-step 2D
+The standard-library module `zp.physics` wraps Box2D 3.1.1 for fixed-step 2D
 simulation, rigid bodies, collision shapes and sensors, joints, contacts, and
 queries. Handles are validated numeric IDs; explicitly destroy resources or
 destroy their owning world. Polygon vertices use a semicolon-separated
 `x,y;x,y;...` string.
 
 ```zp
-use zphysics
+use zp.physics
 
 start {
-    let world = zphysics.createWorld(0, 980)
-    let floor = zphysics.createBody(world, "static", 320, 420)
-    zphysics.createBox(world, floor, 600, 20)
-    let ball = zphysics.createBody(world, "dynamic", 320, 60)
-    zphysics.createCircle(world, ball, 18)
-    zphysics.update(world, 1 / 60)
-    say(zphysics.getPositionY(ball))
-    zphysics.destroyWorld(world)
+    let world = physics.createWorld(0, 980)
+    let floor = physics.createBody(world, "static", 320, 420)
+    physics.createBox(world, floor, 600, 20)
+    let ball = physics.createBody(world, "dynamic", 320, 60)
+    physics.createCircle(world, ball, 18)
+    physics.update(world, 1 / 60)
+    say(physics.getPositionY(ball))
+    physics.destroyWorld(world)
 } stop
 ```
 

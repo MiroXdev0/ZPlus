@@ -1,17 +1,17 @@
-use zgraphics
+use zp.graphics
 
 start {
 
-    let first = zgraphics.createWindow("Z+ Window One", 480, 300)
-    let second = zgraphics.createWindow("Z+ Window Two", 480, 300)
-    zgraphics.background(first, "#172554")
-    zgraphics.background(second, "#3F1D2E")
-    zgraphics.text(first, "This is the first window.", 28, 35, "#FFFFFF", 22)
-    zgraphics.text(second, "This is the second window.", 28, 35, "#FFFFFF", 22)
-    zgraphics.text(first, "Close this window to end the application.", 28, 100, "#BFDBFE", 16)
-    zgraphics.text(second, "Each window has its own drawing surface.", 28, 100, "#FBCFE8", 16)
-    zgraphics.show(first)
-    zgraphics.show(second)
-    zgraphics.run(first)
-    zgraphics.close(second)
+    let first = graphics.createWindow("Z+ Window One", 480, 300)
+    let second = graphics.createWindow("Z+ Window Two", 480, 300)
+    graphics.background(first, "#172554")
+    graphics.background(second, "#3F1D2E")
+    graphics.text(first, "This is the first window.", 28, 35, "#FFFFFF", 22)
+    graphics.text(second, "This is the second window.", 28, 35, "#FFFFFF", 22)
+    graphics.text(first, "Close this window to end the application.", 28, 100, "#BFDBFE", 16)
+    graphics.text(second, "Each window has its own drawing surface.", 28, 100, "#FBCFE8", 16)
+    graphics.show(first)
+    graphics.show(second)
+    graphics.run(first)
+    graphics.close(second)
 } stop

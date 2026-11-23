@@ -1,11 +1,11 @@
-use zgraphics
+use zp.graphics
 start {
 
 pub fn draw(window: number) {
-    zgraphics.rectangle(window, 0, 0, 720, 420, "#18202B", true, 1)
-    zgraphics.rectangle(window, 20, 68, 680, 2, "#334155", true, 1)
-    zgraphics.rectangle(window, 20, 390, 680, 2, "#334155", true, 1)
-    zgraphics.text(window, "Collect the gold circle", 24, 24, "#E2E8F0", 22)
-    zgraphics.text(window, "WASD moves; Escape quits", 24, 44, "#94A3B8", 14)
+    graphics.rectangle(window, 0, 0, 720, 420, "#18202B", true, 1)
+    graphics.rectangle(window, 20, 68, 680, 2, "#334155", true, 1)
+    graphics.rectangle(window, 20, 390, 680, 2, "#334155", true, 1)
+    graphics.text(window, "Collect the gold circle", 24, 24, "#E2E8F0", 22)
+    graphics.text(window, "WASD moves; Escape quits", 24, 44, "#94A3B8", 14)
 } end fn
 } stop

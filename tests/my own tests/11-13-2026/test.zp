@@ -1,6 +1,6 @@
-use zpath as path
-use zstring as text
-use zenv as env
+use zp.path as path
+use zp.string as text
+use zp.env as env
 
 
 start {

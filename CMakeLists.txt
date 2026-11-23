@@ -45,24 +45,24 @@ cmake_policy(POP)
 FetchContent_MakeAvailable(box2d)
 
 add_library(zbuild_engine STATIC
-    zbuild/Build.cpp
-    zbuild/BuildGraph.cpp
-    zbuild/Cache.cpp
-    zbuild/Config.cpp
-    zbuild/Dependencies.cpp
-    zbuild/Filesystem.cpp
-    zbuild/Hash.cpp
-    zbuild/Packages.cpp
-    zbuild/Process.cpp
-    zbuild/RegistryClient.cpp
-    zbuild/RegistryPackages.cpp
-    zbuild/Template.cpp
+    zpbuild/Build.cpp
+    zpbuild/BuildGraph.cpp
+    zpbuild/Cache.cpp
+    zpbuild/Config.cpp
+    zpbuild/Dependencies.cpp
+    zpbuild/Filesystem.cpp
+    zpbuild/Hash.cpp
+    zpbuild/Packages.cpp
+    zpbuild/Process.cpp
+    zpbuild/RegistryClient.cpp
+    zpbuild/RegistryPackages.cpp
+    zpbuild/Template.cpp
     runtime/Json.cpp
 )
 target_compile_definitions(zbuild_engine PRIVATE "ZBUILD_VERSION=\"${ZBUILD_VERSION}\"")
 target_compile_definitions(zbuild_engine PRIVATE "ZPM_VERSION=\"${ZPM_VERSION}\"")
 target_include_directories(zbuild_engine PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/zbuild
+    ${CMAKE_CURRENT_SOURCE_DIR}/zpbuild
 )
 if(WIN32)
     target_link_libraries(zbuild_engine PUBLIC winhttp crypt32)
@@ -70,12 +70,12 @@ else()
     find_package(CURL REQUIRED)
     target_link_libraries(zbuild_engine PUBLIC CURL::libcurl)
 endif()
-add_executable(zbuild zbuild/main.cpp)
+add_executable(zbuild zpbuild/main.cpp)
 target_link_libraries(zbuild PRIVATE zbuild_engine)
 target_compile_definitions(zbuild PRIVATE "ZBUILD_VERSION=\"${ZBUILD_VERSION}\"")
 add_custom_command(TARGET zbuild POST_BUILD
     COMMAND ${CMAKE_COMMAND}
-        "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/zbuild/templates"
+        "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/zpbuild/templates"
         "-DDESTINATION_DIR=$<TARGET_FILE_DIR:zbuild>/zbuild-templates"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CopyDirectoryIfDifferent.cmake"
     COMMAND ${CMAKE_COMMAND}
@@ -90,18 +90,18 @@ add_custom_command(TARGET zbuild POST_BUILD
         "-DCONFIG=$<CONFIG>"
         "-DSOURCE_FILE=$<TARGET_FILE:zbuild>"
         "-DDESTINATION_DIR=${ZPLUS_RELEASE_BIN_DIR}"
-        "-DTEMPLATE_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/zbuild/templates"
+        "-DTEMPLATE_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/zpbuild/templates"
         "-DSTDLIB_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/stdlib"
         -P "${CMAKE_SOURCE_DIR}/cmake/CopyReleaseZBuild.cmake"
     VERBATIM
     COMMENT "Installing the Release zbuild compatibility executable into bin/"
 )
-add_executable(zpbuild zbuild/main.cpp)
+add_executable(zpbuild zpbuild/main.cpp)
 target_link_libraries(zpbuild PRIVATE zbuild_engine)
 target_compile_definitions(zpbuild PRIVATE "ZBUILD_VERSION=\"${ZBUILD_VERSION}\"")
 add_custom_command(TARGET zpbuild POST_BUILD
     COMMAND ${CMAKE_COMMAND}
-        "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/zbuild/templates"
+        "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/zpbuild/templates"
         "-DDESTINATION_DIR=$<TARGET_FILE_DIR:zpbuild>/zbuild-templates"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CopyDirectoryIfDifferent.cmake"
     COMMAND ${CMAKE_COMMAND}
@@ -112,7 +112,7 @@ add_custom_command(TARGET zpbuild POST_BUILD
         "-DCONFIG=$<CONFIG>"
         "-DSOURCE_FILE=$<TARGET_FILE:zpbuild>"
         "-DDESTINATION_DIR=${ZPLUS_RELEASE_BIN_DIR}"
-        "-DTEMPLATE_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/zbuild/templates"
+        "-DTEMPLATE_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/zpbuild/templates"
         "-DSTDLIB_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/stdlib"
         -P "${CMAKE_SOURCE_DIR}/cmake/CopyReleaseZBuild.cmake"
     VERBATIM
@@ -163,8 +163,8 @@ add_executable(zp
 target_compile_definitions(zp PRIVATE "ZPLUS_VERSION=\"${PROJECT_VERSION}\"")
 
 add_library(zplus_graphics STATIC
-    ZGraphics/Core/Window.cpp
-    ZGraphics/Rendering/Color.cpp
+    ZPGraphics/Core/Window.cpp
+    ZPGraphics/Rendering/Color.cpp
 )
 
 if(WIN32)
@@ -219,20 +219,20 @@ if(WIN32)
     zplus_add_version_resource(zpbuild "ZPBuild CLI" "zpbuild.exe" VFT_APP "${ZBUILD_VERSION}")
     zplus_add_version_resource(zpm "ZPM CLI" "zpm.exe" VFT_APP "${ZPM_VERSION}")
     target_sources(zplus_graphics PRIVATE
-        ZGraphics/Platform/WindowsWindow.cpp
+        ZPGraphics/Platform/WindowsWindow.cpp
     )
     target_link_libraries(zplus_graphics PUBLIC user32 gdi32 gdiplus)
 else()
     find_package(X11 REQUIRED)
     target_sources(zplus_graphics PRIVATE
-        ZGraphics/Platform/X11Window.cpp
+        ZPGraphics/Platform/X11Window.cpp
     )
     target_include_directories(zplus_graphics PRIVATE ${X11_INCLUDE_DIR})
     target_link_libraries(zplus_graphics PUBLIC ${X11_LIBRARIES})
 endif()
 
 target_include_directories(zplus_graphics PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/ZGraphics
+    ${CMAKE_CURRENT_SOURCE_DIR}/ZPGraphics
 )
 target_link_libraries(zp PRIVATE zplus_graphics)
 find_package(Threads REQUIRED)
@@ -919,6 +919,15 @@ if(BUILD_TESTING)
     )
     set_tests_properties(standard_library_module_imports PROPERTIES
         PASS_REGULAR_EXPRESSION "all standard-library modules imported"
+    )
+    add_test(
+        NAME standard_library_namespace_resolution
+        COMMAND ${CMAKE_COMMAND}
+            "-DZP=$<TARGET_FILE:zp>"
+            "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/stdlib-namespace-test-output"
+            "-DHOST_WINDOWS=$<BOOL:${WIN32}>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/stdlib/run_namespace_tests.cmake"
     )
     if(WIN32)
         add_test(

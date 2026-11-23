@@ -1,11 +1,11 @@
-use zgraphics
+use zp.graphics
 
 start {
 
-    let app = zgraphics.createWindow("Hello, Z+", 720, 420)
-    zgraphics.background(app, "#18202B")
-    zgraphics.text(app, "A real Z+ desktop window", 36, 44, "#FFFFFF", 30)
-    zgraphics.text(app, "Close the window to exit.", 38, 104, "#B8C7D9", 18)
-    zgraphics.show(app)
-    zgraphics.run(app)
+    let app = graphics.createWindow("Hello, Z+", 720, 420)
+    graphics.background(app, "#18202B")
+    graphics.text(app, "A real Z+ desktop window", 36, 44, "#FFFFFF", 30)
+    graphics.text(app, "Close the window to exit.", 38, 104, "#B8C7D9", 18)
+    graphics.show(app)
+    graphics.run(app)
 } stop

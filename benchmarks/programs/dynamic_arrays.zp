@@ -1,8 +1,8 @@
-use zmemory.management
-use zgraphics
+use zp.memory.management
+use zp.graphics
 
 start {
-    zmemory.setThreshold(1024)
+    memory.setThreshold(1024)
     let values: number[] = []
     for (let i: number = 0; i < 20000; i++) {
         push(values, i)
@@ -43,17 +43,17 @@ start {
         let child: number[] = [i]
         push(nested, child)
     } end for
-    zmemory.collect()
+    memory.collect()
     if nested[199][0] == 199 and values[14999] == 14999 {
         say("nested references survived collection")
     } else {
         say("collection workload failed")
     } end if
 
-    let heapBytes = zmemory.heapUsed()
-    let liveObjects = zmemory.heapObjects()
-    let completedCollections = zmemory.collectionCount()
-    say("heap bytes: " + zgraphics.numberText(heapBytes))
-    say("live objects: " + zgraphics.numberText(liveObjects))
-    say("collections: " + zgraphics.numberText(completedCollections))
+    let heapBytes = memory.heapUsed()
+    let liveObjects = memory.heapObjects()
+    let completedCollections = memory.collectionCount()
+    say("heap bytes: " + graphics.numberText(heapBytes))
+    say("live objects: " + graphics.numberText(liveObjects))
+    say("collections: " + graphics.numberText(completedCollections))
 } stop

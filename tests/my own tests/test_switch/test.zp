@@ -1,14 +1,14 @@
 
-use zmath as math
-use zstring as text
-use zcollections as collections
-use zrandom as random
-use zfile as file
-use zpath as path
-use ztime as time
-use zenv as env
-use zargs as args
-use zlog as log
+use zp.math as math
+use zp.string as text
+use zp.collections as collections
+use zp.random as random
+use zp.file as file
+use zp.path as path
+use zp.time as time
+use zp.env as env
+use zp.args as args
+use zp.log as log
 
 start {
     fn options() {

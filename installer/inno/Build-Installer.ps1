@@ -189,8 +189,8 @@ try {
         'zphysics_runtime.dll',
         'sqlite3.dll',
         'zplus_input_runtime.dll',
-        'stdlib\zfile\zfile.zh',
-        'stdlib\zmath\zmath.zh',
+        'stdlib\zp\file\file.zh',
+        'stdlib\zp\math\math.zh',
         'zbuild-templates\Console\zproject.toml'
     )
     foreach ($relativePath in $requiredFiles) {

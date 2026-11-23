@@ -53,7 +53,7 @@ foreach ($required in @(
     }
 }
 $stdlibSource = Join-Path $compilerBuild 'stdlib'
-if (-not (Test-Path -LiteralPath (Join-Path $stdlibSource 'zstring\zstring.zh'))) {
+if (-not (Test-Path -LiteralPath (Join-Path $stdlibSource 'zp\string\string.zh'))) {
     if (-not [string]::IsNullOrWhiteSpace($CompilerDistributionPath)) {
         throw "The selected compiler distribution does not include its matching standard library: '$stdlibSource'."
     }

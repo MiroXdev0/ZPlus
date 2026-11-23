@@ -40,7 +40,7 @@ internal sealed class CompilerVerifier(InstallLogger logger)
 
         string stdlib = Path.Combine(installPath, "stdlib");
         if (!Directory.Exists(stdlib) ||
-            !File.Exists(Path.Combine(stdlib, "zmath", "zmath.zh")))
+            !File.Exists(Path.Combine(stdlib, "zp", "math", "math.zh")))
             throw new DirectoryNotFoundException(
                 $"The installed standard library is missing or incomplete: {stdlib}");
 
@@ -51,7 +51,7 @@ internal sealed class CompilerVerifier(InstallLogger logger)
         {
             string libraryProgram = Path.Combine(verificationDirectory, "stdlib-check.zp");
             await File.WriteAllTextAsync(libraryProgram,
-                "use zmath as math\n\nstart:\n    say(math.pi() > 3 and math.pi() < 4 ? \"stdlib-ok\" : \"stdlib-fail\")\nstop\n",
+                "use zp.math as math\n\nstart:\n    say(math.pi() > 3 and math.pi() < 4 ? \"stdlib-ok\" : \"stdlib-fail\")\nstop\n",
                 cancellationToken);
             var environment = new Dictionary<string, string?>
             {

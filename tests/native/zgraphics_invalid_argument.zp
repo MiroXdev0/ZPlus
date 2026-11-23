@@ -1,7 +1,7 @@
-use zgraphics
+use zp.graphics
 
 start {
 
-    let app = zgraphics.createWindow("invalid", 0, 240)
-    zgraphics.close(app)
+    let app = graphics.createWindow("invalid", 0, 240)
+    graphics.close(app)
 } stop

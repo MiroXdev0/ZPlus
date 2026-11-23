@@ -362,14 +362,14 @@ check_program("module alias" success "")
 run_program("module alias" "42\n")
 
 set(stdlib_dir "${WORK_DIR}/standard library")
-file(MAKE_DIRECTORY "${stdlib_dir}/stdlib/math")
-file(COPY "${SOURCE_DIR}/stdlib/math/math.zh" DESTINATION "${stdlib_dir}/stdlib/math")
+file(MAKE_DIRECTORY "${stdlib_dir}/stdlib/zp/math")
+file(COPY "${SOURCE_DIR}/stdlib/zp/math/legacy.zh" DESTINATION "${stdlib_dir}/stdlib/zp/math")
 file(WRITE "${stdlib_dir}/main.zp"
-    "use \"stdlib/math/math.zh\" as math\nstart:\n    say(math.abs(-12))\n    say(math.min(2, 9))\n    say(math.max(2, 9))\n    say(math.clamp(20, 0, 10))\nstop\n")
+    "use \"stdlib/zp/math/legacy.zh\" as math\nstart:\n    say(math.abs(-12))\n    say(math.min(2, 9))\n    say(math.max(2, 9))\n    say(math.clamp(20, 0, 10))\nstop\n")
 check_program("standard library" success "")
 run_program("standard library" "12\n2\n9\n10\n")
 file(WRITE "${stdlib_dir}/native.zp"
-    "use \"stdlib/math/math.zh\" as math\nstart:\n    fn main() -> number:\n        return math.abs(-12) + math.min(2, 9) + math.max(2, 9) + math.clamp(20, 0, 10) - 33\n    end\nstop\n")
+    "use \"stdlib/zp/math/legacy.zh\" as math\nstart:\n    fn main() -> number:\n        return math.abs(-12) + math.min(2, 9) + math.max(2, 9) + math.clamp(20, 0, 10) - 33\n    end\nstop\n")
 execute_process(
     COMMAND "${ZP}" build native.zp -o stdlib-native.exe
     WORKING_DIRECTORY "${stdlib_dir}"

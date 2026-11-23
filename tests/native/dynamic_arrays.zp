@@ -1,4 +1,4 @@
-use zmemory.management
+use zp.memory.management
 
 start {
 
@@ -21,7 +21,7 @@ fn allocateTransient() {
     push(discarded, [4])
 } end fn
 
-    zmemory.setThreshold(1024)
+    memory.setThreshold(1024)
     let values: number[] = []
     push(values, 10)
     push(values, 20)
@@ -91,7 +91,7 @@ fn allocateTransient() {
         say("global array failed")
     } end if
 
-    let bytesBeforeGrowth = zmemory.heapUsed()
+    let bytesBeforeGrowth = memory.heapUsed()
     let stress: number[] = []
     for (let i: number = 0; i < 128; i++) {
         push(stress, i)
@@ -101,7 +101,7 @@ fn allocateTransient() {
     } else {
         say("geometric growth failed")
     } end if
-    if zmemory.heapUsed() > bytesBeforeGrowth {
+    if memory.heapUsed() > bytesBeforeGrowth {
         say("heap accounting passed")
     } else {
         say("heap accounting failed")
@@ -116,9 +116,9 @@ fn allocateTransient() {
     } end if
 
     allocateTransient()
-    let objectsBeforeCollection = zmemory.heapObjects()
-    zmemory.collect()
-    let objectsAfterCollection = zmemory.heapObjects()
+    let objectsBeforeCollection = memory.heapObjects()
+    memory.collect()
+    let objectsAfterCollection = memory.heapObjects()
     if values[0] == 15 and nested[0][0] == 5 and contains(words, "beta") {
         say("reachable arrays and strings survived collection")
     } else {

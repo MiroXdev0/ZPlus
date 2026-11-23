@@ -65,7 +65,7 @@ window.ZPlusSite = (() => {
     let remainder: number = 17 % 5
     say(remainder)
 } stop`, "Arithmetic expressions produce values that can be stored, compared, and printed."),
-      l("Strings", "A string is text enclosed in double quotes. Join strings with `+`; there is no string interpolation syntax. `zstring` offers additional text functions.", `start {
+      l("Strings", "A string is text enclosed in double quotes. Join strings with `+`; there is no string interpolation syntax. `zp.string` offers additional text functions.", `start {
     let greeting: string = "Hello, " + "Z+"
     say(greeting)
 } stop`, "Hello, Z+", "Join your first name and a greeting, then print the result.", `start {
@@ -234,7 +234,7 @@ window.ZPlusSite = (() => {
     let values: number[] = [4, 8, 12]
     say(values[2])
 } stop`, "Arrays hold an ordered sequence of values of a compatible type."),
-      l("Working with collections", "Core array functions include `push`, `insert`, `pop`, `remove`, `contains`, `clear`, and `length`. `zcollections` supplies numeric helpers such as `sum` and `average`.", `start {
+      l("Working with collections", "Core array functions include `push`, `insert`, `pop`, `remove`, `contains`, `clear`, and `length`. `zp.collections` supplies numeric helpers such as `sum` and `average`.", `start {
     let scores: number[] = [4, 7]
     push(scores, 9)
     say(contains(scores, 7))
@@ -244,7 +244,7 @@ window.ZPlusSite = (() => {
     push(tasks, "write")
     say(contains(tasks, "write"))
     say(length(tasks))
-} stop`, "Use core array operations for mutation; `zcollections` focuses on numeric-array utilities."),
+} stop`, "Use core array operations for mutation; `zp.collections` focuses on numeric-array utilities."),
       l("Structs and classes", "Structs and classes define nominal types with fields. A struct groups typed data; a class can also declare instance methods. Both use implicit positional construction and literal field defaults. Struct instances use reference semantics: assigning an instance to another variable preserves its identity.", `start {
     struct Point {
         x: number
@@ -270,10 +270,10 @@ window.ZPlusSite = (() => {
 } stop`, "Prefer implemented structures that match the problem; do not assume map/set APIs exist."),
     ]},
     { title: "Modules and the standard library", lessons: [
-      l("Importing modules with use", "`use` loads a standard library module or a relative `.zh` file. An alias names its namespace. Standard module imports are resolved by the compiler's configured standard-library directory.", `use zmath as math
+      l("Importing modules with use", "`use` loads a standard library module or a relative `.zh` file. An alias names its namespace. Standard module imports are resolved by the compiler's configured standard-library directory.", `use zp.math as math
 start {
     say(math.sqrt(81))
-} stop`, "9", "Import `zstring` as `text` and call `text.upper`.", `use zstring as text
+} stop`, "9", "Import `zp.string` as `text` and call `text.upper`.", `use zp.string as text
 start {
     say(text.upper("hello"))
 } stop`, "A module import keeps related functions under a clear namespace."),
@@ -291,53 +291,53 @@ start {
     } end fn
 } stop` }
       ]),
-      l("Strings and text processing", "`zstring` provides text functions such as `upper`, `lower`, `trim`, `split`, `join`, and `replace`. String length is counted in Unicode code points.", `use zstring as text
+      l("Strings and text processing", "`zp.string` provides text functions such as `upper`, `lower`, `trim`, `split`, `join`, and `replace`. String length is counted in Unicode code points.", `use zp.string as text
 start {
     say(text.upper("z plus"))
     say(text.length("Z+"))
-} stop`, "Z PLUS\n2", "Trim surrounding spaces from a string and print it.", `use zstring as text
+} stop`, "Z PLUS\n2", "Trim surrounding spaces from a string and print it.", `use zp.string as text
 start {
     say(text.trim("  ready  "))
 } stop`, "Call the module functions rather than assuming strings have built-in methods."),
-      l("Math utilities", "`zmath` includes functions such as `abs`, `round`, `sqrt`, `pow`, `min`, and `max`. The core `number` type is double precision. Standard-library functions and backend support vary, so check the module documentation before relying on a target-specific operation.", `use zmath as math
+      l("Math utilities", "`zp.math` includes functions such as `abs`, `round`, `sqrt`, `pow`, `min`, and `max`. The core `number` type is double precision. Standard-library functions and backend support vary, so check the module documentation before relying on a target-specific operation.", `use zp.math as math
 start {
     say(math.abs(-7))
     say(math.max(3, 9))
-} stop`, "7\n9", "Use `math.min` to print the smaller of 12 and 5.", `use zmath as math
+} stop`, "7\n9", "Use `math.min` to print the smaller of 12 and 5.", `use zp.math as math
 start {
     say(math.min(12, 5))
 } stop`, "The interpreter and Windows x64 native backend support the shown integer-valued results. Check target-specific documentation before relying on other math operations."),
-      l("File operations", "`zfile` exposes public functions including `exists`, `read`, `write`, `append`, `readLines`, and `writeLines`. I/O failures raise runtime errors; use `try`/`catch` when recovery is appropriate.", `use zfile as file
+      l("File operations", "`zp.file` exposes public functions including `exists`, `read`, `write`, `append`, `readLines`, and `writeLines`. I/O failures raise runtime errors; use `try`/`catch` when recovery is appropriate.", `use zp.file as file
 start {
     file.write("note.txt", "first")
     file.append("note.txt", " line")
     say(file.read("note.txt"))
-} stop`, "first line", "Write two lines to a file and read them back with `readLines`.", `use zfile as file
+} stop`, "first line", "Write two lines to a file and read them back with `readLines`.", `use zp.file as file
 start {
     file.writeLines("tasks.txt", ["learn", "build"])
     say(length(file.readLines("tasks.txt")))
 } stop`, "Use the public file API and handle expected I/O failures instead of hiding them."),
-      l("Working with paths", "`zpath` provides path operations such as `join`, `normalize`, `filename`, `extension`, and `isAbsolute`. Paths follow the host platform's filesystem rules.", `use zpath as path
+      l("Working with paths", "`zp.path` provides path operations such as `join`, `normalize`, `filename`, `extension`, and `isAbsolute`. Paths follow the host platform's filesystem rules.", `use zp.path as path
 start {
     let full: string = path.join("projects", "main.zp")
     say(path.filename(full))
-} stop`, "main.zp", "Join a folder and a file name, then print its extension.", `use zpath as path
+} stop`, "main.zp", "Join a folder and a file name, then print its extension.", `use zp.path as path
 start {
     let full: string = path.join("src", "app.zp")
     say(path.extension(full))
 } stop`, "Use path functions instead of manually concatenating separators."),
-      l("Environment variables", "`zenv` reads and writes process environment values. `exists` distinguishes a missing variable from an existing variable with an empty value. Changes affect only the current process, so results depend on the environment that launched the program.", `use zenv as env
+      l("Environment variables", "`zp.env` reads and writes process environment values. `exists` distinguishes a missing variable from an existing variable with an empty value. Changes affect only the current process, so results depend on the environment that launched the program.", `use zp.env as env
 start {
     say(env.exists("PATH"))
-} stop`, "", "Check whether a variable named `APP_MODE` exists.", `use zenv as env
+} stop`, "", "Check whether a variable named `APP_MODE` exists.", `use zp.env as env
 start {
     say(env.exists("APP_MODE"))
 } stop`, "Treat environment values as external input and check presence before relying on them."),
-      l("Time and dates", "`ztime` provides `now`, date-part helpers, `format`, `parse`, and `sleep`. Its format patterns follow the host C library's time-format conventions. Date-part results depend on the current host clock and local timezone.", `use ztime as time
+      l("Time and dates", "`zp.time` provides `now`, date-part helpers, `format`, `parse`, and `sleep`. Its format patterns follow the host C library's time-format conventions. Date-part results depend on the current host clock and local timezone.", `use zp.time as time
 start {
     let timestamp: number = time.now()
     say(time.year(timestamp))
-} stop`, "", "Read the current timestamp and print its month.", `use ztime as time
+} stop`, "", "Read the current timestamp and print its month.", `use zp.time as time
 start {
     let timestamp: number = time.now()
     say(time.month(timestamp))
@@ -365,7 +365,7 @@ start {
     } catch error {
         say(error.message)
     } end try
-} stop`, "On invalid input, the caught runtime error message is printed.", "Catch an error from a file read and show its message.", `use zfile as file
+} stop`, "On invalid input, the caught runtime error message is printed.", "Catch an error from a file read and show its message.", `use zp.file as file
 start {
     try {
         say(file.read("missing.txt"))
@@ -421,14 +421,14 @@ start {
         say(task)
     } end for
 } stop`, "Arrays and loops are enough to model and display a simple ordered TODO list."),
-      l("Reading and writing files", "Persist tasks by writing lines to disk and reading them again when the program starts. `writeLines` separates entries with newlines; filesystem errors can be caught.", `use zfile as file
+      l("Reading and writing files", "Persist tasks by writing lines to disk and reading them again when the program starts. `writeLines` separates entries with newlines; filesystem errors can be caught.", `use zp.file as file
 start {
     file.writeLines("tasks.txt", ["Learn Z+", "Build an app"])
     let tasks: string[] = file.readLines("tasks.txt")
     for task in tasks {
         say(task)
     } end for
-} stop`, "Learn Z+\nBuild an app", "Save two task strings to `tasks.txt`, read them back, and display them.", `use zfile as file
+} stop`, "Learn Z+\nBuild an app", "Save two task strings to `tasks.txt`, read them back, and display them.", `use zp.file as file
 start {
     let tasks: string[] = ["Practice", "Share"]
     file.writeLines("tasks.txt", tasks)
@@ -481,10 +481,10 @@ start {
     let total: number = 2 + 4 + 6
     say(total)
 } stop`, "Optimize measured bottlenecks while keeping the program easy to verify."),
-      l("Advanced standard-library functionality", "The standard library includes modules for JSON, HTTP, SQLite, graphics, audio, physics, and other tasks. Availability and backend support varies by operation and platform; read the module documentation first.", `use zmath as math
+      l("Advanced standard-library functionality", "The standard library includes modules for JSON, HTTP, SQLite, graphics, audio, physics, and other tasks. Availability and backend support varies by operation and platform; read the module documentation first.", `use zp.math as math
 start {
     say(math.pow(2, 3))
-} stop`, "8", "Choose a standard library module for one project requirement and confirm its backend support in the reference.", `use zstring as text
+} stop`, "8", "Choose a standard library module for one project requirement and confirm its backend support in the reference.", `use zp.string as text
 start {
     say(text.trim(" ready "))
 } stop`, "Standard library calls should be grounded in documented, implemented functions."),
@@ -566,12 +566,12 @@ start {
       ["Backend behavior", "Native compilation does not fall back to interpretation. Unsupported native operations are reported. Supported syntax and runtime features vary by platform."]
     ]},
     { id: "standard-library", title: "Standard library", section: "Reference", summary: "Module names, public functions, and backend limitations.", body: [
-      ["Imports", "Use `use zstring as text` or a dotted module such as `use zmemory.management as memory`. Call public functions through the imported namespace. The exact module set and compatibility depend on the packaged standard library."],
-      ["Math and text", "`zmath` exports `pi()`, `e()`, unary `abs`, `round`, `floor`, `ceil`, `sqrt`, trigonometric, logarithm and exponential functions, and binary `pow`, `min`, and `max` (all numeric). `zstring` exports `upper`, `lower`, `trim`, `reverse` `(string)->string`; `split(string,string)->string[]`; `join(string[],string)->string`; `replace(string,string,string)->string`; `contains`, `startsWith`, `endsWith` `(string,string)->boolean`; `substring(string,number,number)->string`; `length(string)->number`; and `repeat(string,number)->string`."],
-      ["Collections and randomness", "`zcollections` numeric-array APIs are `sum`, `average`, `min`, `max`, `reverse`, `sort`, `unique`, `contains`, `count`, `first`, `last`, and `isEmpty`. Core typed arrays also support `push`, `insert`, `pop`, `remove`, `contains`, `clear`, `length`, indexing, and `for` iteration. `zrandom` exports `integer(number,number)->number`, `number(number,number)->number`, `boolean()->boolean`, `choice(number[])->number`, `shuffle(number[])->number[]`, and `seed(number)->void`. Map and set types are not implemented."],
-      ["Files and paths", "`zfile` exports `read(string)->string`, `readLines(string)->string[]`, `write(string,string)->void`, `writeLines(string,string[])->void`, `append(string,string)->void`, `exists(string)->boolean`, `delete(string)->boolean`, `createDirectory(string)->boolean`, `listDirectory(string)->string[]`, `size(string)->number`, and `isDirectory(string)->boolean`. `zpath` exports `join(string,string)`, `normalize(string)`, `extension(string)`, `filename(string)`, `directory(string)`, `absolute(string)` (return strings), and `isAbsolute(string)->boolean`."],
-      ["Environment, time, arguments, logs", "`zenv` exports `get`, `exists`, `set`, `homeDirectory`, `currentDirectory`, and `arguments`. `ztime` exports `now`, `format`, `parse`, date-part helpers, and `sleep`. `zargs` exports `count`, `get`, `has`, and `all`. `zlog` exports `debug`, `info`, `warning`, `error`, `setLevel`, and `setOutput`. See the checked-in standard-library reference for exact parameter names and error behavior."],
-      ["Other public modules", "The source-backed modules also include `zjson` (JSON text and JSON Pointer operations), `zfilesystem` (copy/move and directory operations), `zprocess` (child process execution), `zcrypto` (file SHA-256), `zhttp` (HTTP client/server and request helpers), `zsqlite` (SQLite handles/queries), `zregistry` (Windows registry), `zsystem` (system and shell operations), `zmemory.management` (heap metrics and collection), `zaudio`, `zgraphics`, and `zphysics`. Function signatures and platform support are specific to each wrapper."],
+      ["Imports", "Use `use zp.string as text` or a dotted module such as `use zp.memory.management as memory`. Call public functions through the imported namespace. The exact module set and compatibility depend on the packaged standard library."],
+      ["Math and text", "`zp.math` exports `pi()`, `e()`, unary `abs`, `round`, `floor`, `ceil`, `sqrt`, trigonometric, logarithm and exponential functions, and binary `pow`, `min`, and `max` (all numeric). `zp.string` exports `upper`, `lower`, `trim`, `reverse` `(string)->string`; `split(string,string)->string[]`; `join(string[],string)->string`; `replace(string,string,string)->string`; `contains`, `startsWith`, `endsWith` `(string,string)->boolean`; `substring(string,number,number)->string`; `length(string)->number`; and `repeat(string,number)->string`."],
+      ["Collections and randomness", "`zp.collections` numeric-array APIs are `sum`, `average`, `min`, `max`, `reverse`, `sort`, `unique`, `contains`, `count`, `first`, `last`, and `isEmpty`. Core typed arrays also support `push`, `insert`, `pop`, `remove`, `contains`, `clear`, `length`, indexing, and `for` iteration. `zp.random` exports `integer(number,number)->number`, `number(number,number)->number`, `boolean()->boolean`, `choice(number[])->number`, `shuffle(number[])->number[]`, and `seed(number)->void`. Map and set types are not implemented."],
+      ["Files and paths", "`zp.file` exports `read(string)->string`, `readLines(string)->string[]`, `write(string,string)->void`, `writeLines(string,string[])->void`, `append(string,string)->void`, `exists(string)->boolean`, `delete(string)->boolean`, `createDirectory(string)->boolean`, `listDirectory(string)->string[]`, `size(string)->number`, and `isDirectory(string)->boolean`. `zp.path` exports `join(string,string)`, `normalize(string)`, `extension(string)`, `filename(string)`, `directory(string)`, `absolute(string)` (return strings), and `isAbsolute(string)->boolean`."],
+      ["Environment, time, arguments, logs", "`zp.env` exports `get`, `exists`, `set`, `homeDirectory`, `currentDirectory`, and `arguments`. `zp.time` exports `now`, `format`, `parse`, date-part helpers, and `sleep`. `zp.args` exports `count`, `get`, `has`, and `all`. `zp.log` exports `debug`, `info`, `warning`, `error`, `setLevel`, and `setOutput`. See the checked-in standard-library reference for exact parameter names and error behavior."],
+      ["Other public modules", "The source-backed modules also include `zp.json` (JSON text and JSON Pointer operations), `zp.filesystem` (copy/move and directory operations), `zp.process` (child process execution), `zp.crypto` (file SHA-256), `zp.http` (HTTP client/server and request helpers), `zp.sqlite` (SQLite handles/queries), `zp.registry` (Windows registry), `zp.system` (system and shell operations), `zp.memory.management` (heap metrics and collection), `zp.audio`, `zp.graphics`, and `zp.physics`. Function signatures and platform support are specific to each wrapper."],
       ["Errors and backend support", "Filesystem and validation failures raise runtime errors rather than success-shaped empty values. The interpreter and Windows x64 native runtime are the main tested execution targets; some native numbers are integer-only and Linux native support varies. Verify each operation's support before depending on it."]
     ]},
     { id: "modules", title: "Modules and imports", section: "Language", summary: "Use standard modules and reusable relative `.zh` files.", body: [
@@ -684,7 +684,7 @@ start {
       ["Distribution status", "The current extension package is version 1.3.4 in this checkout, but no verified Marketplace listing or extension asset appears in the official release feed. The website marks the download unavailable until a valid public asset is published."]
     ]},
     { id: "zgraphics", title: "ZGraphics module", section: "Standard library", summary: "Create a native window and draw basic 2D shapes from Z+.", body: [
-      ["API overview", "The `zgraphics` module exposes window creation and lifecycle, titles, positions and sizing, background colors, text and basic shapes, frame updates, keyboard and mouse state, and an event queue."],
+      ["API overview", "The `zp.graphics` module exposes window creation and lifecycle, titles, positions and sizing, background colors, text and basic shapes, frame updates, keyboard and mouse state, and an event queue."],
       ["Platforms", "The native Windows backend uses Win32 and GDI. Linux uses X11 for interpreter execution and needs X11 development files at build time and a display at runtime. macOS is not implemented. Linux native linking is not implemented."],
       ["Runtime requirements", "Windows native applications need `zgraphics_runtime.dll` beside the executable. Keep the executable and runtime DLL together when distributing an application."],
       ["Limitations", "ZGraphics is a platform layer, not a full GUI toolkit. Invalid handles, dimensions, colors, and frame values raise runtime errors. Consult the module guide for the complete API and limits."]
@@ -795,7 +795,7 @@ start {
     } end fn
 } stop` }] }],
       ["Built-in functions", "`say(value)` writes one value followed by a newline. `printz(value, ...values)` concatenates arguments without a separator or final newline; deprecated `printm` is an alias. `read()` reads a complete line and accepts an optional prompt; `read_number`, `read_integer`, and `read_boolean` validate and convert input. Array built-ins are listed in the array section. Native output currently accepts strings only."],
-      ["Standard library", "The standard library is a collection of imported modules rather than methods added to primitive values. For example, `zstring` supplies functions such as `trim`, `upper`, `split`, and `replace`; `zfile` handles file I/O; `zpath` handles host paths; and `zjson`, `zhttp`, and `zsqlite` expose structured data, HTTP, and SQLite APIs. Exact signatures and interpreter/native platform coverage are module-specific; see the checked-in `stdlib/README.md`.", `use zstring as text
+      ["Standard library", "The standard library is a collection of imported modules rather than methods added to primitive values. For example, `zp.string` supplies functions such as `trim`, `upper`, `split`, and `replace`; `zp.file` handles file I/O; `zp.path` handles host paths; and `zp.json`, `zp.http`, and `zp.sqlite` expose structured data, HTTP, and SQLite APIs. Exact signatures and interpreter/native platform coverage are module-specific; see the checked-in `stdlib/README.md`.", `use zp.string as text
 start {
     say(text.upper(text.trim(" z+ ")))
 } stop`],
@@ -817,7 +817,7 @@ start {
 } stop`],
       ["Native executables", "`zp build` generates a native executable for supported source operations. Basic typed functions, expressions, control flow, strings, and other documented subsets can be compiled; arrays and aggregate types have target-specific limits. Verify the actual target by building and running the produced executable."],
       ["Modular applications", "Relative `.zh` modules, explicit `pub` exports, and ZPBuild project targets support splitting a program into files. ZPM can resolve and install package dependencies, but package installation does not mean every package operation is natively supported by every target."],
-      ["Programs using the standard library", "Use modules such as `zfile`, `zpath`, `zstring`, `zjson`, and `zhttp` when their documented APIs fit the task. Check module-specific platform notes: Windows x64 is the broader native target, while Linux native support remains narrower for aggregates and some runtime integrations."],
+      ["Programs using the standard library", "Use modules such as `zp.file`, `zp.path`, `zp.string`, `zp.json`, and `zp.http` when their documented APIs fit the task. Check module-specific platform notes: Windows x64 is the broader native target, while Linux native support remains narrower for aggregates and some runtime integrations."],
       ["Current limitations", "Z+ does not currently provide class inheritance, maps/sets, function values, string interpolation, or a native fallback through the interpreter. ZGraphics is a basic platform drawing layer rather than a complete GUI framework. Treat graphics, audio, physics, and other platform integrations according to their documented status and test them on the target system."],
       ["Choosing a project", "Z+ is usable today for learning the language, console utilities, modular applications, interpreter-driven scripts, and native executables within the supported subset. For production use, validate the full application on its intended OS, runtime dependencies, and backend; no benchmark or cross-language performance guarantee is implied."]
     ]}
@@ -850,7 +850,7 @@ start {
       ["Install and generate", "The generator is not currently published to npm or offered as a download on this website. No installation link is provided until an official distributable is available. When the generator is available in a developer environment, its command is `zplus-web-interop generate api/openapi.json --out src/generated`; import the generated client from `./generated/zplus-api.js`."],
       ["Use JavaScript modules", "Create a client with `createClient({ baseUrl: \"https://api.example.test\" })` and call generated operations with `await api.getGreeting({ path: { name: \"Ada\" } })`. Use the caller's existing JavaScript module system, bundler, and npm packages; this tool does not rewrite or bundle the rest of the application."],
       ["Promises, browser APIs, and errors", "Generated operations return Promises and accept an optional `AbortSignal`. Use browser-native DOM, events, WebSocket, and other Web APIs directly. The generated client does not polyfill browser APIs or add a Z+ WebSocket feature. HTTP error responses reject with `ApiError`, including status, body, and the original response."],
-      ["Authentication and transport", "Supply bearer headers through the client's `headers` option, or select `credentials: \"include\"` for same-origin or explicitly CORS-enabled cookie sessions. Never put private credentials in browser bundles. The browser may use HTTPS through a trusted host or reverse proxy; the current Z+ `zhttp` client itself only accepts `http://` URLs."],
+      ["Authentication and transport", "Supply bearer headers through the client's `headers` option, or select `credentials: \"include\"` for same-origin or explicitly CORS-enabled cookie sessions. Never put private credentials in browser bundles. The browser may use HTTPS through a trusted host or reverse proxy; the current Z+ `zp.http` client itself only accepts `http://` URLs."],
       ["Compatibility limits", "The generated client supports GET, POST, PUT, PATCH, DELETE, HEAD, and OPTIONS; path/query/header parameters; JSON request bodies; and JSON or bodyless success responses from the supported OpenAPI 3.0/3.1 subset. It does not execute JavaScript inside Z+, provide a JS server runtime, add WebSockets to ZWeb, or guarantee that an API contract matches its application implementation."]
     ]
   };
@@ -880,12 +880,12 @@ start {
         } end if
     } end while
 } stop` },
-    { id: "text", title: "Text processing", summary: "Normalize and inspect text with zstring.", code: `use zstring as text
+    { id: "text", title: "Text processing", summary: "Normalize and inspect text with string.", code: `use zp.string as text
 start {
     let cleaned: string = text.trim("  Z+  ")
     say(text.upper(cleaned))
 } stop` },
-    { id: "files", title: "File handling", summary: "Write and read lines with the public zfile API.", code: `use zfile as file
+    { id: "files", title: "File handling", summary: "Write and read lines with the public zp.file API.", code: `use zp.file as file
 start {
     file.writeLines("notes.txt", ["First", "Second"])
     for line in file.readLines("notes.txt") {
@@ -913,7 +913,7 @@ start {
         return "Hello from a module"
     } end fn
 } stop` }] },
-    { id: "todo", title: "TODO application", summary: "Add, list, and save tasks in a persistent text file.", code: `use zfile as file
+    { id: "todo", title: "TODO application", summary: "Add, list, and save tasks in a persistent text file.", code: `use zp.file as file
 start {
     let filePath: string = "tasks.txt"
     if not file.exists(filePath) {

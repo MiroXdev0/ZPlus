@@ -71,7 +71,7 @@ foreach(required_template IN ITEMS Game WebServer Console Library Desktop Empty 
     endif()
 endforeach()
 run_zbuild(0 "${WORK_DIR}" template info gAmE)
-if(NOT last_output MATCHES "zgraphics" OR NOT last_output MATCHES "Windows")
+if(NOT last_output MATCHES "zp\\.graphics" OR NOT last_output MATCHES "Windows")
     message(FATAL_ERROR "Game template information is incomplete\n${last_output}")
 endif()
 run_zbuild(0 "${WORK_DIR}" template info server)

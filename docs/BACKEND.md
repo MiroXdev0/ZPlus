@@ -81,19 +81,19 @@ point semantics.
 ## Modules
 
 ```zp
-use zweb as web
-use zhttp as http
-use zjson as json
-use zsqlite as sqlite
+use zp.web as web
+use zp.http as http
+use zp.json as json
+use zp.sqlite as sqlite
 ```
 
 These modules are in Z+'s standard library and do not need to be copied into a
 project.
 
-`zweb` is the unified public web module. It builds on the existing HTTP and
+`zp.web` is the unified public web module. It builds on the existing HTTP and
 JSON operations with routing, URL and form helpers, cookies and in-memory
 sessions, multipart uploads, templates, declarative middleware, and safe
-static-file responses. The `zhttp` and `zjson` modules remain available and
+static-file responses. The `zp.http` and `zp.json` modules remain available and
 backward compatible. See the [ZWeb API guide](ZWEB.md) for signatures,
 configuration, and security limitations.
 
@@ -188,7 +188,7 @@ requestHeader(requestJson: string, name: string) -> string
 `""` for a non-match. Query values are percent-decoded and `+` is interpreted
 as a space. A missing query key or header returns `""`.
 
-The unified `zweb` module also has an immutable JSON route table:
+The unified `zp.web` module also has an immutable JSON route table:
 
 ```zp
 let routes = web.routeAdd("[]", "GET", "/users/{id}", "showUser")

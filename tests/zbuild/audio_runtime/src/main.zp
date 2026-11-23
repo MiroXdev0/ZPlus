@@ -1,14 +1,14 @@
-use zaudio
+use zp.audio
 
 start {
 
-if zaudio.deviceCount() > 0 {
-    zaudio.initialize()
-    let music = zaudio.loadMusic("assets/tone.ogg")
-    zaudio.play(music)
-    zaudio.stop(music)
-    zaudio.unload(music)
-    zaudio.shutdown()
+if audio.deviceCount() > 0 {
+    audio.initialize()
+    let music = audio.loadMusic("assets/tone.ogg")
+    audio.play(music)
+    audio.stop(music)
+    audio.unload(music)
+    audio.shutdown()
     say("ZBuild audio integration passed")
 } else {
     say("ZBuild audio integration skipped: no playback device")

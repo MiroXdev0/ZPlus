@@ -1,4 +1,4 @@
-use zmath as math
+use zp.math as math
 
 start {
 

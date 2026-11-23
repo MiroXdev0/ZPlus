@@ -777,18 +777,20 @@ function parseVisibleSymbols(document) {
         for (const line of lines) {
             const use = line.match(/^\s*use\s+(?:"([^"]+)"|([^\s;]+))(?:\s+as\s+([A-Za-z_]\w*))?/);
             if (!use) continue;
-            const relativePath = (use[1] || use[2]).replace(/\\/g, path.sep);
+            const moduleName = use[1] || use[2];
+            const relativePath = moduleName.replace(/\\/g, path.sep);
             if (path.isAbsolute(relativePath) || /^[A-Za-z]:/.test(relativePath)) continue;
             const localPath = path.resolve(path.dirname(sourcePath), relativePath);
             const modulePaths = [localPath];
-            if (!path.extname(relativePath)) {
+            if (path.extname(relativePath).toLowerCase() !== ".zh") {
                 modulePaths.push(`${localPath}.zh`);
                 modulePaths.push(path.join(localPath, `${path.basename(localPath)}.zh`));
-                modulePaths.push(path.resolve(__dirname, "..", "stdlib", relativePath,
-                    `${relativePath}.zh`));
-                for (const folder of vscode.workspace.workspaceFolders || []) {
-                    modulePaths.push(path.resolve(folder.uri.fsPath, "stdlib", relativePath,
-                        `${relativePath}.zh`));
+                const standardPath = standardModuleRelativePath(moduleName);
+                if (standardPath) {
+                    modulePaths.push(path.resolve(__dirname, "..", "stdlib", standardPath));
+                    for (const folder of vscode.workspace.workspaceFolders || []) {
+                        modulePaths.push(path.resolve(folder.uri.fsPath, "stdlib", standardPath));
+                    }
                 }
             }
             const modulePath = modulePaths.find(candidate => {
@@ -809,9 +811,7 @@ function parseVisibleSymbols(document) {
                     continue;
                 }
             }
-            const alias = moduleIdentifier(
-                use[3] || path.basename(relativePath, path.extname(relativePath))
-            );
+            const alias = moduleIdentifier(use[3] || standardModuleAlias(moduleName, relativePath));
             visit(modulePath, moduleText, openModule ? openModule.uri : vscode.Uri.file(modulePath), alias);
         }
     };
@@ -822,6 +822,36 @@ function parseVisibleSymbols(document) {
         visibleSymbolCache.delete(visibleSymbolCache.keys().next().value);
     }
     return symbols.map(symbol => ({ ...symbol }));
+}
+
+function standardModuleParts(moduleName) {
+    if (moduleName === "math") return { parts: ["math", "legacy"], alias: "math" };
+    if (moduleName === "zp" || moduleName.startsWith("zp.")) {
+        const parts = moduleName.slice(3).split(".");
+        if (parts.length === 0 || parts.some(part => !/^[A-Za-z_]\w*$/.test(part))) return undefined;
+        return { parts, alias: parts[0] };
+    }
+    if (/^z[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*$/.test(moduleName)) {
+        const parts = moduleName.split(".");
+        parts[0] = parts[0].slice(1);
+        if (!parts[0]) return undefined;
+        return { parts, alias: moduleName.split(".")[0] };
+    }
+    return undefined;
+}
+
+function standardModuleRelativePath(moduleName) {
+    const standard = standardModuleParts(moduleName);
+    if (!standard) return undefined;
+    const parts = standard.parts.slice();
+    const leaf = parts.pop();
+    if (parts.length === 0) parts.push(leaf);
+    return path.join("zp", ...parts, `${leaf}.zh`);
+}
+
+function standardModuleAlias(moduleName, relativePath) {
+    const standard = standardModuleParts(moduleName);
+    return standard ? standard.alias : path.basename(relativePath, path.extname(relativePath));
 }
 
 function makeSymbol(name, kind, type, parameters, line, offset, sourceLine, uri, column, isPublic = false) {

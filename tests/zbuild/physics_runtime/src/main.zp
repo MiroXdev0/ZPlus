@@ -1,14 +1,14 @@
-use zphysics
+use zp.physics
 
 start {
 
-    let world = zphysics.createWorld(0, 0)
-    let body = zphysics.createBody(world, "static", 10, 10)
-    zphysics.createBox(world, body, 4, 4)
-    if zphysics.raycast(world, 0, 10, 20, 10) == body {
+    let world = physics.createWorld(0, 0)
+    let body = physics.createBody(world, "static", 10, 10)
+    physics.createBox(world, body, 4, 4)
+    if physics.raycast(world, 0, 10, 20, 10) == body {
         say("ZBuild physics integration passed")
     } else {
         say("ZBuild physics integration failed")
     } end if
-    zphysics.destroyWorld(world)
+    physics.destroyWorld(world)
 } stop

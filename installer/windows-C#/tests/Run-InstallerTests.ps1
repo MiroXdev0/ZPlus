@@ -158,7 +158,7 @@ try {
 
     Invoke-Setup @('--install-dir', $firstInstall, '--quiet', '--desktop-shortcut') $testLog
     $compiler = Join-Path $firstInstall 'bin\zp.exe'
-    $stdlibFile = Join-Path $firstInstall 'stdlib\zmath\zmath.zh'
+    $stdlibFile = Join-Path $firstInstall 'stdlib\zp\math\math.zh'
     $licenseFile = Join-Path $firstInstall 'LICENSE.txt'
     $fileCheckDeadline = [DateTime]::UtcNow.AddSeconds(10)
     do {

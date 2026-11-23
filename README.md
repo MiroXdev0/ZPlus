@@ -48,7 +48,7 @@ Import relative `.zh` modules with `use`, for example `use "helpers.zh" as helpe
 
 - [Language syntax](./docs/syntax.md) and [standard library](./stdlib/README.md)
 - [ZPBuild](./docs/ZBUILD.md) and [ZPM](./docs/ZPM.md)
-- [ZGraphics](./ZGraphics/README.md)
+- [ZGraphics](./ZPGraphics/README.md)
 - [Windows installer](./installer/inno/README.md)
 
 ## Contributing

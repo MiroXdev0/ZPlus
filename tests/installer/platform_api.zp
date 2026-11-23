@@ -1,13 +1,13 @@
-use zcrypto as crypto
-use zenv as env
-use zfile as file
-use zfilesystem as filesystem
-use zjson as json
-use zpath as path
-use zprocess as process
-use zregistry as registry
-use zsystem as system
-use zstring as text
+use zp.crypto as crypto
+use zp.env as env
+use zp.file as file
+use zp.filesystem as filesystem
+use zp.json as json
+use zp.path as path
+use zp.process as process
+use zp.registry as registry
+use zp.system as system
+use zp.string as text
 
 start {
 

@@ -1,7 +1,7 @@
-use zenv as env
-use zfile as file
-use zpath as path
-use zstring as text
+use zp.env as env
+use zp.file as file
+use zp.path as path
+use zp.string as text
 use "../src/components/deployment.zh" as deployment
 use "../src/components/verification.zh" as verification
 

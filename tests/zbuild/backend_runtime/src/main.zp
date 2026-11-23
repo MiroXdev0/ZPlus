@@ -1,5 +1,5 @@
-use zsqlite as sqlite
-use zjson as json
+use zp.sqlite as sqlite
+use zp.json as json
 
 start {
 

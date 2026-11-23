@@ -5,7 +5,7 @@
 #include "../compiler/ir/IRVerifier.hpp"
 #include "Input.hpp"
 #include "NumericFormat.hpp"
-#include "../ZGraphics/ZGraphics.hpp"
+#include "../ZPGraphics/ZGraphics.hpp"
 #include "audio/Audio.hpp"
 #include "physics/Physics.hpp"
 #include "StandardLibrary.hpp"

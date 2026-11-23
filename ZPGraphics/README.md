@@ -8,7 +8,7 @@ ZGraphics is a graphics module for Z+. The current implementation opens real nat
 - **Linux:** X11 windows and Xlib drawing into retained pixmaps; requires X11 development headers and libraries at build time and an accessible X display at runtime.
 - **macOS:** not implemented.
 
-The public C++ facade is in `ZGraphics/ZGraphics.hpp`; native implementations are separated under `ZGraphics/Platform/`. Z+ calls use public wrappers in `stdlib/zgraphics/zgraphics.zh`. `zp run` dispatches through the interpreter; Windows x64 native programs call the same C++ graphics implementation through the packaged `zgraphics_runtime.dll`.
+The public C++ facade is in `ZPGraphics/ZGraphics.hpp`; native implementations are separated under `ZPGraphics/Platform/`. Z+ calls use the `zp.graphics` wrapper in `stdlib/zp/graphics/graphics.zh`. `zp run` dispatches through the interpreter; Windows x64 native programs call the same C++ graphics implementation through the packaged `zgraphics_runtime.dll`.
 
 ## Build and run
 
@@ -41,18 +41,18 @@ The compiler copies `zgraphics_runtime.dll` beside the requested executable. Kee
 
 ## Z+ API
 
-Import the module with `use zgraphics`. Window handles are numeric IDs owned by the runtime's single graphics application. The `start { ... } stop` example below is complete:
+Import the module with `use zp.graphics`. Its default namespace alias is `graphics`; an explicit alias can be supplied with `as`. Window handles are numeric IDs owned by the runtime's single graphics application. The `start { ... } stop` example below is complete:
 
 ```zp
-use zgraphics
+use zp.graphics
 
 start {
-    let app = zgraphics.createWindow("Z+ demo", 720, 420)
-    zgraphics.background(app, "#18202B")
-    zgraphics.text(app, "Hello from Z+", 32, 36, "#FFFFFF", 28)
-    zgraphics.rectangle(app, 32, 100, 220, 70, "#2563EB", true, 1)
-    zgraphics.show(app)
-    zgraphics.run(app)
+    let app = graphics.createWindow("Z+ demo", 720, 420)
+    graphics.background(app, "#18202B")
+    graphics.text(app, "Hello from Z+", 32, 36, "#FFFFFF", 28)
+    graphics.rectangle(app, 32, 100, 220, 70, "#2563EB", true, 1)
+    graphics.show(app)
+    graphics.run(app)
 } stop
 ```
 
@@ -87,15 +87,15 @@ Call `update` once per frame before reading input. `keyDown`, `keyPressed`, and 
 Example continuous loop:
 
 ```zp
-use zgraphics
+use zp.graphics
 
 start {
-    let app = zgraphics.createWindow("Frame loop", 640, 360)
-    zgraphics.show(app)
-    while zgraphics.isOpen(app) {
-        zgraphics.update(app)
-        if zgraphics.keyDown(app, 27) {
-            zgraphics.close(app)
+    let app = graphics.createWindow("Frame loop", 640, 360)
+    graphics.show(app)
+    while graphics.isOpen(app) {
+        graphics.update(app)
+        if graphics.keyDown(app, 27) {
+            graphics.close(app)
         } end if
     } end while
 } stop

@@ -4,7 +4,7 @@ Z+ automatically manages arrays and dynamically concatenated strings. Programs
 do not manually free these values.
 
 ```zp
-use zmemory.management
+use zp.memory.management
 
 start {
     let name = "Z+" + " language"
@@ -12,26 +12,26 @@ start {
 
     say(name)
     say(numbers)
-    say(zmemory.heapUsed())
-    say(zmemory.heapObjects())
+    say(memory.heapUsed())
+    say(memory.heapObjects())
 
-    zmemory.collect()
-    say(zmemory.collectionCount())
+    memory.collect()
+    say(memory.collectionCount())
 } stop
 ```
 
-`use zmemory.management` resolves the standard module without a source-file
-path. Its default module name is `zmemory`.
+`use zp.memory.management` resolves the standard module without a source-file
+path. Its default module name is `zp.memory`.
 
 ## Public API
 
 | Function | Behavior |
 |---|---|
-| `zmemory.heapUsed() -> number` | Estimated bytes held by currently managed objects. |
-| `zmemory.heapObjects() -> number` | Number of live managed arrays and dynamic strings. |
-| `zmemory.collect()` | Runs a tracing collection immediately. |
-| `zmemory.collectionCount() -> number` | Completed collection cycles in this execution. |
-| `zmemory.setThreshold(bytes: number)` | Sets the minimum automatic collection threshold. Requires an integer from 1024 through 1099511627776. |
+| `memory.heapUsed() -> number` | Estimated bytes held by currently managed objects. |
+| `memory.heapObjects() -> number` | Number of live managed arrays and dynamic strings. |
+| `memory.collect()` | Runs a tracing collection immediately. |
+| `memory.collectionCount() -> number` | Completed collection cycles in this execution. |
+| `memory.setThreshold(bytes: number)` | Sets the minimum automatic collection threshold. Requires an integer from 1024 through 1099511627776. |
 
 `heapUsed()` counts managed object headers and payload capacities. It excludes
 collector bookkeeping, native stack/global storage, static string literals, and

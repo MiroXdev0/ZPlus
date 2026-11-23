@@ -1,4 +1,4 @@
-use zmemory.management
+use zp.memory.management
 
 start {
     let iterations: number = 10000 // BENCH_ITERATIONS

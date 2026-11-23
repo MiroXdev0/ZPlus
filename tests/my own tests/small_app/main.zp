@@ -1,4 +1,4 @@
-use zstring as text
+use zp.string as text
 
 start {
     fn greeting(name: string): string {

@@ -1,4 +1,4 @@
-use zmemory.management
+use zp.memory.management
 
 start {
 
@@ -56,9 +56,9 @@ fn allocateTransient() {
     } end if
 
     allocateTransient()
-    let objectsBeforeCollection = zmemory.heapObjects()
-    zmemory.collect()
-    let objectsAfterCollection = zmemory.heapObjects()
+    let objectsBeforeCollection = memory.heapObjects()
+    memory.collect()
+    let objectsAfterCollection = memory.heapObjects()
     if values[0] == 41 and matrix[1][0] == 9 and shared[1] == 4 {
         say("array references survived collection")
     } else {
@@ -70,7 +70,7 @@ fn allocateTransient() {
     } else {
         say("unreachable arrays retained")
     } end if
-    if zmemory.heapObjects() > 0 and zmemory.collectionCount() > 0 {
+    if memory.heapObjects() > 0 and memory.collectionCount() > 0 {
         say("managed array collection passed")
     } else {
         say("managed array collection failed")

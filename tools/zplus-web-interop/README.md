@@ -89,7 +89,7 @@ and npm libraries directly; those are not Z+ features.
 
 ## Example and checks
 
-`examples/zweb-openapi/` contains an OpenAPI contract and a small ZWeb server.
+`examples/zweb-openapi/` contains an OpenAPI contract and a small server using `zp.web`.
 The generator's unit tests run with:
 
 ```powershell

@@ -1,5 +1,5 @@
-use zfile as file
-use zgraphics as graphics
+use zp.file as file
+use zp.graphics as graphics
 start {
 
 fn inside(x: number, y: number, left: number, top: number, width: number, height: number): boolean {

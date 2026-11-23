@@ -1,17 +1,17 @@
 # Z+ Audio
 
-`zaudio` provides audio playback through [miniaudio](https://github.com/mackron/miniaudio) 0.11.26. It is independent of ZGraphics. Interpreter and native Windows x64 execution have been validated; the Linux x86-64 native path is implemented but still requires execution on Linux.
+`zp.audio` provides audio playback through [miniaudio](https://github.com/mackron/miniaudio) 0.11.26. It is independent of ZGraphics. Interpreter and native Windows x64 execution have been validated; the Linux x86-64 native path is implemented but still requires execution on Linux.
 
 ## Initialization
 
 ```zp
-use zaudio
+use zp.audio
 
-zaudio.initialize()
-if zaudio.initialized() {
+audio.initialize()
+if audio.initialized() {
     say("Audio is ready")
 } end if
-zaudio.shutdown()
+audio.shutdown()
 ```
 
 `initialize()` opens the default playback device and is safe to call more than once. It reports an error if no playback device is available or the engine cannot start. `shutdown()` stops playback and releases loaded resources and device state; it is safe to call repeatedly. The runtime also shuts the engine down at process exit.
@@ -19,24 +19,24 @@ zaudio.shutdown()
 ## Loading and playback
 
 ```zp
-use zaudio
+use zp.audio
 
-zaudio.initialize()
-let music = zaudio.loadMusic("assets/theme.ogg")
-let jump = zaudio.loadSound("assets/jump.wav")
+audio.initialize()
+let music = audio.loadMusic("assets/theme.ogg")
+let jump = audio.loadSound("assets/jump.wav")
 
-zaudio.setLooping(music, true)
-zaudio.setVolume(music, 0.6)
-zaudio.play(music)
+audio.setLooping(music, true)
+audio.setVolume(music, 0.6)
+audio.play(music)
 
-zaudio.play(jump)
-zaudio.pause(music)
-zaudio.resume(music)
-zaudio.stop(music)
+audio.play(jump)
+audio.pause(music)
+audio.resume(music)
+audio.stop(music)
 
-zaudio.unload(jump)
-zaudio.unload(music)
-zaudio.shutdown()
+audio.unload(jump)
+audio.unload(music)
+audio.shutdown()
 ```
 
 Music is streamed for long files. Sound effects are decoded when loaded and can overlap: each `play()` starts another instance, up to 64 simultaneous instances per sound handle. A sound's volume and looping settings apply to its instances; stopping or unloading one handle does not stop unrelated music or sounds.

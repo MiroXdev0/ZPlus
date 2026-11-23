@@ -356,7 +356,7 @@ test("manifest, grammar, language configuration and snippets are loadable", () =
     assert.ok(!fs.existsSync(path.join(extensionRoot, "LICENSE")));
     assert.deepEqual(
         fs.readFileSync(extensionLicensePath),
-        fs.readFileSync(path.join(projectRoot, "LICENSE.txt")),
+        fs.readFileSync(path.join(projectRoot, "LICENSE")),
         "extension terms must match the official root Z+ license exactly"
     );
     assert.match(fs.readFileSync(extensionLicensePath, "utf8"), /Apache License\s+Version 2\.0/m);
@@ -822,23 +822,35 @@ test("imported .zh declarations support completion, signature help and definitio
     }
 });
 
-test("bare zgraphics import provides qualified API completions and navigation", () => {
-    const source = "use zgraphics\nstart:\n    zgraphics.createWindow(\"demo\", 400, 300)\nstop";
+test("zp.graphics import provides canonical qualified API completions and navigation", () => {
+    const source = "use zp.graphics\nstart:\n    graphics.createWindow(\"demo\", 400, 300)\nstop";
     const document = documentFrom(source, path.join(os.tmpdir(), "zgraphics-main.zp"));
+    const completions = extension.provideCompletions(document, new vscodeMock.Position(2, 13))
+        .map(item => String(item.label));
+    assert.ok(completions.includes("graphics.createWindow"));
+    assert.ok(completions.includes("graphics.waitEvent"));
+
+    const signature = extension.provideSignatureHelp(document, new vscodeMock.Position(2, 35));
+    assert.equal(signature.signatures[0].parameters.length, 3);
+
+    const hover = extension.provideHover(document, new vscodeMock.Position(2, 17));
+    assert.match(hover.contents.value, /createWindow/);
+    const definition = extension.provideDefinition(document, new vscodeMock.Position(2, 17));
+    assert.equal(
+        definition.uri.fsPath,
+        path.join(projectRoot, "stdlib", "zp", "graphics", "graphics.zh")
+    );
+});
+
+test("legacy standard-module names resolve the migrated source with the legacy alias", () => {
+    const source = "use zgraphics\nstart:\n    zgraphics.createWindow(\"demo\", 400, 300)\nstop";
+    const document = documentFrom(source, path.join(os.tmpdir(), "legacy-zgraphics-main.zp"));
     const completions = extension.provideCompletions(document, new vscodeMock.Position(2, 14))
         .map(item => String(item.label));
     assert.ok(completions.includes("zgraphics.createWindow"));
-    assert.ok(completions.includes("zgraphics.waitEvent"));
-
-    const signature = extension.provideSignatureHelp(document, new vscodeMock.Position(2, 37));
-    assert.equal(signature.signatures[0].parameters.length, 3);
-
-    const hover = extension.provideHover(document, new vscodeMock.Position(2, 19));
-    assert.match(hover.contents.value, /createWindow/);
-    const definition = extension.provideDefinition(document, new vscodeMock.Position(2, 19));
     assert.equal(
-        definition.uri.fsPath,
-        path.join(projectRoot, "stdlib", "zgraphics", "zgraphics.zh")
+        extension.provideDefinition(document, new vscodeMock.Position(2, 18)).uri.fsPath,
+        path.join(projectRoot, "stdlib", "zp", "graphics", "graphics.zh")
     );
 });
 

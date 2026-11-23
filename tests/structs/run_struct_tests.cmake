@@ -92,7 +92,7 @@ endfunction()
 set(basic_dir "${WORK_DIR}/basic nested and managed")
 file(MAKE_DIRECTORY "${basic_dir}")
 file(WRITE "${basic_dir}/main.zp" [=[
-use zmemory.management
+use zp.memory.management
 start {
     struct Vec2 {
         x: number
@@ -168,7 +168,7 @@ start {
     root.children[0].value = 9
     say(leaf.value)
 
-    zmemory.setThreshold(1024)
+    memory.setThreshold(1024)
     for (let i: number = 0; i < 300; i++) {
         let transient = Shape(Vec2(i, i), Metadata("temporary", true, 't'))
     } end for

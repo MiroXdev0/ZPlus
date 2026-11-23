@@ -8,7 +8,9 @@
 #include <cctype>
 #include <cstdlib>
 #include <fstream>
+#include <optional>
 #include <sstream>
+#include <string_view>
 #include <system_error>
 #include <utility>
 
@@ -204,6 +206,113 @@ bool hasDrivePrefix(const std::string& path) {
     return path.size() >= 2 &&
         std::isalpha(static_cast<unsigned char>(path[0])) &&
         path[1] == ':';
+}
+
+struct StandardModuleResolution {
+    std::filesystem::path path;
+    std::string defaultAlias;
+    std::string canonicalName;
+    bool deprecated = false;
+    bool invalidNamespace = false;
+};
+
+bool validNamespaceSegment(std::string_view segment) {
+    if (segment.empty() ||
+        !(std::isalpha(static_cast<unsigned char>(segment.front())) ||
+          segment.front() == '_')) {
+        return false;
+    }
+    return std::all_of(segment.begin() + 1, segment.end(), [](unsigned char ch) {
+        return std::isalnum(ch) || ch == '_';
+    });
+}
+
+std::vector<std::string> splitNamespace(std::string_view name) {
+    std::vector<std::string> segments;
+    std::size_t begin = 0;
+    while (begin <= name.size()) {
+        const std::size_t separator = name.find('.', begin);
+        const std::size_t end = separator == std::string_view::npos
+            ? name.size()
+            : separator;
+        segments.emplace_back(name.substr(begin, end - begin));
+        if (separator == std::string_view::npos) break;
+        begin = separator + 1;
+    }
+    return segments;
+}
+
+std::filesystem::path standardModuleEntry(
+    const std::filesystem::path& standardLibrary,
+    const std::vector<std::string>& segments
+) {
+    if (standardLibrary.empty() || segments.empty()) return {};
+    std::filesystem::path entry = standardLibrary / "zp";
+    for (std::size_t index = 0; index + 1 < segments.size(); ++index) {
+        entry /= pathFromUtf8(segments[index]);
+    }
+    const std::string& leaf = segments.back();
+    if (segments.size() == 1) {
+        entry /= pathFromUtf8(leaf);
+        entry /= pathFromUtf8(leaf + ".zh");
+    } else {
+        entry /= pathFromUtf8(leaf + ".zh");
+    }
+    return entry;
+}
+
+std::optional<StandardModuleResolution> resolveStandardModuleName(
+    const std::filesystem::path& standardLibrary,
+    const std::string& modulePath
+) {
+    if (modulePath == "math") {
+        return StandardModuleResolution{
+            standardLibrary / "zp" / "math" / "legacy.zh",
+            "math",
+            "zp.math.legacy",
+            true,
+            false
+        };
+    }
+
+    if (modulePath == "zp" || modulePath.rfind("zp.", 0) == 0) {
+        const auto names = modulePath == "zp"
+            ? std::vector<std::string>{}
+            : splitNamespace(std::string_view(modulePath).substr(3));
+        if (names.empty() ||
+            !std::all_of(names.begin(), names.end(), validNamespaceSegment)) {
+            return StandardModuleResolution{{}, {}, {}, false, true};
+        }
+        return StandardModuleResolution{
+            standardModuleEntry(standardLibrary, names),
+            names.front(),
+            "zp." + modulePath.substr(3),
+            false,
+            false
+        };
+    }
+
+    if (!modulePath.empty() && modulePath.front() == 'z') {
+        auto names = splitNamespace(modulePath);
+        if (names.front().size() > 1) names.front().erase(names.front().begin());
+        else return std::nullopt;
+        if (!std::all_of(names.begin(), names.end(), validNamespaceSegment)) {
+            return std::nullopt;
+        }
+        std::string canonicalName = "zp";
+        for (const auto& name : names) canonicalName += "." + name;
+        const auto aliasEnd = modulePath.find('.');
+        const std::string legacyAlias = modulePath.substr(0, aliasEnd);
+        return StandardModuleResolution{
+            standardModuleEntry(standardLibrary, names),
+            legacyAlias,
+            std::move(canonicalName),
+            true,
+            false
+        };
+    }
+
+    return std::nullopt;
 }
 
 std::string moduleIdentifier(std::string name) {
@@ -442,26 +551,39 @@ bool ModuleLoader::loadModule(
 
         auto resolvedPath = canonicalPath.parent_path() / usePath;
         std::error_code existenceError;
+        std::string standardAlias;
         if ((existenceError || !std::filesystem::exists(resolvedPath, existenceError)) &&
             standardModuleName) {
-            std::filesystem::path standardModule = standardLibraryDirectory();
-            if (modulePath.find('.') == std::string::npos) {
-                standardModule /= pathFromUtf8(modulePath);
-                standardModule /= pathFromUtf8(modulePath + ".zh");
-            } else {
-                std::size_t begin = 0;
-                std::size_t separator = modulePath.find('.');
-                while (separator != std::string::npos) {
-                    standardModule /= pathFromUtf8(
-                        modulePath.substr(begin, separator - begin));
-                    begin = separator + 1;
-                    separator = modulePath.find('.', begin);
-                }
-                standardModule /= pathFromUtf8(modulePath.substr(begin) + ".zh");
+            const auto standardModule = resolveStandardModuleName(
+                standardLibraryDirectory(), modulePath);
+            if (standardModule && standardModule->invalidNamespace) {
+                addDiagnostic(
+                    "invalid standard-library namespace '" + use->path +
+                        "'; expected 'zp.<library>[.<module>...]'",
+                    pathToUtf8(canonicalPath),
+                    use->location.line,
+                    use->location.column,
+                    "E3002"
+                );
+                activePaths.pop_back();
+                return false;
             }
-            existenceError.clear();
-            if (std::filesystem::exists(standardModule, existenceError) && !existenceError) {
-                resolvedPath = standardModule;
+            if (standardModule) {
+                existenceError.clear();
+                if (std::filesystem::exists(standardModule->path, existenceError) &&
+                    !existenceError) {
+                    resolvedPath = standardModule->path;
+                    standardAlias = standardModule->defaultAlias;
+                    if (standardModule->deprecated) {
+                        addWarning(
+                            "standard library name '" + use->path +
+                                "' is deprecated; use '" + standardModule->canonicalName + "'",
+                            pathToUtf8(canonicalPath),
+                            use->location.line,
+                            use->location.column
+                        );
+                    }
+                }
             }
         }
         existenceError.clear();
@@ -487,8 +609,10 @@ bool ModuleLoader::loadModule(
             activePaths.pop_back();
             return false;
         }
-        std::string defaultAlias = pathToUtf8(pathFromUtf8(modulePath).stem());
-        if (standardModuleName) {
+        std::string defaultAlias = standardAlias.empty()
+            ? pathToUtf8(pathFromUtf8(modulePath).stem())
+            : standardAlias;
+        if (standardModuleName && standardAlias.empty()) {
             const auto separator = modulePath.find('.');
             if (bareDottedModule && separator != std::string::npos) {
                 defaultAlias = modulePath.substr(0, separator);
@@ -588,6 +712,16 @@ void ModuleLoader::addDiagnostic(
     const std::string& code
 ) {
     result_.diagnostics.push_back({message, sourceFile, line, column, code});
+}
+
+void ModuleLoader::addWarning(
+    const std::string& message,
+    const std::string& sourceFile,
+    int line,
+    int column,
+    const std::string& code
+) {
+    result_.warnings.push_back({message, sourceFile, line, column, code});
 }
 
 } // namespace zplus

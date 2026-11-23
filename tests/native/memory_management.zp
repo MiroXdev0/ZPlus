@@ -1,4 +1,4 @@
-use zmemory.management
+use zp.memory.management
 
 start {
 
@@ -17,7 +17,7 @@ fn readShared(): string {
 } end fn
 
 fn exerciseActiveRoot(value: string): string {
-    zmemory.setThreshold(1024)
+    memory.setThreshold(1024)
     let result: string = value + "!"
     for (let i: number = 0; i < 5000; i++) {
         let churn: string = "a" + "b"
@@ -26,22 +26,22 @@ fn exerciseActiveRoot(value: string): string {
 } end fn
 
     let transient: string = makeTransient("managed")
-    if zmemory.heapObjects() > 0 {
+    if memory.heapObjects() > 0 {
         say("native managed string allocated")
     } else {
         say("native managed string missing")
     } end if
     say(transient)
     transient = "released"
-    zmemory.collect()
+    memory.collect()
     say(readShared())
-    if zmemory.heapObjects() == 1 {
+    if memory.heapObjects() == 1 {
         say("native managed string reclaimed")
     } else {
         say("native managed string retained")
     } end if
     say(exerciseActiveRoot(readShared()))
-    if zmemory.collectionCount() > 0 {
+    if memory.collectionCount() > 0 {
         say("native collection completed")
     } else {
         say("native collection missing")

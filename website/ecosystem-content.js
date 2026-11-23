@@ -43,10 +43,10 @@
     },
     zgraphics: {
       id: "zgraphics", title: "ZGraphics", eyebrow: "Graphics module · in development",
-      summary: "A native window and 2D drawing layer exposed through the `zgraphics` module.",
+      summary: "A native window and 2D drawing layer exposed through the `zp.graphics` module.",
       sections: [
         { heading: "Current platform backends", text: "Windows uses Win32 windows and GDI drawing. Linux uses X11 and requires development libraries at build time and a display at runtime. A macOS backend is not implemented. Native Windows executables use the packaged `zgraphics_runtime.dll`; Linux native linking is not implemented.", href: "/docs/zgraphics" },
-        { heading: "Windows and drawing", text: "The current API covers window lifecycle, title and geometry, background, text, lines, rectangles and circles, frame updates, basic keyboard and mouse state, and queued events. It is a platform layer, not a full GUI toolkit.", code: "use zgraphics\n\nstart {\n    let app = zgraphics.createWindow(\"Z+ demo\", 720, 420)\n    zgraphics.background(app, \"#18202B\")\n    zgraphics.text(app, \"Hello from Z+\", 32, 36, \"#FFFFFF\", 28)\n    zgraphics.show(app)\n    zgraphics.run(app)\n} stop" },
+        { heading: "Windows and drawing", text: "The current API covers window lifecycle, title and geometry, background, text, lines, rectangles and circles, frame updates, basic keyboard and mouse state, and queued events. It is a platform layer, not a full GUI toolkit.", code: "use zp.graphics\n\nstart {\n    let app = graphics.createWindow(\"Z+ demo\", 720, 420)\n    graphics.background(app, \"#18202B\")\n    graphics.text(app, \"Hello from Z+\", 32, 36, \"#FFFFFF\", 28)\n    graphics.show(app)\n    graphics.run(app)\n} stop" },
         { heading: "Runtime behavior", text: "Drawing commands are collected offscreen and published by `update`, `show`, or `run`. Invalid handles, dimensions, colors, and drawing values report runtime errors. Interactive examples require a graphical desktop; headless environments can check them without opening a window." },
         { heading: "Documentation", text: "The module API and backend limits are documented in the repository's ZGraphics guide and in the compiler language reference.", href: "/docs/zgraphics" }
       ]

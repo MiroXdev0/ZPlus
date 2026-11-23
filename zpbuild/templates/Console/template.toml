@@ -1,10 +1,10 @@
 name = "Console"
-description = "Portable console application with functions, imports, zargs, and standard-library examples."
+description = "Portable console application with functions, imports, zp.args, and standard-library examples."
 version = "1.0.0"
 required_zplus_version = "0.5.0"
 default_target_type = "executable"
 platforms = ["Windows", "Linux"]
-required_modules = ["zargs", "zstring"]
+required_modules = ["zp.args", "zp.string"]
 aliases = ["executable", "exe", "default"]
 configuration = ["backend=interpreter"]
 directories = ["src/commands", "tests", "include", "assets", "build"]

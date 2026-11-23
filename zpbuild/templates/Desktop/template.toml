@@ -4,7 +4,7 @@ version = "1.0.0"
 required_zplus_version = "0.5.0"
 default_target_type = "executable"
 platforms = ["Windows (interpreter or native)", "Linux (interpreter with X11)"]
-required_modules = ["zgraphics"]
+required_modules = ["zp.graphics"]
 aliases = ["gui"]
 configuration = ["backend=interpreter"]
 directories = ["src/ui", "assets", "tests"]

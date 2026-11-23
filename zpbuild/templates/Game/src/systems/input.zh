@@ -1,12 +1,12 @@
-use zgraphics
+use zp.graphics
 start {
 
 pub fn horizontal(window: number): number {
-    if zgraphics.keyDown(window, 65) or zgraphics.keyDown(window, 97) {
+    if graphics.keyDown(window, 65) or graphics.keyDown(window, 97) {
         return -1
     } else {
     } end if
-    if zgraphics.keyDown(window, 68) or zgraphics.keyDown(window, 100) {
+    if graphics.keyDown(window, 68) or graphics.keyDown(window, 100) {
         return 1
     } else {
     } end if
@@ -14,11 +14,11 @@ pub fn horizontal(window: number): number {
 } end fn
 
 pub fn vertical(window: number): number {
-    if zgraphics.keyDown(window, 87) or zgraphics.keyDown(window, 119) {
+    if graphics.keyDown(window, 87) or graphics.keyDown(window, 119) {
         return -1
     } else {
     } end if
-    if zgraphics.keyDown(window, 83) or zgraphics.keyDown(window, 115) {
+    if graphics.keyDown(window, 83) or graphics.keyDown(window, 115) {
         return 1
     } else {
     } end if

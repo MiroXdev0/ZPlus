@@ -1,50 +1,50 @@
-use zgraphics
+use zp.graphics
 
 start {
 
-    let app = zgraphics.createWindow("Z+ native graphics test", 320, 240)
-    zgraphics.setTitle(app, "Z+ native graphics test passed")
-    zgraphics.setPosition(app, 24, 36)
-    zgraphics.resize(app, 320, 240)
-    zgraphics.background(app, "#152030")
-    zgraphics.clear(app)
-    zgraphics.text(app, zgraphics.numberText(42), 8, 8, "#FFFFFF", 18)
-    zgraphics.line(app, 0, 0, 30, 30, "#00FF00", 2)
-    zgraphics.rectangle(app, 40, 40, 30, 20, "#FF0000", true, 1)
-    zgraphics.circle(app, 100, 100, 15, "#0000FF", false, 2)
-    zgraphics.setTargetFPS(app, 0)
-    zgraphics.update(app)
-    if not zgraphics.isOpen(app) or zgraphics.deltaTimeMs(app) < 0 {
+    let app = graphics.createWindow("Z+ native graphics test", 320, 240)
+    graphics.setTitle(app, "Z+ native graphics test passed")
+    graphics.setPosition(app, 24, 36)
+    graphics.resize(app, 320, 240)
+    graphics.background(app, "#152030")
+    graphics.clear(app)
+    graphics.text(app, graphics.numberText(42), 8, 8, "#FFFFFF", 18)
+    graphics.line(app, 0, 0, 30, 30, "#00FF00", 2)
+    graphics.rectangle(app, 40, 40, 30, 20, "#FF0000", true, 1)
+    graphics.circle(app, 100, 100, 15, "#0000FF", false, 2)
+    graphics.setTargetFPS(app, 0)
+    graphics.update(app)
+    if not graphics.isOpen(app) or graphics.deltaTimeMs(app) < 0 {
         say("native graphics frame/input API failed")
     } else {
     } end if
-    if not zgraphics.pointInRectangle(10, 10, 0, 0, 20, 20) {
+    if not graphics.pointInRectangle(10, 10, 0, 0, 20, 20) {
         say("native graphics rectangle helper failed")
     } else {
     } end if
-    if not zgraphics.rectanglesIntersect(0, 0, 20, 20, 10, 10, 20, 20) {
+    if not graphics.rectanglesIntersect(0, 0, 20, 20, 10, 10, 20, 20) {
         say("native graphics intersection helper failed")
     } else {
     } end if
-    if not zgraphics.pointInCircle(5, 5, 5, 5, 2) {
+    if not graphics.pointInCircle(5, 5, 5, 5, 2) {
         say("native graphics circle helper failed")
     } else {
     } end if
-    if not zgraphics.circlesIntersect(5, 5, 5, 10, 5, 5) {
+    if not graphics.circlesIntersect(5, 5, 5, 10, 5, 5) {
         say("native graphics circle intersection helper failed")
     } else {
     } end if
-    let event = zgraphics.pollEvent(app)
-    let eventX = zgraphics.eventX(app)
-    let eventY = zgraphics.eventY(app)
-    let eventKey = zgraphics.eventKey(app)
-    let eventText = zgraphics.eventText(app)
-    zgraphics.hide(app)
-    zgraphics.show(app)
-    zgraphics.minimize(app)
-    zgraphics.maximize(app)
-    zgraphics.close(app)
-    let status = zgraphics.run(app)
+    let event = graphics.pollEvent(app)
+    let eventX = graphics.eventX(app)
+    let eventY = graphics.eventY(app)
+    let eventKey = graphics.eventKey(app)
+    let eventText = graphics.eventText(app)
+    graphics.hide(app)
+    graphics.show(app)
+    graphics.minimize(app)
+    graphics.maximize(app)
+    graphics.close(app)
+    let status = graphics.run(app)
     if status == 0 {
         say("native ZGraphics passed")
     } else {

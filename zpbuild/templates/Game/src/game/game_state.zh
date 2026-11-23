@@ -1,4 +1,4 @@
-use zgraphics
+use zp.graphics
 start {
 
 pub fn startX(): number {
@@ -10,6 +10,6 @@ pub fn startY(): number {
 } end fn
 
 pub fn drawHud(window: number, score: number) {
-    zgraphics.text(window, "Score: " + zgraphics.numberText(score), 24, 386, "#F8FAFC", 16)
+    graphics.text(window, "Score: " + graphics.numberText(score), 24, 386, "#F8FAFC", 16)
 } end fn
 } stop

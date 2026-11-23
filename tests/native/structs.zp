@@ -1,4 +1,4 @@
-use zmemory.management
+use zp.memory.management
 
 start {
 
@@ -33,13 +33,13 @@ fn preserve(player: Player): Player {
     session.players[1].score = 19
     say(session.players[1].score)
 
-    zmemory.setThreshold(1024)
+    memory.setThreshold(1024)
     for (let i: number = 0; i < 2000; i++) {
         let transient = Player("temporary")
     } end for
     say(session.player.name)
     say(session.players[1].score)
-    if zmemory.collectionCount() > 0 {
+    if memory.collectionCount() > 0 {
         say("struct references survived collection")
     } end if
 } stop

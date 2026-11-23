@@ -1,6 +1,6 @@
-use zmemory.management
+use zp.memory.management
 
 start {
 
-    zmemory.setThreshold(100)
+    memory.setThreshold(100)
 } stop

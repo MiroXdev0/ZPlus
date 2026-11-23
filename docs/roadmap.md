@@ -27,7 +27,7 @@ back to interpretation.
 | Modules | `compiler/ModuleLoader.cpp` resolves relative `.zh` dependencies, aliases, visibility, cycles, and module initialization. | This is a source-module loader, not a package manager, extension loader, or capability system. |
 | Standard library and graphics | The source library includes math, strings, collections (including generic `List`, `Stack`, `Queue`, `Set`, `Map`, and `Optional`), file/path/system, JSON, HTTP, SQLite, memory, and ZGraphics APIs. | Generic collections and managed arrays are supported by the interpreter and Windows x64 backend. Linux native generic/runtime execution is not verified; ZGraphics is not a general host-extension API. |
 | CLI and diagnostics | `compiler/main.cpp` implements `check`, `run`, `build`, `version`, and `help`, including positioned and JSON diagnostics. | There are no scripting-runtime or extension-management commands. |
-| VS Code extension | `Z+_VS_code/` provides compiler-backed checks, completion, hover, signature help, definition navigation, snippets, and module-aware editor behavior. | Editor support follows the compiler's implemented syntax and cannot make incomplete runtime features executable. |
+| VS Code extension | `ZPlus_VS_code_extension/` provides compiler-backed checks, completion, hover, signature help, definition navigation, snippets, and module-aware editor behavior. | Editor support follows the compiler's implemented syntax and cannot make incomplete runtime features executable. |
 | Host integration | The only existing C ABI is the ZGraphics-specific adapter in `runtime/graphics/NativeApi.cpp`. | A general, stable C embedding API and host-function registration interface are not implemented. Nodren-specific SDK and host integration are explicitly out of scope. |
 
 The public syntax reference, `docs/syntax.md`, documents accepted-but-incomplete
@@ -82,7 +82,7 @@ The first runtime-correctness slice and interpreter arrays are implemented:
   functions can access them. A binding integration fixture covers globals,
   parameters, defaults, forward calls, recursion, return values, and repeated
   calls.
-- `use zmemory.management` exposes heap statistics, collection, and a safe
+- `use zp.memory.management` exposes heap statistics, collection, and a safe
   threshold setting. The interpreter uses a non-moving tracing mark-and-sweep
   heap for arrays and dynamically concatenated strings, with module globals
   and active frames as roots. Windows x64 native programs use the same API for
@@ -148,7 +148,7 @@ Array literals, nested arrays, indexing, indexed assignment, typed empty
 arrays, array argument/return behavior, and length are implemented and covered
 in interpreter tests. Arrays use shared reference-like mutation semantics.
 The Windows x64 native backend now implements these operations with managed,
-tagged array handles and a tracing runtime integrated with `zmemory.management`.
+tagged array handles and a tracing runtime integrated with `zp.memory.management`.
 Native arrays preserve aliasing, nested references and bounds checking. Linux
 native builds explicitly reject managed array operations because there is no
 Linux native managed-memory runtime.

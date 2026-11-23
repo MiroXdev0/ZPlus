@@ -1,9 +1,9 @@
-use zcrypto as crypto
-use zfile as file
-use zfilesystem as filesystem
-use zgraphics as graphics
-use zpath as path
-use zstring as text
+use zp.crypto as crypto
+use zp.file as file
+use zp.filesystem as filesystem
+use zp.graphics as graphics
+use zp.path as path
+use zp.string as text
 use "../ui/layout.zh" as layout
 start {
 

@@ -3,12 +3,12 @@
 ZWeb is Z+'s unified web-development standard module. Import it with:
 
 ```zp
-use zweb as web
+use zp.web as web
 ```
 
 The public API follows Z+'s current value model: HTTP requests, responses,
 routes, middleware declarations, forms, and JSON values are represented as
-JSON strings. `zhttp` and `zjson` remain available and compatible.
+JSON strings. `zp.http` and `zp.json` remain available and compatible.
 
 ## Status and runtime requirements
 
@@ -289,7 +289,7 @@ untrusted interpolations in script, style, or URL contexts.
 
 ## JSON, examples, and limits
 
-The `json*` functions are wrappers around the compatible `zjson` module.
+The `json*` functions are wrappers around the compatible `zp.json` module.
 `parseJsonBody` parses JSON request text; `jsonResponse` creates JSON
 responses. Dynamic JSON is not exposed as native Z+ object/array values; use
 the JSON-string API and JSON Pointer helpers.

@@ -24,11 +24,11 @@ the maintainer can review it before accepting the contribution.
 - `compiler/`: lexer, parser, semantic analysis, IR, and native backends.
 - `runtime/`: interpreter/native runtime and standard-library implementation.
 - `stdlib/`: Z+ module declarations and APIs.
-- `zbuild/`, `zpm/`: build system and package manager.
-- `ZGraphics/`: graphics layer.
+- `zpbuild/`, `zpm/`: build system and package manager.
+- `ZPGraphics/`: graphics layer.
 - `tests/`: compiler, runtime, backend, integration, and tool tests.
 - `docs/`, `MODULES.md`, `NATIVE_BACKEND.md`: language and tool documentation, including [`docs/syntax.md`](docs/syntax.md).
-- `website/`, `Z+_VS_code/`: official website and editor integration.
+- `website/`, `ZPlus_VS_code_extension/`: official website and editor integration.
 
 ## Build and test
 

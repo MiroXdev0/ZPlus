@@ -1,4 +1,4 @@
-use zgraphics as graphics
+use zp.graphics as graphics
 start {
 
 pub fn create(): number {

@@ -1,6 +1,6 @@
-use zenv as env
-use zpath as path
-use zstring as text
+use zp.env as env
+use zp.path as path
+use zp.string as text
 start {
 
 pub fn defaultDirectory(): string {

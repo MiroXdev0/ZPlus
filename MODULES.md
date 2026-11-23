@@ -61,8 +61,8 @@ The compiler resolves standard-library names from its configured `stdlib/`
 directory, not relative to the process working directory:
 
 ```zp
-use zmath as math
-use zstring as text
+use zp.math as math
+use zp.string as text
 
 start {
     let result: number = math.sqrt(144)
@@ -75,7 +75,7 @@ Aliases currently share the flattened program namespace: duplicate aliases
 conflict, and the same file cannot be imported under different aliases. Alias
 scope is not isolated per importing module. See
 [stdlib/README.md](./stdlib/README.md) for the actual module APIs and their
-backend differences. The original source-level `stdlib/math/math.zh` remains
+backend differences. The original source-level `stdlib/zp/math/legacy.zh` remains
 available for its `abs`, `min`, `max`, and `clamp` functions.
 
 ## Editor and CLI

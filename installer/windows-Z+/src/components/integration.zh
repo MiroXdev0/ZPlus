@@ -1,11 +1,11 @@
-use zcrypto as crypto
-use zenv as env
-use zfile as file
-use zfilesystem as filesystem
-use zpath as path
-use zregistry as registry
-use zstring as text
-use zsystem as system
+use zp.crypto as crypto
+use zp.env as env
+use zp.file as file
+use zp.filesystem as filesystem
+use zp.path as path
+use zp.registry as registry
+use zp.string as text
+use zp.system as system
 start {
 
 fn integrationSamePath(left: string, right: string): boolean {

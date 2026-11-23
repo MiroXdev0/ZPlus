@@ -1,33 +1,33 @@
-use zgraphics
+use zp.graphics
 
 start {
 
-    let app = zgraphics.createWindow("Z+ Button Demo", 520, 300)
+    let app = graphics.createWindow("Z+ Button Demo", 520, 300)
     let clicks = 0
-    zgraphics.background(app, "#18202B")
-    zgraphics.text(app, "Click the button", 36, 30, "#FFFFFF", 26)
-    zgraphics.rectangle(app, 40, 100, 210, 62, "#2563EB", true, 1)
-    zgraphics.text(app, "Count a click", 66, 116, "#FFFFFF", 20)
-    zgraphics.text(app, "Click the blue button to update this message.", 40, 210, "#A7F3D0", 18)
-    zgraphics.show(app)
+    graphics.background(app, "#18202B")
+    graphics.text(app, "Click the button", 36, 30, "#FFFFFF", 26)
+    graphics.rectangle(app, 40, 100, 210, 62, "#2563EB", true, 1)
+    graphics.text(app, "Count a click", 66, 116, "#FFFFFF", 20)
+    graphics.text(app, "Click the blue button to update this message.", 40, 210, "#A7F3D0", 18)
+    graphics.show(app)
 
     while true {
-        let event = zgraphics.waitEvent(app)
+        let event = graphics.waitEvent(app)
         if event == 1 {
             break
         } else {
         } end if
         if event == 2 {
-            let x = zgraphics.eventX(app)
-            let y = zgraphics.eventY(app)
+            let x = graphics.eventX(app)
+            let y = graphics.eventY(app)
             if x >= 40 and x <= 250 and y >= 100 and y <= 162 {
                 clicks += 1
                 say("button clicked")
-                zgraphics.rectangle(app, 30, 190, 450, 55, "#18202B", true, 1)
+                graphics.rectangle(app, 30, 190, 450, 55, "#18202B", true, 1)
                 if clicks == 1 {
-                    zgraphics.text(app, "Button clicked!", 40, 210, "#A7F3D0", 22)
+                    graphics.text(app, "Button clicked!", 40, 210, "#A7F3D0", 22)
                 } else {
-                    zgraphics.text(app, "Button clicked again!", 40, 210, "#A7F3D0", 22)
+                    graphics.text(app, "Button clicked again!", 40, 210, "#A7F3D0", 22)
                 } end if
             } else {
             } end if

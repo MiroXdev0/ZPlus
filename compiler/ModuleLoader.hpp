@@ -22,6 +22,7 @@ struct ModuleDiagnostic {
 struct LoadedProgram {
     std::unique_ptr<ast::Program> program;
     std::vector<ModuleDiagnostic> diagnostics;
+    std::vector<ModuleDiagnostic> warnings;
     std::vector<std::filesystem::path> sourceFiles;
 };
 
@@ -47,6 +48,14 @@ private:
         int line = 0,
         int column = 0,
         const std::string& code = "E3001"
+    );
+
+    void addWarning(
+        const std::string& message,
+        const std::string& sourceFile,
+        int line = 0,
+        int column = 0,
+        const std::string& code = "W3001"
     );
 
     std::filesystem::path entryPath_;

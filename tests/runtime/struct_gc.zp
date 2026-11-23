@@ -1,4 +1,4 @@
-use zmemory.management
+use zp.memory.management
 
 start {
 
@@ -12,7 +12,7 @@ struct Player {
         let player = Player("kept", i)
         push(players, player)
     } end for
-    zmemory.collect()
+    memory.collect()
     say(players[0].name)
     say(players[1499].score)
 } stop

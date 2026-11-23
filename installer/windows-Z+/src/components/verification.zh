@@ -1,9 +1,9 @@
-use zcrypto as crypto
-use zfile as file
-use zjson as json
-use zpath as path
-use zprocess as process
-use zstring as text
+use zp.crypto as crypto
+use zp.file as file
+use zp.json as json
+use zp.path as path
+use zp.process as process
+use zp.string as text
 start {
 
 pub fn verify(installDirectory: string): string {
@@ -13,7 +13,7 @@ pub fn verify(installDirectory: string): string {
     if not file.exists(compiler) {
         return "Compiler executable is missing: " + compiler
     } end if
-    if not file.isDirectory(path.join(library, "zstring")) {
+    if not file.isDirectory(path.join(path.join(library, "zp"), "string")) {
         return "The standard library is missing beside the compiler."
     } end if
 

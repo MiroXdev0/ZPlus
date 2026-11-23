@@ -5,7 +5,7 @@ endif()
 file(MAKE_DIRECTORY "${WORK_DIR}/interpreter")
 set(terminal_file_work "${WORK_DIR}/terminal-input-zfile")
 file(MAKE_DIRECTORY "${terminal_file_work}")
-set(terminal_file_input "${WORK_DIR}/terminal-input-zfile.stdin")
+set(terminal_file_input "${WORK_DIR}/terminal-input-file.stdin")
 file(WRITE "${terminal_file_input}" "add\nRemember to test\n")
 execute_process(
     COMMAND "${ZP}" run "${SOURCE_DIR}/tests/stdlib/terminal_input_with_zfile.zp"

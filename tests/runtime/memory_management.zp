@@ -1,10 +1,10 @@
-use zmemory.management
+use zp.memory.management
 use "modules/memory_values.zh" as values
 
 start {
 
 fn collectWhileActive(items: number[][]): number {
-    zmemory.collect()
+    memory.collect()
     return items[1][0]
 } end fn
 
@@ -17,25 +17,25 @@ fn allocateRepeatedly(count: number): number {
     return result
 } end fn
 
-    let baseline: number = zmemory.heapObjects()
+    let baseline: number = memory.heapObjects()
     let empty: number[] = []
     let nested: number[][] = [[10, 20], [30, 40]]
     let label: string = "Z+" + " memory"
     say(length(empty))
     say(nested[1][0])
     say(label)
-    say(zmemory.heapObjects() > baseline)
-    say(zmemory.heapUsed() > 0)
+    say(memory.heapObjects() > baseline)
+    say(memory.heapUsed() > 0)
     say(collectWhileActive(nested))
     say(values.importedValues[0] + values.importedValues[1])
     say(allocateRepeatedly(30000))
-    say(zmemory.collectionCount() > 0)
-    say(zmemory.heapUsed() > 0)
+    say(memory.collectionCount() > 0)
+    say(memory.heapUsed() > 0)
 
     let doomed: number[] = [7, 8, 9]
-    let beforeCollect: number = zmemory.heapObjects()
+    let beforeCollect: number = memory.heapObjects()
     doomed = []
-    zmemory.collect()
-    say(zmemory.heapObjects() < beforeCollect)
+    memory.collect()
+    say(memory.heapObjects() < beforeCollect)
     say(length(nested))
 } stop

@@ -1,23 +1,23 @@
-use zaudio
+use zp.audio
 
 start {
 
-if zaudio.deviceCount() > 0 {
-    zaudio.initialize()
-    let music = zaudio.loadMusic("tone.mp3")
-    let effect = zaudio.loadSound("tone.wav")
-    zaudio.setVolume(music, 0.7)
-    zaudio.setLooping(music, true)
-    zaudio.setPlaybackPosition(music, 0.1)
-    zaudio.play(music)
-    zaudio.pause(music)
-    zaudio.resume(music)
-    zaudio.play(effect)
-    zaudio.play(effect)
-    zaudio.stop(effect)
-    zaudio.stop(music)
-    zaudio.unloadAll()
-    zaudio.shutdown()
+if audio.deviceCount() > 0 {
+    audio.initialize()
+    let music = audio.loadMusic("tone.mp3")
+    let effect = audio.loadSound("tone.wav")
+    audio.setVolume(music, 0.7)
+    audio.setLooping(music, true)
+    audio.setPlaybackPosition(music, 0.1)
+    audio.play(music)
+    audio.pause(music)
+    audio.resume(music)
+    audio.play(effect)
+    audio.play(effect)
+    audio.stop(effect)
+    audio.stop(music)
+    audio.unloadAll()
+    audio.shutdown()
     say("Audio native integration passed")
 } else {
     say("Audio native integration skipped: no playback device")

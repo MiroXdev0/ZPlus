@@ -1,4 +1,4 @@
-use zgraphics
+use zp.graphics
 
 start {
 
@@ -23,17 +23,17 @@ fn calculate(left: number, right: number, operation: number): number {
 } end fn
 
 fn drawKey(app: number, x: number, y: number, label: string) {
-    zgraphics.rectangle(app, x, y, 62, 42, "#334155", true, 1)
-    zgraphics.text(app, label, x + 20, y + 9, "#FFFFFF", 18)
+    graphics.rectangle(app, x, y, 62, 42, "#334155", true, 1)
+    graphics.text(app, label, x + 20, y + 9, "#FFFFFF", 18)
 } end fn
 
-    let app = zgraphics.createWindow("Z+ Pocket Calculator", 300, 400)
+    let app = graphics.createWindow("Z+ Pocket Calculator", 300, 400)
     let current = 0
     let total = 0
     let operation = 0
-    zgraphics.background(app, "#111827")
-    zgraphics.rectangle(app, 20, 28, 250, 54, "#1F2937", true, 1)
-    zgraphics.text(app, "0", 32, 40, "#A7F3D0", 24)
+    graphics.background(app, "#111827")
+    graphics.rectangle(app, 20, 28, 250, 54, "#1F2937", true, 1)
+    graphics.text(app, "0", 32, 40, "#A7F3D0", 24)
     drawKey(app, 20, 105, "7")
     drawKey(app, 95, 105, "8")
     drawKey(app, 170, 105, "9")
@@ -49,17 +49,17 @@ fn drawKey(app: number, x: number, y: number, label: string) {
     drawKey(app, 20, 305, "-")
     drawKey(app, 95, 305, "x")
     drawKey(app, 170, 305, "=")
-    zgraphics.show(app)
+    graphics.show(app)
 
     while true {
-        let event = zgraphics.waitEvent(app)
+        let event = graphics.waitEvent(app)
         if event == 1 {
             break
         } else {
         } end if
         if event == 2 {
-            let x = zgraphics.eventX(app)
-            let y = zgraphics.eventY(app)
+            let x = graphics.eventX(app)
+            let y = graphics.eventY(app)
             let digit = -1
             let selectedOperation = 0
             if y >= 105 and y < 147 {
@@ -121,7 +121,7 @@ fn drawKey(app: number, x: number, y: number, label: string) {
                                             operation = 0
                                         } else {
                                         } end if
-                                        say(zgraphics.numberText(current))
+                                        say(graphics.numberText(current))
                                     } end if
                                 } end if
                             } else {
@@ -145,8 +145,8 @@ fn drawKey(app: number, x: number, y: number, label: string) {
                 operation = selectedOperation
             } else {
             } end if
-            zgraphics.rectangle(app, 20, 28, 250, 54, "#1F2937", true, 1)
-            zgraphics.text(app, zgraphics.numberText(current), 32, 40, "#A7F3D0", 24)
+            graphics.rectangle(app, 20, 28, 250, 54, "#1F2937", true, 1)
+            graphics.text(app, graphics.numberText(current), 32, 40, "#A7F3D0", 24)
         } else {
         } end if
     } end while

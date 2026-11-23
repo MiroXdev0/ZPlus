@@ -1,4 +1,4 @@
-use zcollections as collections
+use zp.collections as collections
 
 start {
 

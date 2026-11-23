@@ -5,7 +5,7 @@
 #include <windows.h>
 #include <shellapi.h>
 
-#include "../../ZGraphics/ZGraphics.hpp"
+#include "../../ZPGraphics/ZGraphics.hpp"
 #include "../StandardLibrary.hpp"
 #include "../Json.hpp"
 #include "../Http.hpp"

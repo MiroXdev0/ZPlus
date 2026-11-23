@@ -1,4 +1,4 @@
-use zfile as file
+use zp.file as file
 
 start {
     file.writeLines("invalid-file-lines.txt", ["one\ntwo"])

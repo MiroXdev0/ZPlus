@@ -15,4 +15,4 @@ The window opens at 720x420. Move the red player with **W/A/S/D** and collect th
 - `assets/textures`, `assets/audio`, and `assets/fonts` are ready for project resources. Put files there; ZBuild stages them under `build/<profile>/assets/` and includes them when packaging.
 - `tests/` is reserved for test entry programs.
 
-Z+ imports declaration modules from `.zh` files; the compiler cannot import `.zp` implementation files as modules. Graphics calls use the public `zgraphics` module API.
+Z+ imports declaration modules from `.zh` files; the compiler cannot import `.zp` implementation files as modules. Graphics calls use the public `zp.graphics` module API.

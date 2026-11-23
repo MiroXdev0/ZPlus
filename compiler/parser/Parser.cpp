@@ -4641,13 +4641,26 @@ Parser::parseUse() {
     if (match(TokenType::String)) {
         declaration->path = previous().value;
     } else {
-        while (check(TokenType::Identifier) ||
-               check(TokenType::Number) ||
-               check(TokenType::Dot) ||
-               check(TokenType::Range) ||
-               check(TokenType::Slash) ||
-               check(TokenType::Backslash) ||
-               check(TokenType::Minus)) {
+        const auto isModulePathToken = [](TokenType type) {
+            switch (type) {
+                case TokenType::Identifier:
+                case TokenType::Number:
+                case TokenType::Dot:
+                case TokenType::Range:
+                case TokenType::Slash:
+                case TokenType::Backslash:
+                case TokenType::Minus:
+                case TokenType::NumberType:
+                case TokenType::StringType:
+                case TokenType::CharacterType:
+                case TokenType::BooleanType:
+                case TokenType::VoidType:
+                    return true;
+                default:
+                    return false;
+            }
+        };
+        while (isModulePathToken(current().type)) {
             declaration->path += current().value;
             advance();
         }

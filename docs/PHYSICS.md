@@ -4,21 +4,21 @@ ZPhysics is a 2D rigid-body module built on Box2D 3.1.1. It is independent of
 ZGraphics and can run in interpreter or native programs.
 
 ```zp
-use zphysics
+use zp.physics
 
 start {
-    let world = zphysics.createWorld(0, 980)
-    let floor = zphysics.createBody(world, "static", 320, 420)
-    zphysics.createBox(world, floor, 600, 20)
-    let ball = zphysics.createBody(world, "dynamic", 320, 80)
-    zphysics.createCircle(world, ball, 18)
+    let world = physics.createWorld(0, 980)
+    let floor = physics.createBody(world, "static", 320, 420)
+    physics.createBox(world, floor, 600, 20)
+    let ball = physics.createBody(world, "dynamic", 320, 80)
+    physics.createCircle(world, ball, 18)
 
     for (let frame: number = 0; frame < 180; frame++) {
-        zphysics.update(world, 1 / 60)
+        physics.update(world, 1 / 60)
     } end for
 
-    say(zphysics.getPositionY(ball))
-    zphysics.destroyWorld(world)
+    say(physics.getPositionY(ball))
+    physics.destroyWorld(world)
 } stop
 ```
 

@@ -1,25 +1,25 @@
-use zgraphics
+use zp.graphics
 
 start {
 
-    let app = zgraphics.createWindow("ZGraphics rendering smoke", 480, 300)
+    let app = graphics.createWindow("ZGraphics rendering smoke", 480, 300)
     let x: number = 24
     let direction: number = 1
     let frame: number = 0
 
-    zgraphics.setTargetFPS(app, 60)
-    zgraphics.background(app, "#102030")
-    zgraphics.show(app)
+    graphics.setTargetFPS(app, 60)
+    graphics.background(app, "#102030")
+    graphics.show(app)
 
-    while zgraphics.isOpen(app) and frame < 120 {
-        zgraphics.update(app)
-        if zgraphics.keyDown(app, 27) {
-            zgraphics.close(app)
+    while graphics.isOpen(app) and frame < 120 {
+        graphics.update(app)
+        if graphics.keyDown(app, 27) {
+            graphics.close(app)
         } else {
-            zgraphics.clear(app)
-            zgraphics.background(app, "#102030")
-            zgraphics.rectangle(app, x, 96, 52, 52, "#22C55E", true, 1)
-            zgraphics.text(app, "Buffered frame " + zgraphics.numberText(frame), 24, 28, "#F8FAFC", 20)
+            graphics.clear(app)
+            graphics.background(app, "#102030")
+            graphics.rectangle(app, x, 96, 52, 52, "#22C55E", true, 1)
+            graphics.text(app, "Buffered frame " + graphics.numberText(frame), 24, 28, "#F8FAFC", 20)
             x += direction * 5
             if x >= 404 {
                 direction = -1
@@ -33,8 +33,8 @@ start {
         } end if
     } end while
 
-    if zgraphics.isOpen(app) {
-        zgraphics.close(app)
+    if graphics.isOpen(app) {
+        graphics.close(app)
     } else {
     } end if
     say("ZGraphics buffered rendering smoke passed")

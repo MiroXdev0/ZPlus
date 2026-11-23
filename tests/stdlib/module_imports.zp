@@ -1,26 +1,26 @@
-use math as legacyMath
-use zargs
-use zaudio
-use zcollections
-use zcrypto
-use zenv
-use zfile
-use zfilesystem
-use zgraphics
-use zhttp
-use zjson
-use zlog
-use zmath
-use zmemory.management as managedMemory
-use zpath
-use zphysics
-use zprocess
-use zrandom
-use zregistry
-use zsqlite
-use zstring
-use zsystem
-use ztime
+use zp.math.legacy as legacyMath
+use zp.args
+use zp.audio
+use zp.collections
+use zp.crypto
+use zp.env
+use zp.file
+use zp.filesystem
+use zp.graphics
+use zp.http
+use zp.json
+use zp.log
+use zp.math
+use zp.memory.management as managedMemory
+use zp.path
+use zp.physics
+use zp.process
+use zp.random
+use zp.registry
+use zp.sqlite
+use zp.string
+use zp.system
+use zp.time
 
 start {
 

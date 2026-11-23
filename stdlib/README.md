@@ -4,8 +4,8 @@ The compiler locates standard modules from its configured `stdlib/` directory,
 independent of the current working directory. Import with an alias:
 
 ```zp
-use zmath as math
-use zstring as text
+use zp.math as math
+use zp.string as text
 
 start {
     let total: number = math.sqrt(144) + math.pow(2, 3)
@@ -13,10 +13,17 @@ start {
 } stop
 ```
 
-`use zmath` resolves to `stdlib/zmath/zmath.zh`. Dotted paths such as
-`use zmemory.management as memory` resolve to nested directories. Quoted
-relative `.zh` imports remain supported. Public functions are accessed through
-their imported namespace.
+`use zp.math` resolves to `stdlib/zp/math/math.zh`; nested names such as
+`use zp.memory.management as memory` resolve beneath `stdlib/zp/`. The default
+alias for a `zp.*` name is its first component after `zp` (`memory` in that
+example). Quoted relative `.zh` imports remain supported. Public functions are
+accessed through their imported namespace.
+
+Legacy standard-library names such as `zmath` and `zmemory.management` remain
+available during migration and emit a deprecation warning when resolved. They
+retain their former default aliases. The old bare name `math` continues to
+resolve the helper module as `zp.math.legacy`; prefer the explicit canonical
+name `use zp.math.legacy as legacyMath`.
 
 Terminal input is provided by compiler built-ins rather than a standard-module
 import. `read()`, `read_number()`, `read_integer()`, and `read_boolean()` accept
@@ -26,7 +33,7 @@ behavior, EOF handling, and examples are documented in the
 
 ## Implemented modules
 
-### `zmath as math`
+### `zp.math as math`
 
 The unary functions `abs`, `round`, `floor`, `ceil`, `sqrt`, `sin`, `cos`,
 `tan`, `asin`, `acos`, `atan`, `log`, `log10`, and `exp` have signature
@@ -43,7 +50,7 @@ an exactly representable integer or the runtime reports an error. `pi()` and
 `e()` therefore report an unsupported fractional result natively. Linux
 native execution does not provide the standard-library runtime.
 
-### `zstring as text`
+### `zp.string as text`
 
 | Function | Signature / behavior |
 |---|---|
@@ -56,7 +63,7 @@ native execution does not provide the standard-library runtime.
 | `length` | `(value: string) -> number`; Unicode code-point count |
 | `repeat` | `(value: string, repetitions: number) -> string`; repetitions must be non-negative |
 
-All `zstring` inputs are validated UTF-8. Length, substring, and reverse use
+All `zp.string` inputs are validated UTF-8. Length, substring, and reverse use
 Unicode code points; trimming recognizes Unicode whitespace. Upper/lower case
 conversion uses the Windows invariant Unicode mapping on Windows and the
 system `C.UTF-8` locale (falling back to the environment locale) on POSIX.
@@ -64,7 +71,7 @@ Searching, splitting, joining, and replacement match exact UTF-8 sequences;
 they do not normalize canonically equivalent strings. Generated strings and
 split arrays are managed by ZMemory.
 
-### `zrandom as random`
+### `zp.random as random`
 
 - `integer(minimum: number, maximum: number) -> number`: inclusive integer bounds.
 - `number(minimum: number, maximum: number) -> number`: lower-inclusive, upper-exclusive.
@@ -80,7 +87,7 @@ match. Native Windows x64 supports integer, boolean, choice, and shuffle;
 `number()` is explicitly unsupported because native floating-point values are
 not implemented.
 
-### `zcollections as collections`
+### `zp.collections as collections`
 
 `sum(values: number[]) -> number`, `average(values: number[]) -> number`,
 `min(values: number[]) -> number`, and `max(values: number[]) -> number`.
@@ -126,7 +133,7 @@ backend. Native numeric values remain integer-only. Directly accessing the
 backing array fields can bypass collection invariants; use the methods above
 for normal operations.
 
-### `zfile as file`
+### `zp.file as file`
 
 `read(path: string) -> string`, `write(path: string, contents: string) -> void`,
 `readLines(path: string) -> string[]`,
@@ -149,7 +156,7 @@ Filesystem paths follow the host platform. All listed functions are supported
 by the interpreter and Windows x64 native runtime; filesystem and validation
 failures raise runtime errors in both.
 
-### `zpath as path`
+### `zp.path as path`
 
 `join(left: string, right: string) -> string`,
 `normalize(value: string) -> string`, `extension(value: string) -> string`,
@@ -158,7 +165,7 @@ and `absolute(value: string) -> string`; `isAbsolute(value: string) -> boolean`.
 These use `std::filesystem` path semantics, including platform-specific
 separators and roots.
 
-### `zenv as env`
+### `zp.env as env`
 
 `get(name: string) -> string`, `set(name: string, value: string) -> void`,
 `exists(name: string) -> boolean`, `homeDirectory() -> string`,
@@ -168,7 +175,7 @@ affect only the current process. The interpreter receives program arguments
 after `--` in `zp run file.zp -- arg...`; native programs see their process
 arguments, excluding the executable name.
 
-### `ztime as time`
+### `zp.time as time`
 
 `now() -> number` returns Unix seconds.
 `format(timestamp: number, pattern: string) -> string` and
@@ -180,7 +187,7 @@ arguments, excluding the executable name.
 Native Windows x64 timestamps and numeric results must be representable as
 integers.
 
-### `zargs as args`
+### `zp.args as args`
 
 `count() -> number`, `get(index: number) -> string`,
 `has(value: string) -> boolean`, and `all() -> string[]`. Indexing is zero-based and excludes the executable name.
@@ -188,7 +195,7 @@ An out-of-range index raises a runtime error. Interpreter arguments are
 provided after `--` to `zp run`; native arguments come from the process command
 line.
 
-### `zlog as log`
+### `zp.log as log`
 
 `debug(message: string) -> void`, `info(message: string) -> void`,
 `warning(message: string) -> void`, `error(message: string) -> void`,
@@ -207,7 +214,7 @@ raise runtime errors unless a function explicitly returns a status or
 validation result. Native support is per operation; see the support summary
 and integration tests before relying on a platform-specific call.
 
-### `zjson as json`
+### `zp.json as json`
 
 | Function | Signature | Purpose |
 |---|---|---|
@@ -227,14 +234,14 @@ JSON, invalid pointers, missing values, type mismatches, and invalid indexes.
 Values cross the API as JSON strings; Z+ does not expose a dynamic JSON object.
 
 ```zp
-use zjson as json
+use zp.json as json
 start {
     let name: string = json.getString("{\"name\":\"Mira\"}", "/name")
     say(name)
 } stop
 ```
 
-### `zfilesystem as fs`
+### `zp.filesystem as fs`
 
 `copyFile(source: string, destination: string, overwrite: boolean) -> boolean`,
 `moveFile(source: string, destination: string, overwrite: boolean) -> boolean`,
@@ -250,7 +257,7 @@ success. `scheduleDeleteOnReboot` is Windows-specific. The remaining APIs use
 the host filesystem; native support follows the packaged runtime's platform
 coverage.
 
-### `zprocess as process`
+### `zp.process as process`
 
 `run(executable: string, arguments: string[], workingDirectory: string,
 timeoutMilliseconds: number) -> string` starts a child process and returns its
@@ -258,12 +265,12 @@ captured output. Invalid arguments, process startup failures, and timeouts are
 runtime errors. Use a fully qualified executable path when portability or
 search-path behavior matters.
 
-### `zcrypto as crypto`
+### `zp.crypto as crypto`
 
 `sha256File(path: string) -> string` returns the lowercase SHA-256 digest of a
 file. File access and hashing failures are runtime errors.
 
-### `zhttp as http`
+### `zp.http as http`
 
 | Function | Signature |
 |---|---|
@@ -287,12 +294,12 @@ as JSON strings. HTTP headers are limited to 16 KiB and 100 fields; client
 request bodies are limited to 16 MiB. Networking support depends on the
 platform runtime.
 
-### `zweb as web`
+### `zp.web as web`
 
-`zweb` is the unified public web module for HTTP/1.x, route tables,
+`zp.web` is the unified public web module for HTTP/1.x, route tables,
 URL-encoded and multipart forms, validation, cookies, in-memory sessions,
 declarative middleware, templates, JSON responses, and safe static files.
-Existing `zhttp` and `zjson` imports remain supported.
+Existing `zp.http` and `zp.json` imports remain supported.
 
 | Area | Public operations |
 |---|---|
@@ -350,7 +357,7 @@ See the [ZWeb API guide](../docs/ZWEB.md),
 [backend runtime guide](../docs/BACKEND.md), and runnable
 [`examples/zweb/`](../examples/zweb/) programs.
 
-### `zsqlite as sqlite`
+### `zp.sqlite as sqlite`
 
 `open(path: string) -> number`, `close(database: number) -> void`,
 `execute(database: number, sql: string, parametersJson: string) -> number`,
@@ -363,7 +370,7 @@ Database handles and SQL failures are reported as runtime errors. Parameters
 are supplied as a JSON array, and query results are JSON text. The interpreter
 and Windows x64 runtime are covered by SQLite integration tests.
 
-### `zregistry as registry`
+### `zp.registry as registry`
 
 `readString(keyPath: string, valueName: string) -> string`,
 `valueKind(keyPath: string, valueName: string) -> string`,
@@ -374,7 +381,7 @@ These APIs access the Windows registry and are unavailable on other platforms.
 Access and type failures are runtime errors; write/delete return whether an
 operation changed a value.
 
-### `zsystem as system`
+### `zp.system as system`
 
 `platform() -> string`, `architecture() -> string`, `osVersion() -> string`,
 `executablePath() -> string`, `availableSpace(path: string) -> number`,
@@ -389,11 +396,11 @@ System-information and filesystem queries use the host platform. Folder
 selection, message boxes, and shortcut operations are platform-dependent
 (Windows UI/shell integrations); unsupported operations report runtime errors.
 
-`zaudio` and `zphysics` provide the APIs documented in
+`zp.audio` and `zp.physics` provide the APIs documented in
 [AUDIO.md](../docs/AUDIO.md) and [PHYSICS.md](../docs/PHYSICS.md).
-`zgraphics` is documented in [ZGraphics](../ZGraphics/README.md), and
-`zmemory.management` in [managed memory](../docs/memory-management.md).
-`stdlib/math/math.zh` retains the source-level `abs`, `min`, `max`, and
+`zp.graphics` is documented in [ZGraphics](../ZPGraphics/README.md), and
+`zp.memory.management` in [managed memory](../docs/memory-management.md).
+`stdlib/zp/math/legacy.zh` retains the source-level `abs`, `min`, `max`, and
 `clamp` helpers.
 
 ## User modules and runtime errors
@@ -421,9 +428,10 @@ stable error codes are not currently part of the language API.
 
 ## Compatibility and backend support
 
-The `collections`, `graphics`, `io`, `math`, and `memory` directories are
-legacy compatibility locations, not additional complete modules. Import the
-documented `z...` module names for supported APIs.
+All official standard-library modules live under `stdlib/zp/`. The former
+`z...` names are compatibility aliases resolved by the compiler and emit a
+deprecation warning. The bare `math` compatibility name refers to the
+source-level helper module; use `zp.math.legacy` for that API.
 
 The interpreter and Windows x64 native runtime are the primary tested
 execution targets. Runtime coverage is module-specific: CTest includes
@@ -437,13 +445,13 @@ certified by the Windows test suite.
 
 | Module | Interpreter | Windows x64 native | Linux native |
 |---|---|---|---|
-| `zmath` | Double-precision | Integer results only; fractional results and constants error | Unsupported |
-| `zstring` | Yes | Yes; byte-oriented strings | Unsupported |
-| `zrandom` | Yes | Integer/bool/array APIs; `number` errors | Unsupported |
-| `zcollections` | Yes | Numeric arrays; integer numbers | Unsupported |
-| `zfile`, `zpath`, `zenv`, `ztime`, `zargs`, `zlog` | Yes | Yes, with integer-only native numbers | Unsupported |
-| `zaudio`, `zgraphics`, `zphysics` | Yes | Windows x64 runtime integrations; see the linked module documentation | Platform-specific |
-| `zjson`, `zhttp`, `zsqlite`, installer/system modules | Runtime bindings exist; see module API and tests | Runtime and platform coverage is per operation | Platform-specific |
+| `zp.math` | Double-precision | Integer results only; fractional results and constants error | Unsupported |
+| `zp.string` | Yes | Yes; byte-oriented strings | Unsupported |
+| `zp.random` | Yes | Integer/bool/array APIs; `number` errors | Unsupported |
+| `zp.collections` | Yes | Numeric arrays; integer numbers | Unsupported |
+| `zp.file`, `zp.path`, `zp.env`, `zp.time`, `zp.args`, `zp.log` | Yes | Yes, with integer-only native numbers | Unsupported |
+| `zp.audio`, `zp.graphics`, `zp.physics` | Yes | Windows x64 runtime integrations; see the linked module documentation | Platform-specific |
+| `zp.json`, `zp.http`, `zp.sqlite`, installer/system modules | Runtime bindings exist; see module API and tests | Runtime and platform coverage is per operation | Platform-specific |
 
 Native standard-library calls use the packaged `zgraphics_runtime.dll`; keep
 it beside the generated executable. The API wrappers do not add a C++ source

@@ -1,4 +1,4 @@
-use zmemory.management
+use zp.memory.management
 
 fn allocateArrays(count: number): number {
     let checksum: number = 0
@@ -12,11 +12,11 @@ fn allocateArrays(count: number): number {
 start {
     let checksum: number = allocateArrays(30000)
     say(checksum)
-    say(zmemory.heapUsed())
-    say(zmemory.heapObjects())
-    say(zmemory.collectionCount())
-    zmemory.collect()
-    say(zmemory.heapUsed())
-    say(zmemory.heapObjects())
-    say(zmemory.collectionCount())
+    say(memory.heapUsed())
+    say(memory.heapObjects())
+    say(memory.collectionCount())
+    memory.collect()
+    say(memory.heapUsed())
+    say(memory.heapObjects())
+    say(memory.collectionCount())
 } stop

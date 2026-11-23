@@ -1,4 +1,4 @@
-use zweb as web
+use zp.web as web
 
 start {
     let routes = web.routeAddConfigured("[]", "GET", "/users/{id}", "showUser", "user.show", "{\"auth\":true}")

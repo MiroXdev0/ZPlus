@@ -1,17 +1,17 @@
-use zphysics
+use zp.physics
 
 start {
 
-    let world = zphysics.createWorld(0, 9.8)
-    let floor = zphysics.createBody(world, "static", 10, 20)
-    zphysics.createBox(world, floor, 20, 2)
-    let body = zphysics.createBody(world, "dynamic", 10, 0)
-    zphysics.createCircle(world, body, 1)
-    zphysics.update(world, 0.1)
-    if zphysics.getPositionY(body) > 0 and zphysics.pointQuery(world, 10, 20) == 1 {
+    let world = physics.createWorld(0, 9.8)
+    let floor = physics.createBody(world, "static", 10, 20)
+    physics.createBox(world, floor, 20, 2)
+    let body = physics.createBody(world, "dynamic", 10, 0)
+    physics.createCircle(world, body, 1)
+    physics.update(world, 0.1)
+    if physics.getPositionY(body) > 0 and physics.pointQuery(world, 10, 20) == 1 {
         say("ZPhysics interpreter integration passed")
     } else {
         say("ZPhysics interpreter integration failed")
     } end if
-    zphysics.destroyWorld(world)
+    physics.destroyWorld(world)
 } stop

@@ -1,4 +1,4 @@
-use zgraphics
+use zp.graphics
 use "../systems/collision.zh" as collision
 start {
 
@@ -11,6 +11,6 @@ pub fn moveY(window: number, y: number, direction: number): number {
 } end fn
 
 pub fn draw(window: number, x: number, y: number) {
-    zgraphics.rectangle(window, x, y, 28, 28, "#F87171", true, 1)
+    graphics.rectangle(window, x, y, 28, 28, "#F87171", true, 1)
 } end fn
 } stop

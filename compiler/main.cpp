@@ -669,6 +669,14 @@ int runCli(
     auto loaded = moduleLoader.load(
         pathFromUtf8(filename),
         sourceFromStdin ? &sourceText : nullptr);
+    for (const auto& warning : loaded.warnings) {
+        printWarning(
+            warning.message,
+            warning.line,
+            warning.column,
+            warning.sourceFile
+        );
+    }
     for (const auto& diagnostic : loaded.diagnostics) {
         printError(
             diagnostic.message,

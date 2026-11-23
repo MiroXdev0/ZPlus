@@ -59,11 +59,11 @@ zpbuild package [TARGET] [--release]
 
 | Template | Aliases | Target / modules | Platforms and notes |
 |---|---|---|---|
-| `Game` | `2d` | Executable; `zgraphics` | Windows interpreter/native where supported; Linux interpreter with X11. Includes a moving, keyboard-controlled player, collectible, collision, and score HUD. |
+| `Game` | `2d` | Executable; `zp.graphics` | Windows interpreter/native where supported; Linux interpreter with X11. Includes a moving, keyboard-controlled player, collectible, collision, and score HUD. |
 | `WebServer` | `server`, `web` | Unavailable | Z+ currently has no HTTP listener/server API. It is intentionally not generated; the HTTP client is not presented as server functionality. |
-| `Console` | `executable`, `exe`, `default` | Executable; `zargs`, `zstring` | Windows and Linux. Demonstrates imported modules, argument handling, string helpers, and `printz()`. |
+| `Console` | `executable`, `exe`, `default` | Executable; `zp.args`, `zp.string` | Windows and Linux. Demonstrates imported modules, argument handling, string helpers, and `printz()`. |
 | `Library` | `lib` | Source `.zh` modules plus a test executable | Windows and Linux. The compiler has no library/archive/link target, so this template does not claim to produce a linkable library artifact. |
-| `Desktop` | `gui` | Executable; `zgraphics` | Windows interpreter/native where supported; Linux interpreter with X11. Demonstrates a window, text, mouse input, and Escape-to-quit. |
+| `Desktop` | `gui` | Executable; `zp.graphics` | Windows interpreter/native where supported; Linux interpreter with X11. Demonstrates a window, text, mouse input, and Escape-to-quit. |
 | `Empty` | `minimal` | Executable; no extra modules | Windows and Linux. Generates only `zproject.toml`, `src/main.zp`, and `README.md`. |
 
 Game and Desktop use only the currently supported ZGraphics API. Their windows are interactive programs and require a graphical display to run; their generated projects can still be build-validated separately. See each generated README for controls and asset guidance.
@@ -189,13 +189,13 @@ A target fingerprint includes ZPBuild/compiler versions, compiler executable has
 
 Custom targets have no declared input/output model in the current configuration, so they always execute, are not cache hits, and are serialized against other targets because their arbitrary commands may modify shared files. Independent compiler targets in the DAG run concurrently in bounded batches; compiler/runtime publication uses target-specific temporary outputs and atomic promotion. The engine does not parallelize compilation within a single executable target because `zp` exposes no object-file or incremental-module compilation API.
 
-Assets are copied into the selected profile's `assets` directory. Only changed files are copied; stale staged files are removed. `preserve_structure = true` preserves paths within each configured source directory; `false` flattens files by name and reports collisions. `package` copies the selected executable and staged assets into `build/<profile>/package/`; on Windows it also includes the graphics runtime DLL when found beside the compiler. Native targets that import `zaudio` automatically stage the matching audio runtime beside the executable and include it in packages. Projects that do not use `zaudio` do not stage an audio runtime.
+Assets are copied into the selected profile's `assets` directory. Only changed files are copied; stale staged files are removed. `preserve_structure = true` preserves paths within each configured source directory; `false` flattens files by name and reports collisions. `package` copies the selected executable and staged assets into `build/<profile>/package/`; on Windows it also includes the graphics runtime DLL when found beside the compiler. Native targets that import `zp.audio` automatically stage the matching audio runtime beside the executable and include it in packages. Projects that do not use `zp.audio` do not stage an audio runtime.
 
 ## Testing and troubleshooting
 
 Test targets are regular Z+ programs; a successful process exit is a pass. Use `--verbose` to show successful test output. Compiler diagnostics are forwarded unchanged. `zbuild graph --dot` can help diagnose dependency cycles; missing targets and cycles are errors.
 
-The repository's ZPBuild unit and integration tests run through CTest. The build integration fixture is [zbuild_multi](../test_program/zbuild_multi/), and validates native compilation, compiler-reported transitive imports, parallel target ordering, cache reuse/invalidation/verification/cleaning, dry-run non-mutation, `--no-cache`, profile separation, test execution, asset staging/packaging, and cycle diagnostics. The audio integration test builds and runs a `zaudio` target and verifies runtime and asset packaging. The template integration test generates and validates every available built-in template, checks custom discovery/aliases/variables and overwrite protection, and builds or runs generated projects where practical.
+The repository's ZPBuild unit and integration tests run through CTest. The build integration fixture is [zbuild_multi](../test_program/zbuild_multi/), and validates native compilation, compiler-reported transitive imports, parallel target ordering, cache reuse/invalidation/verification/cleaning, dry-run non-mutation, `--no-cache`, profile separation, test execution, asset staging/packaging, and cycle diagnostics. The audio integration test builds and runs a `zp.audio` target and verifies runtime and asset packaging. The template integration test generates and validates every available built-in template, checks custom discovery/aliases/variables and overwrite protection, and builds or runs generated projects where practical.
 
 ### Current compiler-driven limitations
 

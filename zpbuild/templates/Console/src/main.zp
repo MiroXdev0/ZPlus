@@ -1,5 +1,5 @@
-use zargs as args
-use zstring as text
+use zp.args as args
+use zp.string as text
 use "commands/greeting.zh" as greeting
 
 start {
