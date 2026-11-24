@@ -29,7 +29,7 @@ createServer(async (request, response) => {
     response.writeHead(400).end("Invalid request path");
     return;
   }
-  let target = resolve(root, `.${pathname}`);
+  let target = resolve(root, pathname === "/favicon.ico" ? "./assets/favicon-dark.png" : `.${pathname}`);
   const relativeTarget = relative(root, target);
   if (relativeTarget === ".." || relativeTarget.startsWith(`..${sep}`) || relativeTarget.includes(`..${sep}`)) {
     response.writeHead(403).end("Forbidden");

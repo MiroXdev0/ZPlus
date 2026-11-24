@@ -6,7 +6,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { createRegistryHandler, extractArchive } from "../lib/registry.js";
 import { createVercelNodeHandler } from "../lib/vercel-adapter.js";
 
-const publicOrigin = "https://zpluse.vercel.app";
+const publicOrigin = "https://z-plus-flax.vercel.app";
 const baseUrl = `${publicOrigin}/api/registry`;
 const database = new PGlite();
 const pool = {

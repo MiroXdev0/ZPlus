@@ -31,7 +31,7 @@ const release = {
 };
 
 function createSite() {
-  const dom = new JSDOM(html, { runScripts: "outside-only", url: "https://zpluse.vercel.app/" });
+  const dom = new JSDOM(html, { runScripts: "outside-only", url: "https://z-plus-flax.vercel.app/" });
   dom.window.scrollTo = () => {};
   dom.window.requestAnimationFrame = callback => callback();
   dom.window.fetch = async () => ({
@@ -71,7 +71,7 @@ test("home retains the dark language-site shell and links into the course", asyn
   assert.ok(document.querySelector('a[href="/learn"]'));
   assert.ok(document.querySelector('a[href="/download"]'));
   assert.equal(dom.window.ZPlusSite.course.flatMap(module => module.lessons).length, 54);
-  assert.equal(document.querySelector('link[rel="canonical"]').href, "https://zpluse.vercel.app/");
+  assert.equal(document.querySelector('link[rel="canonical"]').href, "https://z-plus-flax.vercel.app/");
   assert.equal(document.querySelector('meta[property="og:title"]').content, document.title);
   dom.window.close();
 });
@@ -88,7 +88,7 @@ test("all product and documentation routes render dedicated content and route me
   for (const [path, heading] of routes) {
     visit(dom.window, path);
     assert.ok(document.querySelector("main h1")?.textContent.includes(heading), `${path} should render ${heading}`);
-    assert.equal(document.querySelector('link[rel="canonical"]').href, `https://zpluse.vercel.app${path}`);
+    assert.equal(document.querySelector('link[rel="canonical"]').href, `https://z-plus-flax.vercel.app${path}`);
     assert.equal(document.querySelector('meta[property="og:title"]').content, document.title);
   }
   visit(dom.window, "/docs/visibility");
@@ -284,12 +284,12 @@ test("mobile navigation exposes state and the SEO files enumerate public routes"
   assert.equal(toggle.getAttribute("aria-expanded"), "false");
   const sitemap = await read("sitemap.xml");
   const robots = await read("robots.txt");
-  assert.match(sitemap, /https:\/\/zpluse\.vercel\.app\/docs\/enums/);
-  assert.match(sitemap, /https:\/\/zpluse\.vercel\.app\/wiki\/syntax/);
-  assert.match(sitemap, /https:\/\/zpluse\.vercel\.app\/wiki\/idea/);
-  assert.match(sitemap, /https:\/\/zpluse\.vercel\.app\/wiki\/uses/);
-  assert.match(sitemap, /https:\/\/zpluse\.vercel\.app\/zgraphics/);
-  assert.match(robots, /Sitemap: https:\/\/zpluse\.vercel\.app\/sitemap\.xml/);
+  assert.match(sitemap, /https:\/\/z-plus-flax\.vercel\.app\/docs\/enums/);
+  assert.match(sitemap, /https:\/\/z-plus-flax\.vercel\.app\/wiki\/syntax/);
+  assert.match(sitemap, /https:\/\/z-plus-flax\.vercel\.app\/wiki\/idea/);
+  assert.match(sitemap, /https:\/\/z-plus-flax\.vercel\.app\/wiki\/uses/);
+  assert.match(sitemap, /https:\/\/z-plus-flax\.vercel\.app\/zgraphics/);
+  assert.match(robots, /Sitemap: https:\/\/z-plus-flax\.vercel\.app\/sitemap\.xml/);
   await flush();
   dom.window.close();
 });

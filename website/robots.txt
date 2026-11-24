@@ -5,4 +5,4 @@ Disallow: /login
 Disallow: /register
 Disallow: /publish
 
-Sitemap: https://zpluse.vercel.app/sitemap.xml
+Sitemap: https://z-plus-flax.vercel.app/sitemap.xml

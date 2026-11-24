@@ -24,5 +24,5 @@ const handler = createRegistryHandler({
 
 export default createVercelNodeHandler(
   handler,
-  process.env.ZPM_PUBLIC_ORIGIN || "https://zpluse.vercel.app"
+  process.env.ZPM_PUBLIC_ORIGIN || "https://z-plus-flax.vercel.app"
 );

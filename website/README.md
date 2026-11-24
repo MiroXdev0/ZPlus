@@ -38,7 +38,7 @@ branch intended for each environment:
 | `AWS_SECRET_ACCESS_KEY` | Neon Object Storage branch secret. |
 | `AWS_ENDPOINT_URL_S3` | Branch's S3-compatible endpoint. |
 | `AWS_REGION` | Branch region, for example `us-east-2`. |
-| `ZPM_PUBLIC_ORIGIN` | Optional website origin; defaults to `https://zpluse.vercel.app`. |
+| `ZPM_PUBLIC_ORIGIN` | Optional website origin; defaults to `https://z-plus-flax.vercel.app`. |
 
 Keep `DATABASE_URL_UNPOOLED` in a secure local migration environment only; it
 is not needed by the running API. For local development, link or check out a
@@ -65,7 +65,7 @@ validated and production rollout is approved.
 The Vercel rewrite in `vercel.json` sends `/api/registry/*` requests to
 `api/registry.js`; all other deep links continue to fall back to `index.html`.
 The browser account and publish UI uses same-origin requests. ZPM's default
-registry URL is `https://zpluse.vercel.app/api/registry`; set
+registry URL is `https://z-plus-flax.vercel.app/api/registry`; set
 `ZPM_REGISTRY_URL` to an HTTPS registry when testing another deployment.
 
 The registry API supports account registration, browser and CLI login/logout,

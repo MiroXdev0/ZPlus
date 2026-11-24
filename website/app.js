@@ -1138,8 +1138,8 @@
     document.querySelector('meta[name="description"]').setAttribute("content", metaDescription);
     document.querySelector('meta[property="og:title"]').setAttribute("content", document.title);
     document.querySelector('meta[property="og:description"]').setAttribute("content", metaDescription);
-    document.querySelector('meta[property="og:url"]').setAttribute("content", `https://zpluse.vercel.app${route}`);
-    document.querySelector('link[rel="canonical"]').setAttribute("href", `https://zpluse.vercel.app${route}`);
+    document.querySelector('meta[property="og:url"]').setAttribute("content", `https://z-plus-flax.vercel.app${route}`);
+    document.querySelector('link[rel="canonical"]').setAttribute("href", `https://z-plus-flax.vercel.app${route}`);
     document.querySelector("#primary-nav").classList.remove("nav-open");
     document.querySelector(".menu-toggle").setAttribute("aria-expanded", "false");
     main.focus({ preventScroll: true });

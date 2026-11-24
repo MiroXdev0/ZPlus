@@ -945,7 +945,7 @@ async function manageMaintainer(pool, user, packageName, targetName, request, re
 }
 
 function publicOriginValue(value) {
-  const configured = value || "https://zpluse.vercel.app";
+  const configured = value || "https://z-plus-flax.vercel.app";
   try {
     const parsed = new URL(configured);
     if ((parsed.protocol !== "https:" && parsed.hostname !== "localhost" &&
