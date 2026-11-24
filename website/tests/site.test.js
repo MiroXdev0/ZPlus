@@ -205,6 +205,49 @@ test("direct Wiki deep links reach the existing SPA entry point", async () => {
   }
 });
 
+test("Google Search Console verification is served from the website static root", async () => {
+  const expected = "google-site-verification: google31e0e661a363b0cf.html";
+  const verification = await read("google31e0e661a363b0cf.html");
+  assert.equal(verification, expected);
+  assert.equal(Buffer.byteLength(verification), 53);
+
+  const config = JSON.parse(await read("vercel.json"));
+  assert.equal(config.builds.some(build => build.use === "@vercel/static" && build.src === "**"), true);
+  assert.equal(config.rewrites.some(route => route.source === "/google31e0e661a363b0cf.html"), false);
+
+  const probe = createServer();
+  await new Promise(resolve => probe.listen(0, "127.0.0.1", resolve));
+  const port = probe.address().port;
+  await new Promise(resolve => probe.close(resolve));
+  const serverPath = fileURLToPath(new URL("../server.mjs", import.meta.url));
+  const child = spawn(process.execPath, [serverPath], {
+    env: { ...process.env, PORT: String(port) },
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  let serverOutput = "";
+  const ready = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Website server did not start: ${serverOutput}`)), 3000);
+    child.stdout.on("data", chunk => {
+      serverOutput += chunk.toString();
+      if (serverOutput.includes(`http://localhost:${port}`)) { clearTimeout(timer); resolve(); }
+    });
+    child.once("error", error => { clearTimeout(timer); reject(error); });
+    child.once("exit", code => { clearTimeout(timer); reject(new Error(`Website server exited with ${code}: ${serverOutput}`)); });
+  });
+  try {
+    await ready;
+    const response = await fetch(`http://127.0.0.1:${port}/google31e0e661a363b0cf.html`);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type"), /^text\/html/);
+    assert.equal(await response.text(), expected);
+  } finally {
+    if (child.exitCode === null) {
+      child.kill();
+      await new Promise(resolve => child.once("exit", resolve));
+    }
+  }
+});
+
 test("registry API paths never fall through to the static SPA", async () => {
   const probe = createServer();
   await new Promise(resolve => probe.listen(0, "127.0.0.1", resolve));
