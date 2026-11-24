@@ -1,37 +1,37 @@
 {
     "Z+ Program": {
         "prefix": "start",
-        "body": ["start:", "\t$0", "stop"],
+        "body": ["start {", "\t$0", "} stop"],
         "description": "Create a Z+ entry block"
     },
     "Function": {
         "prefix": "fn",
-        "body": ["fn ${1:name}(${2:parameters})${3: -> number}:", "\t$0", "end"],
+        "body": ["fn ${1:name}(${2:parameters})${3:: number} {", "\t$0", "} end fn"],
         "description": "Create a Z+ function"
     },
     "If / Else": {
         "prefix": "ifelse",
-        "body": ["if ${1:condition}:", "\t${2}", "else:", "\t$0", "end"],
+        "body": ["if ${1:condition} {", "\t${2}", "} else {", "\t$0", "} end if"],
         "description": "Create an if/else statement"
     },
     "While Loop": {
         "prefix": "while",
-        "body": ["while ${1:condition}:", "\t$0", "end"],
+        "body": ["while ${1:condition} {", "\t$0", "} end while"],
         "description": "Create a while loop"
     },
     "Repeat Loop": {
         "prefix": "repeat",
-        "body": ["repeat(${1:count}):", "\t$0", "end"],
+        "body": ["repeat(${1:count}) {", "\t$0", "} end repeat"],
         "description": "Create a fixed-count repeat loop"
     },
     "For Loop": {
         "prefix": "for",
-        "body": ["for (let ${1:i}: number = 0; ${1:i} < ${2:count}; ${1:i}++):", "\t$0", "end"],
+        "body": ["for (let ${1:i}: number = 0; ${1:i} < ${2:count}; ${1:i}++) {", "\t$0", "} end for"],
         "description": "Create a for loop"
     },
     "Switch": {
         "prefix": "switch",
-        "body": ["switch ${1:value}:", "\tcase ${2:1}:", "\t\t${3}", "\tdefault:", "\t\t$0", "end"],
+        "body": ["switch ${1:value} {", "\tcase ${2:1}:", "\t\t${3}", "\tdefault:", "\t\t$0", "} end switch"],
         "description": "Create a switch statement"
     },
     "Variable": {
@@ -82,26 +82,26 @@
     "Array": {
         "prefix": "array",
         "body": ["[${1:first}, ${2:second}]$0"],
-        "description": "Create an array literal (interpreter runtime support is incomplete)"
+        "description": "Create an array literal"
     },
     "Struct": {
         "prefix": "struct",
-        "body": ["struct ${1:Name}:", "\t${2:field}: ${3:number}", "end"],
+        "body": ["struct ${1:Name} {", "\t${2:field}: ${3:number}", "} end struct"],
         "description": "Declare a struct type"
     },
     "Enum": {
         "prefix": "enum",
-        "body": ["enum ${1:Name}:", "\t${2:First}", "\t${3:Second}", "end"],
+        "body": ["enum ${1:Name} {", "\t${2:First}", "\t${3:Second}", "} end enum"],
         "description": "Declare an enum type"
     },
     "Namespace": {
         "prefix": "namespace",
-        "body": ["namespace ${1:Name}:", "\t$0", "end"],
+        "body": ["namespace ${1:Name} {", "\t$0", "} end namespace"],
         "description": "Create a namespace block"
     },
-    "Import": {
-        "prefix": "import",
-        "body": ["import \"${1:module}\" as ${2:module}$0"],
-        "description": "Add an import declaration (module loading is not implemented)"
+    "Use Module": {
+        "prefix": "use",
+        "body": ["use \"${1:module.zh}\" as ${2:module}$0"],
+        "description": "Import a Z+ source module"
     }
 }

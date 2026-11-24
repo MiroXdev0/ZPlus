@@ -5,24 +5,33 @@
   const footer = document.querySelector("#site-footer");
   const search = document.querySelector("#site-search");
   const searchResults = document.querySelector("#search-results");
-  const releasesUrl = "https://github.com/MiroXdev0/ZPluse-release/releases";
-  const releasesApi = "https://api.github.com/repos/MiroXdev0/ZPluse-release/releases?per_page=100";
-  const releaseAssetPrefix = "/MiroXdev0/ZPluse-release/releases/download/";
-  const downloadTargets = [{
-    id: "windows-x86_64",
-    label: "Windows x86_64",
-    filePattern: /\.exe$/i,
-    installerPattern: /\b(?:setup|installer)\b/i,
-    platformPattern: /\b(?:windows|win64)\b/i,
-    architecturePattern: /\b(?:x64|amd64|x86\s+64)\b/i,
-    conflictPattern: /\b(?:linux|macos|darwin|osx|arm64|aarch64|i386|i686|win32|x86\s+32)\b/i
-  }];
+  let metadata = null;
+  let releasesUrl = "";
+  let releasesApi = "";
+  let releaseAssetPrefix = "";
+  let downloadTargets = [];
   const progressKey = "zplus-learning-progress-v1";
   let releaseRequest;
   let releaseViewSequence = 0;
   let registrySearchTimer;
   let registrySearchSequence = 0;
   let publishSelectionSequence = 0;
+
+  function configureMetadata(value) {
+    metadata = value;
+    releasesUrl = metadata.releases.page;
+    releasesApi = metadata.releases.api;
+    releaseAssetPrefix = metadata.releases.downloadPathPrefix;
+    downloadTargets = metadata.releases.assetTargets.map(target => ({
+      ...target,
+      filePattern: new RegExp(target.filePattern, "i"),
+      installerPattern: new RegExp(target.installerPattern, "i"),
+      platformPattern: new RegExp(target.platformPattern, "i"),
+      architecturePattern: new RegExp(target.architecturePattern, "i"),
+      conflictPattern: new RegExp(target.conflictPattern, "i")
+    }));
+    document.querySelector('meta[property="og:image"]').setAttribute("content", metadata.project.socialImage);
+  }
 
   const lessons = course.flatMap((module, moduleIndex) =>
     module.lessons.map((lesson, lessonIndex) => ({
@@ -174,6 +183,8 @@
         ${link("/packages", "Registry")}
         ${link("/dashboard", "Developer account")}
         <a href="${releasesUrl}" target="_blank" rel="noreferrer">GitHub Releases ↗</a>
+        <a href="${metadata.project.repository}" target="_blank" rel="noreferrer">Source repository ↗</a>
+        <a href="${metadata.project.issueTracker}" target="_blank" rel="noreferrer">Issues ↗</a>
       </div>
       <small>Language details are grounded in the checked-in compiler documentation. Check the release page for current published builds.</small>
     </div>`;
@@ -229,7 +240,8 @@
     const match = header.match(/<([^>]+)>;\s*rel="next"/);
     if (!match) return null;
     const next = new URL(match[1]);
-    if (next.origin !== "https://api.github.com" || next.pathname !== "/repos/MiroXdev0/ZPluse-release/releases") {
+    const officialApi = new URL(releasesApi);
+    if (next.origin !== officialApi.origin || next.pathname !== officialApi.pathname) {
       throw new Error("GitHub returned an unexpected Releases pagination link.");
     }
     return next.href;
@@ -348,7 +360,8 @@
         asset.state && asset.state !== "uploaded") return null;
     try {
       const url = new URL(asset.browser_download_url);
-      if (url.protocol !== "https:" || url.hostname !== "github.com" ||
+      const releaseRepository = new URL(metadata.releases.repository);
+      if (url.protocol !== "https:" || url.origin !== releaseRepository.origin ||
           !url.pathname.startsWith(releaseAssetPrefix)) return null;
       return url.href;
     } catch {
@@ -360,8 +373,9 @@
     if (typeof release.html_url !== "string") return releasesUrl;
     try {
       const url = new URL(release.html_url);
-      return url.protocol === "https:" && url.hostname === "github.com" &&
-        url.pathname.startsWith("/MiroXdev0/ZPluse-release/releases/tag/")
+      const releaseRepository = new URL(metadata.releases.repository);
+      return url.protocol === "https:" && url.origin === releaseRepository.origin &&
+        url.pathname.startsWith(`${releaseRepository.pathname}/releases/tag/`)
         ? url.href
         : releasesUrl;
     } catch {
@@ -547,7 +561,20 @@
 
   function ecosystemPage(product) {
     if (!product) return notFound();
-    return `<section class="product-heading"><div><p class="eyebrow">${escapeHtml(product.eyebrow)}</p><h1>${escapeHtml(product.title)}</h1><p class="article-lede">${escapeHtml(product.summary)}</p></div><div class="product-status"><span class="status-square"></span>${escapeHtml(product.status || "Current implementation details")}</div></section><div class="product-content">${product.sections.map((section, index) => `<section class="product-section"><div class="product-section-number">${String(index + 1).padStart(2, "0")}</div><div><h2>${escapeHtml(section.heading)}</h2><p>${inlineMarkup(section.text)}</p>${section.code ? codeBlock(section.code, product.title) : ""}${section.href ? link(section.href, "Read the guide →", "text-link") : ""}${section.action ? link(section.action.href, section.action.label, "button button-secondary") : ""}</div></section>`).join("")}<div class="product-related"><p class="eyebrow">Keep exploring</p>${link("/ecosystem", "Z+ ecosystem overview")} ${link("/docs", "Documentation index")} ${link("/download", "Downloads & releases")}</div></div>`;
+    const componentKey = { compiler: "compiler", zpm: "zpm", zpbuild: "zpbuild", vscode: "vscodeExtension" }[product.id];
+    const version = componentKey ? metadata.components[componentKey].version : null;
+    const platformSummary = platforms => `<ul class="metadata-list">${platforms.map(item => `<li><strong>${escapeHtml(item.operatingSystem)} ${escapeHtml(item.architecture)}</strong> · ${escapeHtml(item.status)} · ${item.evidence.map(escapeHtml).join(", ")}</li>`).join("")}</ul>`;
+    const sectionContent = section => {
+      if (section.metadata === "platforms.compilerBuilds") return `<p>Compiler builds covered by the current CI matrix:</p>${platformSummary(metadata.platforms.compilerBuilds)}<p>Native backend status:</p>${platformSummary(metadata.platforms.nativeBackend)}`;
+      if (section.metadata === "standardLibrary.modules") return `<p>Modules discovered from <code>${escapeHtml(metadata.standardLibrary.path)}</code>:</p><p class="module-list">${metadata.standardLibrary.modules.map(item => `<code>${escapeHtml(item)}</code>`).join(" · ")}</p>`;
+      if (section.metadata === "compatibility.extensionToCompiler") {
+        const compatibility = metadata.compatibility.extensionToCompiler;
+        return `<p>Compatibility status: <strong>${escapeHtml(compatibility.status)}</strong>. Compiler range: ${escapeHtml(compatibility.compilerRange || "not declared")}. Standard-library interface: ${escapeHtml(compatibility.standardLibraryInterface || "not pinned")}. ${escapeHtml(compatibility.evidence)}</p>`;
+      }
+      return `<p>${inlineMarkup(section.text || "")}</p>`;
+    };
+    const eyebrow = version ? `${product.eyebrow} · ${version}` : product.eyebrow;
+    return `<section class="product-heading"><div><p class="eyebrow">${escapeHtml(eyebrow)}</p><h1>${escapeHtml(product.title)}</h1><p class="article-lede">${escapeHtml(product.summary)}</p></div><div class="product-status"><span class="status-square"></span>${escapeHtml(product.status || "Current implementation details")}</div></section><div class="product-content">${product.sections.map((section, index) => `<section class="product-section"><div class="product-section-number">${String(index + 1).padStart(2, "0")}</div><div><h2>${escapeHtml(section.heading)}</h2>${sectionContent(section)}${section.code ? codeBlock(section.code, product.title) : ""}${section.href ? link(section.href, "Read the guide →", "text-link") : ""}${section.marketplaceLink ? `<a class="text-link" href="${escapeHtml(metadata.components.vscodeExtension.marketplaceUrl)}" target="_blank" rel="noreferrer">Install ${escapeHtml(metadata.components.vscodeExtension.marketplaceId)} ↗</a>` : ""}${section.action ? link(section.action.href, section.action.label, "button button-secondary") : ""}</div></section>`).join("")}<div class="product-related"><p class="eyebrow">Keep exploring</p>${link("/ecosystem", "Z+ ecosystem overview")} ${link("/docs", "Documentation index")} ${link("/download", "Downloads & releases")}</div></div>`;
   }
 
   function ecosystemIndexPage() {
@@ -555,12 +582,14 @@
   }
 
   function downloadProducts() {
-    return `<section class="download-products"><div class="section-heading"><p class="eyebrow">Current distribution</p><h2>Tools and availability.</h2><p>Versions and assets come from checked-in release metadata and the official release feed. An unavailable item has no download link.</p></div><div class="download-product-grid">
-      <article><span class="availability-pill">Release feed</span><h3>Z+ Compiler</h3><p id="download-compiler-version">Latest stable version is loading from official releases.</p><p>Windows x64 installer when present in the selected release. Interpreter and native target support are documented separately.</p>${link("/releases", "View published releases →")}</article>
-      <article><span class="availability-pill">Bundled with distribution</span><h3>ZPM <small>1.0.0</small></h3><p>Package manager supplied in the Windows compiler distribution, with local and registry workflows.</p>${link("/zpm", "ZPM guide →")}</article>
-      <article><span class="availability-pill">Bundled with distribution</span><h3>ZPBuild <small>1.0.0</small></h3><p>Project build and test tool supplied alongside the compiler. <code>zbuild</code> remains a compatibility alias.</p>${link("/zpbuild", "ZPBuild guide →")}</article>
-      <article><span class="availability-pill unavailable-pill">No verified public asset</span><h3>VS Code extension <small>1.3.4</small></h3><p>The checkout identifies version 1.3.4, but no official Marketplace listing or release asset is currently verified.</p>${link("/vscode", "Extension details →")}</article>
-    </div><p class="platform-note"><strong>Platform availability:</strong> the official release feed currently publishes Windows x64 setup assets. This page does not imply an official Linux or macOS installer.</p></section>`;
+    const components = metadata.components;
+    const ciPlatforms = metadata.platforms.compilerBuilds.map(item => `${item.operatingSystem} ${item.architecture}`).join(", ");
+    return `<section class="download-products"><div class="section-heading"><p class="eyebrow">Current distribution</p><h2>Tools and availability.</h2><p>Component versions come from their source declarations. Compiler release assets are loaded from the official release feed.</p></div><div class="download-product-grid">
+      <article><span class="availability-pill">Release feed</span><h3>${escapeHtml(components.compiler.name)}</h3><p>Source version: <strong>${escapeHtml(components.compiler.version)}</strong>.</p><p id="download-compiler-version">Latest stable version is loading from official releases.</p><p>Builds are tested in CI for ${escapeHtml(ciPlatforms)}. Published installers are matched against actual release assets.</p>${link("/releases", "View published releases →")}</article>
+      <article><span class="availability-pill">Bundled with distribution</span><h3>${escapeHtml(components.zpm.name)} <small>${escapeHtml(components.zpm.version)}</small></h3><p>Package manager supplied with the compiler distribution.</p>${link("/zpm", "ZPM guide →")}</article>
+      <article><span class="availability-pill">Bundled with distribution</span><h3>${escapeHtml(components.zpbuild.name)} <small>${escapeHtml(components.zpbuild.version)}</small></h3><p>Project build and test tool supplied alongside the compiler. <code>zbuild</code> remains a compatibility alias.</p>${link("/zpbuild", "ZPBuild guide →")}</article>
+      <article><span class="availability-pill">Marketplace</span><h3>${escapeHtml(components.vscodeExtension.name)} <small>${escapeHtml(components.vscodeExtension.version)}</small></h3><p>Install the independently versioned extension from the official Marketplace listing.</p><a class="text-link" href="${escapeHtml(components.vscodeExtension.marketplaceUrl)}" target="_blank" rel="noreferrer">Open Marketplace listing ↗</a></article>
+    </div><p class="platform-note"><strong>Native backend status:</strong> ${metadata.platforms.nativeBackend.map(item => `${escapeHtml(item.operatingSystem)} ${escapeHtml(item.architecture)}: ${escapeHtml(item.status)}`).join("; ")}. Installer availability is determined from published assets, not platform build claims.</p></section>`;
   }
 
   function articlePage(item, kind, all, base, extraRelated = []) {
@@ -1013,6 +1042,7 @@
   }
 
   function render() {
+    if (!metadata) return;
     const route = path();
     main.classList.remove("page-enter");
     void main.offsetWidth;
@@ -1138,8 +1168,9 @@
     document.querySelector('meta[name="description"]').setAttribute("content", metaDescription);
     document.querySelector('meta[property="og:title"]').setAttribute("content", document.title);
     document.querySelector('meta[property="og:description"]').setAttribute("content", metaDescription);
-    document.querySelector('meta[property="og:url"]').setAttribute("content", `https://z-plus-flax.vercel.app${route}`);
-    document.querySelector('link[rel="canonical"]').setAttribute("href", `https://z-plus-flax.vercel.app${route}`);
+    const canonical = new URL(route, metadata.project.website).href;
+    document.querySelector('meta[property="og:url"]').setAttribute("content", canonical);
+    document.querySelector('link[rel="canonical"]').setAttribute("href", canonical);
     document.querySelector("#primary-nav").classList.remove("nav-open");
     document.querySelector(".menu-toggle").setAttribute("aria-expanded", "false");
     main.focus({ preventScroll: true });
@@ -1459,6 +1490,21 @@
   });
   window.addEventListener("popstate", render);
 
-  renderFooter();
-  render();
+  if (window.ZPlusMetadata) {
+    configureMetadata(window.ZPlusMetadata);
+    renderFooter();
+    render();
+  } else {
+    fetch("/ecosystem-metadata.json", { headers: { Accept: "application/json" } }).then(response => {
+      if (!response.ok) throw new Error(`Metadata request failed with HTTP ${response.status}.`);
+      return response.json();
+    }).then(value => {
+      configureMetadata(value);
+      renderFooter();
+      render();
+    }).catch(error => {
+      main.innerHTML = `<section class="state-panel state-warning"><h1>Project metadata is unavailable.</h1><p>${escapeHtml(error.message)}</p></section>`;
+      console.error("Unable to load generated Z+ ecosystem metadata.", error);
+    });
+  }
 })();

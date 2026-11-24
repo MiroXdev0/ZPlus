@@ -47,7 +47,7 @@ execute_process(
 )
 if(NOT dependencies_result EQUAL 0 OR
    NOT dependencies_output MATCHES "message\\.zh" OR
-   NOT dependencies_output MATCHES "math\\.zh")
+   NOT dependencies_output MATCHES "legacy\\.zh")
     message(FATAL_ERROR
         "compiler dependency query did not report transitive imports\n"
         "${dependencies_output}${dependencies_error}")

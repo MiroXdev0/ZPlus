@@ -1,0 +1,24 @@
+use zphysics
+
+start {
+
+    let world = zphysics.createWorld(0, 320)
+    let floor = zphysics.createBody(world, "static", 320, 430)
+    zphysics.createBox(world, floor, 620, 24)
+    let ball = zphysics.createBody(world, "dynamic", 140, 80)
+    let ballShape = zphysics.createCircle(world, ball, 22)
+    zphysics.setRestitution(ballShape, 0.82)
+    let block = zphysics.createBody(world, "dynamic", 300, 30)
+    let blockShape = zphysics.createBox(world, block, 50, 34)
+    zphysics.setFriction(blockShape, 0.65)
+    let triangle = zphysics.createBody(world, "dynamic", 440, 60)
+    zphysics.createPolygon(world, triangle, "-24,18;24,18;0,-24")
+
+    for (let frame: number = 0; frame < 360; frame++) {
+        zphysics.update(world, 1 / 60)
+    } end for
+
+    say("Contacts after mixed-shape simulation:")
+    say(zphysics.contactCount(world))
+    zphysics.destroyWorld(world)
+} stop

@@ -5,6 +5,7 @@ import {
   scrypt,
   timingSafeEqual
 } from "node:crypto";
+import { siteMetadata } from "./site-metadata.js";
 
 const API_BASE = "/api/registry";
 const MAX_ARCHIVE_BYTES = 4 * 1024 * 1024;
@@ -945,7 +946,7 @@ async function manageMaintainer(pool, user, packageName, targetName, request, re
 }
 
 function publicOriginValue(value) {
-  const configured = value || "https://z-plus-flax.vercel.app";
+  const configured = value || siteMetadata.project.website;
   try {
     const parsed = new URL(configured);
     if ((parsed.protocol !== "https:" && parsed.hostname !== "localhost" &&

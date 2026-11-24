@@ -29,6 +29,19 @@ createServer(async (request, response) => {
     response.writeHead(400).end("Invalid request path");
     return;
   }
+  if (pathname === "/api/registry" || pathname.startsWith("/api/registry/")) {
+    response.writeHead(503, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff"
+    }).end(JSON.stringify({
+      error: {
+        code: "registry_api_unavailable",
+        message: "The static development server does not run the registry API. Use the Vercel development server for registry routes."
+      }
+    }));
+    return;
+  }
   let target = resolve(root, pathname === "/favicon.ico" ? "./assets/favicon-dark.png" : `.${pathname}`);
   const relativeTarget = relative(root, target);
   if (relativeTarget === ".." || relativeTarget.startsWith(`..${sep}`) || relativeTarget.includes(`..${sep}`)) {

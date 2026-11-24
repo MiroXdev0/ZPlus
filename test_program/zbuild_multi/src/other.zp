@@ -1,0 +1,3 @@
+start {
+    printz("Other target\n")
+} stop

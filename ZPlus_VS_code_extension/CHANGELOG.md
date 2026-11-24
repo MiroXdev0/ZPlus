@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.5
+
+- Verified extension checks, diagnostics, compiler discovery, and run/build commands against Z+ compiler 1.4.0; no compiler compatibility range is claimed.
+- Updated release version metadata and packaged the extension as a local VSIX.
+
 ## 1.3.4
 
 - Prepared the 1.3.4 Marketplace release with the existing official Z+ proprietary license and website metadata.

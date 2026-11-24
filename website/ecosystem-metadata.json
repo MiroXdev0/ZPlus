@@ -1,0 +1,183 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "Z+",
+    "description": "A statically typed programming language implemented in C++20, with a compiler, interpreter, native backend, package manager, build system, and editor tools.",
+    "website": "https://z-plus-lang.vercel.app/",
+    "previousWebsite": "https://z-plus-flax.vercel.app/",
+    "repository": "https://github.com/MiroXdev0/ZPlus",
+    "documentation": "https://z-plus-lang.vercel.app/docs",
+    "issueTracker": "https://github.com/MiroXdev0/ZPlus/issues",
+    "registryApi": "https://z-plus-lang.vercel.app/api/registry",
+    "socialImage": "https://z-plus-lang.vercel.app/assets/favicon-dark.png"
+  },
+  "components": {
+    "compiler": {
+      "name": "Z+ Compiler",
+      "version": "1.4.0",
+      "source": "CMakeLists.txt:project(VERSION)"
+    },
+    "zpm": {
+      "name": "ZPM",
+      "version": "1.0.0",
+      "source": "CMakeLists.txt:ZPM_VERSION"
+    },
+    "zpbuild": {
+      "name": "ZPBuild",
+      "version": "1.0.0",
+      "source": "CMakeLists.txt:ZBUILD_VERSION"
+    },
+    "vscodeExtension": {
+      "name": "Z+ Programming Language",
+      "version": "1.3.5",
+      "marketplaceId": "MiroXdev0.zplus-language",
+      "marketplaceUrl": "https://marketplace.visualstudio.com/items?itemName=MiroXdev0.zplus-language",
+      "source": "ZPlus_VS_code_extension/package.json"
+    }
+  },
+  "platforms": {
+    "compilerBuilds": [
+      {
+        "operatingSystem": "Windows",
+        "architecture": "x86_64",
+        "status": "unverified",
+        "evidence": [
+          ".github/workflows/ci.yml",
+          "README.md"
+        ]
+      },
+      {
+        "operatingSystem": "Linux",
+        "architecture": "x86_64",
+        "status": "unverified",
+        "evidence": [
+          ".github/workflows/ci.yml",
+          "README.md"
+        ]
+      }
+    ],
+    "nativeBackend": [
+      {
+        "operatingSystem": "Windows",
+        "architecture": "x86_64",
+        "status": "supported",
+        "evidence": [
+          "docs/BACKEND.md",
+          ".github/workflows/ci.yml"
+        ]
+      },
+      {
+        "operatingSystem": "Linux",
+        "architecture": "x86_64",
+        "status": "partial",
+        "evidence": [
+          "docs/BACKEND.md",
+          ".github/workflows/ci.yml"
+        ]
+      }
+    ],
+    "extension": {
+      "vscodeEngine": "^1.80.0",
+      "testedInCi": [
+        "ubuntu-latest"
+      ]
+    }
+  },
+  "installations": [
+    {
+      "id": "source-build",
+      "method": "Build from source with CMake",
+      "url": "https://github.com/MiroXdev0/ZPlus",
+      "documentation": "https://github.com/MiroXdev0/ZPlus/blob/main/README.md#build-from-source",
+      "platforms": [
+        "Windows x86_64",
+        "Linux x86_64"
+      ]
+    },
+    {
+      "id": "windows-x86_64-installer",
+      "method": "Windows x86_64 installer from official releases",
+      "url": "https://github.com/MiroXdev0/ZPluse-release/releases",
+      "documentation": "https://z-plus-lang.vercel.app/docs/installation",
+      "platforms": [
+        "Windows x86_64"
+      ]
+    },
+    {
+      "id": "vscode-marketplace",
+      "method": "Visual Studio Marketplace",
+      "url": "https://marketplace.visualstudio.com/items?itemName=MiroXdev0.zplus-language",
+      "documentation": "https://z-plus-lang.vercel.app/vscode",
+      "platforms": []
+    }
+  ],
+  "language": {
+    "identifier": "zplus",
+    "fileExtensions": [
+      ".zp",
+      ".zh"
+    ]
+  },
+  "standardLibrary": {
+    "path": "stdlib/zp",
+    "version": null,
+    "modules": [
+      "zp.args",
+      "zp.audio",
+      "zp.collections",
+      "zp.crypto",
+      "zp.env",
+      "zp.file",
+      "zp.filesystem",
+      "zp.graphics",
+      "zp.http",
+      "zp.json",
+      "zp.log",
+      "zp.math",
+      "zp.math.legacy",
+      "zp.memory.management",
+      "zp.path",
+      "zp.physics",
+      "zp.process",
+      "zp.random",
+      "zp.registry",
+      "zp.sqlite",
+      "zp.string",
+      "zp.system",
+      "zp.time",
+      "zp.web"
+    ],
+    "documentation": "https://z-plus-lang.vercel.app/docs/standard-library"
+  },
+  "compatibility": {
+    "extensionToCompiler": {
+      "status": "unknown",
+      "compilerRange": null,
+      "standardLibraryInterface": null,
+      "evidence": "The extension delegates to the installed compiler. No compiler-version range or standard-library interface pin is declared in the extension source, documentation, or tests."
+    },
+    "compilerToStandardLibrary": {
+      "status": "verified",
+      "compilerRange": "1.4.0",
+      "standardLibraryInterface": "co-shipped repository sources; no separate standard-library version is declared",
+      "evidence": "Compiler and standard library are built and tested from the same repository checkout; stdlib/zp has no independent version declaration."
+    }
+  },
+  "releases": {
+    "repository": "https://github.com/MiroXdev0/ZPluse-release",
+    "page": "https://github.com/MiroXdev0/ZPluse-release/releases",
+    "api": "https://api.github.com/repos/MiroXdev0/ZPluse-release/releases?per_page=100",
+    "downloadPathPrefix": "/MiroXdev0/ZPluse-release/releases/download/",
+    "assetTargets": [
+      {
+        "id": "windows-x86_64",
+        "label": "Windows x86_64",
+        "filePattern": "\\.exe$",
+        "installerPattern": "\\b(?:setup|installer)\\b",
+        "platformPattern": "\\b(?:windows|win64)\\b",
+        "architecturePattern": "\\b(?:x64|amd64|x86\\s+64)\\b",
+        "conflictPattern": "\\b(?:linux|macos|darwin|osx|arm64|aarch64|i386|i686|win32|x86\\s+32)\\b"
+      }
+    ]
+  }
+}

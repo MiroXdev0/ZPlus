@@ -7,22 +7,23 @@
       sections: [
         { heading: "Two ways to execute", text: "`zp run` executes a checked program in the interpreter. `zp build` generates a native executable for the supported target and language subset; it does not silently fall back to interpretation.", code: "zp check hello.zp\nzp run hello.zp\nzp build hello.zp -o hello.exe" },
         { heading: "Language foundation", text: "The implementation includes typed variables and functions, control flow, arrays, modules, classes, enums, structs, and a growing standard library. See the language reference for constraints on constructors, visibility, aggregate types, and platform support.", href: "/docs/reference" },
-        { heading: "Platform support", text: "The interpreter is available on Windows and Linux. Windows x64 has the broadest tested native runtime support. Linux native execution exists for a narrower set of operations; the compiler reports unsupported operations rather than promising parity that is not there.", href: "/docs/native" },
-        { heading: "Get a published build", text: "The Downloads page reads actual release assets from the official GitHub Releases API. At the time of this page load, the published feed is the source for the current stable version and available platform installers.", href: "/download" }
+        { heading: "Platform support", metadata: "platforms.compilerBuilds", href: "/docs/native" },
+        { heading: "Get a published build", text: "The Downloads page reads actual release assets from the official GitHub Releases API. At the time of this page load, the published feed is the source for the current stable version and available platform installers.", href: "/download" },
+        { heading: "Standard library modules", metadata: "standardLibrary.modules", href: "/docs/standard-library" }
       ]
     },
     zpm: {
-      id: "zpm", title: "ZPM", eyebrow: "Package manager · 1.0.0",
+      id: "zpm", title: "ZPM", eyebrow: "Package manager",
       summary: "Resolve, install, lock, cache, inspect, and publish Z+ source packages.",
       sections: [
         { heading: "A reproducible project", text: "ZPM reads `zpm.json`, resolves semantic version constraints, and records selected package versions and content hashes in `zpm-lock.json`. `zpm install --locked` restores that exact dependency graph and fails if the lock cannot be honored.", code: "zpm init my-app\nzpm add example-package@^1.2.0\nzpm install --locked\nzpm list" },
         { heading: "Package locations", text: "Managed packages are installed under `z+_packages/`; verified archives and sources also use ZPM's local cache. Local directories and `.zpm` archives can be added without a registry connection. The cache can support offline restoration when the exact source is already present.", href: "/docs/zpm" },
-        { heading: "Registry", text: "The official website has a working package registry API for search, version metadata, publication, and archive downloads. Packages are validated and integrity checked. Package code is not executed as an install hook.", href: "/packages" },
+        { heading: "Registry", text: "The repository includes a package registry API for search, version metadata, publication, and archive downloads. A deployment needs its API route and database/object-storage credentials configured. Packages are validated and integrity checked; package code is not executed as an install hook.", href: "/packages" },
         { heading: "Scope", text: "ZPM owns package metadata, dependency resolution, lockfiles, caching, and package archives. ZPBuild owns project build configuration and orchestration; ZPM does not replace the compiler or linker." }
       ]
     },
     zpbuild: {
-      id: "zpbuild", title: "ZPBuild", eyebrow: "Build system · 1.0.0",
+      id: "zpbuild", title: "ZPBuild", eyebrow: "Build system",
       summary: "A project-oriented build engine that discovers dependencies and schedules configured targets.",
       sections: [
         { heading: "Project workflow", text: "Create a project with a built-in template, configure targets in `zproject.toml`, then build, run, or test through the project graph. `zpbuild` is the primary command; `zbuild` remains a compatibility alias.", code: "zpbuild init MyApp\ncd MyApp\nzpbuild check\nzpbuild build --release\nzpbuild test" },
@@ -32,10 +33,11 @@
       ]
     },
     vscode: {
-      id: "vscode", title: "VS Code extension", eyebrow: "Editor integration · 1.3.4",
+      id: "vscode", title: "VS Code extension", eyebrow: "Editor integration",
       summary: "Official Z+ language support for Visual Studio Code, built around the installed compiler and ZPBuild.",
       sections: [
-        { heading: "Install status", text: "The extension is not currently linked from a verified Marketplace listing or official release asset. The website does not provide a guessed Marketplace URL. Check the official release channels before installing a VSIX.", action: { href: "/download#vscode", label: "Check available downloads" } },
+        { heading: "Marketplace", text: "The official Marketplace listing is available under the project’s published extension ID.", marketplaceLink: true },
+        { heading: "Compiler compatibility", metadata: "compatibility.extensionToCompiler" },
         { heading: "What it provides", text: "The extension recognizes `.zp` and `.zh` files, highlights Z+ syntax, provides snippets and compiler-backed checks, and exposes commands for checking, running, building, and project workflows. Workspace features include symbol lookup and navigation from the extension's source analysis; they are not a separate semantic Language Server.", href: "/docs/vscode" },
         { heading: "Tool paths", text: "Compiler, ZPM, and ZPBuild locations can be configured in VS Code settings. When left blank, the extension searches the system PATH. The editor delegates compilation and project builds to the real installed tools." },
         { heading: "Boundaries", text: "The extension does not include the compiler, provide a debugger, or claim type-correct IntelliSense for information unavailable to its analysis. Compiler diagnostics remain authoritative." }

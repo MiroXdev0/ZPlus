@@ -1,0 +1,29 @@
+use zaudio
+
+start {
+
+zaudio.initialize()
+let music = zaudio.loadMusic("assets/tone.ogg")
+
+zaudio.setVolume(music, 0.7)
+zaudio.setLooping(music, true)
+zaudio.play(music)
+say("Playing tone.ogg")
+say("Duration (seconds):")
+say(zaudio.getDuration(music))
+say("Position (seconds):")
+say(zaudio.getPlaybackPosition(music))
+
+zaudio.pause(music)
+say("Paused:")
+say(zaudio.isPaused(music))
+zaudio.resume(music)
+say("Playing:")
+say(zaudio.isPlaying(music))
+zaudio.stop(music)
+say("Stopped:")
+say(zaudio.isStopped(music))
+
+zaudio.unload(music)
+zaudio.shutdown()
+} stop

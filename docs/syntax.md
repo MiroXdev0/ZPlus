@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This reference describes the language accepted by the Z+ 1.4.0 development compiler in this repository. It follows the lexer, parser, semantic analyzer, IR builder, and interpreter—not proposed or aspirational features.
+This reference describes the language accepted by the compiler in this repository. Its claims follow the lexer, parser, semantic analyzer, IR builder, interpreter, and backend—not proposed or aspirational features. The compiler version is declared in the root `CMakeLists.txt`.
 
 The status labels used below mean:
 

@@ -669,7 +669,7 @@ start {
       ["Common commands", "`zpm init`, `zpm add`, `zpm install`, `zpm list`, `zpm build`, `zpm test`, `zpm remove`, `zpm pack`, and `zpm publish` support package workflows. See the dedicated ZPM page and the full package guide for details.", "zpm init my-app\nzpm add ..\\my-library\nzpm install --locked\nzpm list"],
       ["Manifest and lock", "Package metadata lives in `zpm.json`; a project lockfile records the manifest hash, resolved versions, and content hashes. `zpm install --locked` restores the exact graph and refuses lock changes."],
       ["Sources and storage", "ZPM accepts local directories and `.zpm` archives as well as registry packages. Installed packages live under `z+_packages/`; verified package sources may be restored from the local cache offline."],
-      ["Security", "Package metadata, sources, and archives are validated, and SHA-256 integrity is checked. Installation does not run arbitrary package scripts. The official website registry provides search, version resolution, publishing, and archive download endpoints."]
+      ["Security", "Package metadata, sources, and archives are validated, and SHA-256 integrity is checked. Installation does not run arbitrary package scripts. When its API route and storage credentials are configured, the website deployment provides search, version resolution, publishing, and archive downloads."]
     ]},
     { id: "zpbuild", title: "ZPBuild build system", section: "Tools", summary: "Configure, build, test, and inspect multi-target Z+ projects.", body: [
       ["Primary command", "Use `zpbuild`; `zbuild` remains a compatibility alias. Commands include `init`, `new`, `configure`, `build`, `plan`, `run`, `check`, `test`, `clean`, `rebuild`, `info`, `targets`, `graph`, and `package`."],
@@ -681,7 +681,7 @@ start {
       ["Files and editing", "The extension recognizes `.zp` and `.zh`, provides syntax highlighting and snippets, and includes formatter support based on lexical scanning. The README documents the current feature set."],
       ["Compiler workflows", "Commands can check, run, and build a file and invoke ZPBuild and ZPM project workflows. Compiler, ZPBuild, and ZPM executable paths are configurable; otherwise, tools are discovered on PATH."],
       ["Analysis boundaries", "Diagnostics are backed by the compiler. The extension has workspace symbol and source-reference features, but it is not a Language Server Protocol implementation and does not provide a debugger or claim compiler type inference for completion ranking."],
-      ["Distribution status", "The current extension package is version 1.3.4 in this checkout, but no verified Marketplace listing or extension asset appears in the official release feed. The website marks the download unavailable until a valid public asset is published."]
+      ["Distribution status", "The extension is published separately on the Visual Studio Marketplace. Its compiler compatibility range is not pinned; the installed compiler remains authoritative for language and runtime behavior."]
     ]},
     { id: "zgraphics", title: "ZGraphics module", section: "Standard library", summary: "Create a native window and draw basic 2D shapes from Z+.", body: [
       ["API overview", "The `zp.graphics` module exposes window creation and lifecycle, titles, positions and sizing, background colors, text and basic shapes, frame updates, keyboard and mouse state, and an event queue."],

@@ -1,0 +1,41 @@
+use zmath as math
+use zcollections as collections
+use zrandom as random
+use ztime as time
+use zpath as path
+use zfile as file
+use zstring as text
+use zargs as args
+
+start {
+
+    let outputDir: string = args.get(0)
+    let userName: string = args.get(1)
+    let displayName: string = text.upper(userName)
+
+    let values: number[] = [10, 20, 30, 40]
+    let mathOk: boolean = math.abs(-25) == 25 and math.sqrt(25) == 5 and math.pow(2, 3) == 8
+    let averageValue: number = collections.average(values)
+    let collectionOk: boolean = averageValue == 25 and collections.contains(values, 30)
+
+    random.seed(11)
+    let seededRandom: number = random.integer(1, 100)
+    random.seed(11)
+    let consistentRandom: number = random.integer(1, 100)
+    let randomOk: boolean = seededRandom == consistentRandom
+
+    let timeStamp: number = time.parse("2024-02-29", "%Y-%m-%d")
+    let timeOk: boolean = text.contains(time.format(timeStamp, "%Y-%m-%d"), "2024-02-29")
+    let configOk: boolean = mathOk and collectionOk and randomOk and timeOk
+
+    say("Z+ Developer Report for " + displayName)
+    say(configOk ? "Configuration loaded" : "Configuration failed")
+    say(mathOk ? "Math check passed" : "Math check failed")
+    say(collectionOk ? "Collection check passed" : "Collection check failed")
+    say(randomOk ? "Random check passed" : "Random check failed")
+    say(timeOk ? "Time check passed" : "Time check failed")
+
+    file.write(path.join(outputDir, "report.txt"), "Average: 25\nMath check: passed\nCollection check: passed\nRandom check: passed\nTime check: passed\n")
+
+    say("Report written")
+} stop

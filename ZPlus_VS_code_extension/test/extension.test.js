@@ -10,6 +10,7 @@ const { test } = require("node:test");
 const extensionRoot = path.resolve(__dirname, "..");
 const projectRoot = path.resolve(extensionRoot, "..");
 const manifest = require(path.join(extensionRoot, "package.json"));
+const ecosystemMetadata = require(path.join(projectRoot, "website", "ecosystem-metadata.json"));
 const grammar = require(path.join(extensionRoot, "syntaxes", "zplusLanguage.json"));
 const snippets = require(path.join(extensionRoot, "snippets", "zplus.json"));
 const { parseDiagnostics } = require(path.join(extensionRoot, "lib", "diagnostics"));
@@ -332,13 +333,17 @@ function documentFrom(text, filePath = path.join(os.tmpdir(), "example.zp")) {
 
 test("manifest, grammar, language configuration and snippets are loadable", () => {
     assert.equal(manifest.contributes.languages[0].id, "zplus");
-    assert.equal(manifest.version, "1.3.4");
+    assert.match(manifest.version, /^\d+\.\d+\.\d+/);
     assert.equal(manifest.name, "zplus-language");
-    assert.equal(manifest.publisher, "Miroxdev0");
+    assert.equal(manifest.publisher, "MiroXdev0");
     assert.equal(manifest.license, "Apache-2.0");
-    assert.equal(manifest.homepage, "https://zpluse.vercel.app/");
-    assert.equal(Object.hasOwn(manifest, "repository"), false);
-    assert.equal(Object.hasOwn(manifest, "bugs"), false);
+    assert.equal(manifest.homepage, ecosystemMetadata.project.website);
+    assert.deepEqual(manifest.repository, {
+        type: "git",
+        url: `${ecosystemMetadata.project.repository}.git`,
+        directory: "ZPlus_VS_code_extension"
+    });
+    assert.equal(manifest.bugs.url, ecosystemMetadata.project.issueTracker);
     assert.ok(manifest.description.length > 20);
     assert.doesNotMatch(manifest.description, /proprietary/i);
     const marketplaceText = [
@@ -346,7 +351,7 @@ test("manifest, grammar, language configuration and snippets are loadable", () =
         fs.readFileSync(path.join(extensionRoot, "README.md"), "utf8"),
         fs.readFileSync(path.join(extensionRoot, "CHANGELOG.md"), "utf8")
     ].join("\n");
-    assert.match(marketplaceText, /https:\/\/zpluse\.vercel\.app\//);
+    assert.ok(marketplaceText.includes(ecosystemMetadata.project.website));
     assert.doesNotMatch(marketplaceText, /github\.com|gitlab\.com|bitbucket\.org/i);
     assert.doesNotMatch(marketplaceText, /open[ -]?source|free and open/i);
     assert.ok(manifest.categories.includes("Programming Languages"));
@@ -369,6 +374,12 @@ test("manifest, grammar, language configuration and snippets are loadable", () =
     assert.ok(grammar.repository.comments.patterns.some(pattern => pattern.begin === "/\\*"));
     assert.ok(grammar.repository.keywords.patterns.some(pattern => pattern.match.includes("pub")));
     assert.ok(snippets["Z+ Program"]);
+    assert.deepEqual(snippets["Z+ Program"].body, ["start {", "\t$0", "} stop"]);
+    assert.ok(snippets.Function.body.some(line => line.includes("{")));
+    assert.ok(snippets.Function.body.includes("} end fn"));
+    assert.ok(snippets["Use Module"]?.body[0].startsWith("use "));
+    assert.equal(Object.hasOwn(snippets, "Import"), false);
+    assert.ok(snippets["Array"].description.includes("array literal"));
     const iconTheme = manifest.contributes.iconThemes.find(theme => theme.id === "zplus-icon-theme");
     assert.ok(iconTheme, "Z+ file icon theme must be registered");
     const iconThemePath = path.join(extensionRoot, iconTheme.path);

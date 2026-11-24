@@ -1,6 +1,6 @@
 # Official Z+ Developer Tools for Visual Studio Code
 
-Z+ is a statically typed programming language and compiler developed by the Z+ project. This extension provides official developer tools for `.zp` programs and `.zh` modules, backed by the Z+ compiler. Visit the [official Z+ website](https://zpluse.vercel.app/) for product information and official resources.
+Z+ is a statically typed programming language and compiler developed by the Z+ project. This extension provides official developer tools for `.zp` programs and `.zh` modules, backed by the Z+ compiler. Visit the [official Z+ website](https://z-plus-lang.vercel.app/) for product information and official resources.
 
 This extension is licensed under Apache License 2.0. Third-party materials retain their own licenses; see `LICENSE.txt` and `NOTICE`.
 
@@ -9,12 +9,14 @@ This extension is licensed under Apache License 2.0. Third-party materials retai
 Install the packaged `zplus-language-*.vsix` file with **Extensions: Install from VSIX...**, or run:
 
 ```powershell
-code --install-extension .\bin\zpluse-language-1.3.4.vsix
+code --install-extension .\path\to\downloaded-extension.vsix
 ```
+
+The Marketplace package is published as **MiroXdev0.zplus-language**. Install it from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=MiroXdev0.zplus-language), or replace the example path above with a downloaded VSIX file.
 
 ## Requirements and compiler setup
 
-The extension requires the Z+ compiler. See the [official Z+ website](https://zpluse.vercel.app/) for current compiler distribution information, then make `zp` (or `zp.exe`) available on `PATH`. The extension uses the compiler directly; it does not simulate checking, interpretation, or native compilation.
+The extension requires the Z+ compiler. See the [official Z+ website](https://z-plus-lang.vercel.app/) for current compiler distribution information, then make `zp` (or `zp.exe`) available on `PATH`. The extension uses the compiler directly; it does not simulate checking, interpretation, or native compilation. Release 1.3.5 was verified against compiler 1.4.0; the extension and compiler versions are managed independently, and no general compiler compatibility range or standard-library interface pin is declared.
 
 If the executable is not on `PATH`, set **Z+: Compiler Path** (`zplus.compilerPath`) to its full path, or run **Z+: Select Compiler**. Paths containing spaces are supported.
 
@@ -40,7 +42,7 @@ The **Tasks: Run Task** picker also offers project-scoped ZPBuild Build, Run, an
 
 Compiler output is available in **View: Output**, **Z+**. Checks run automatically while typing and on save by default; a newer check cancels the previous compiler process for that document. Run and Build show cancellable progress and stop when cancelled or when the source changes. Stale diagnostics are cleared on edits while the next check is pending. Change `zplus.checkWhileTyping`, `zplus.checkOnSave`, and `zplus.checkDelay` to adjust this behavior.
 
-ZBuild project commands require a `zproject.toml` in the active file's directory or an ancestor (or a workspace folder ancestor). The project initializer requires `zpbuild` (or the compatibility `zbuild` command) and uses its built-in templates. Consult the [official Z+ website](https://zpluse.vercel.app/) for current project and compiler information.
+ZBuild project commands require a `zproject.toml` in the active file's directory or an ancestor (or a workspace folder ancestor). The project initializer requires `zpbuild` (or the compatibility `zbuild` command) and uses its built-in templates. Consult the [official Z+ website](https://z-plus-lang.vercel.app/) for current project and compiler information.
 
 ## Editor features
 
@@ -58,19 +60,19 @@ ZBuild project commands require a `zproject.toml` in the active file's directory
 - Compiler-generated diagnostics with source positions; successful checks clear old diagnostics.
 - Test Explorer discovers `zproject.toml` projects and delegates each project suite to `zpbuild test`; ZPBuild remains responsible for selecting and running test targets.
 
-The compiler resolves `.zh` modules relative to the file containing each `use` statement and reports header diagnostics against their actual source files. Consult the [official Z+ website](https://zpluse.vercel.app/) for current module-system information.
+The compiler resolves `.zh` modules relative to the file containing each `use` statement and reports header diagnostics against their actual source files. Consult the [official Z+ website](https://z-plus-lang.vercel.app/) for current module-system information.
 
 Run and Build require a `.zp` entry file; `.zh` files are declaration-only modules and cannot be executed or built directly.
 
 ## Language and native support
 
-The installed compiler remains authoritative for parsing and semantics; editor symbol indexing supports navigation and does not replace compiler validation. The compiler has no semantic-query or debugger protocol, so the extension does not claim type-correct IntelliSense, semantic tokens, call/type hierarchy, or Debug Adapter Protocol support. References and rename are based on the extension's parsed declaration/import graph and are most reliable for direct declarations and explicitly imported modules. Visit the [official Z+ website](https://zpluse.vercel.app/) for current language documentation.
+The installed compiler remains authoritative for parsing and semantics; editor symbol indexing supports navigation and does not replace compiler validation. The compiler has no semantic-query or debugger protocol, so the extension does not claim type-correct IntelliSense, semantic tokens, call/type hierarchy, or Debug Adapter Protocol support. References and rename are based on the extension's parsed declaration/import graph and are most reliable for direct declarations and explicitly imported modules. Visit the [official Z+ website](https://z-plus-lang.vercel.app/) for current language documentation.
 
-`zp run` uses the interpreter. `zp build` uses the x86-64 native backend and supports only a subset of Z+. Unsupported IR produces the compiler's actual error; the extension never falls back to the interpreter. Consult the [official Z+ website](https://zpluse.vercel.app/) for current native-backend information.
+`zp run` uses the interpreter. `zp build` uses the x86-64 native backend and supports only a subset of Z+. Unsupported IR produces the compiler's actual error; the extension never falls back to the interpreter. Consult the [official Z+ website](https://z-plus-lang.vercel.app/) for current native-backend information.
 
 Live checks pass the current editor contents to the compiler over standard input, so unsaved edits are analyzed without creating source snapshots in the project. The compiler uses the real source path for relative `.zh` imports and diagnostics. The checker uses the compiler's `--source-stdin` and `--diagnostics=json` options; use a current compiler build if diagnostics are missing or shown only in the output channel.
 
-ZGraphics editor suggestions describe the available wrappers, not native-link support. Run graphics examples with `zp run`; `zp build` currently rejects graphics calls. Visit the [official Z+ website](https://zpluse.vercel.app/) for current ZGraphics platform and runtime information.
+ZGraphics editor suggestions describe the available wrappers, not native-link support. Run graphics examples with `zp run`; `zp build` currently rejects graphics calls. Visit the [official Z+ website](https://z-plus-lang.vercel.app/) for current ZGraphics platform and runtime information.
 
 ## Troubleshooting
 
@@ -81,7 +83,7 @@ ZGraphics editor suggestions describe the available wrappers, not native-link su
 
 ## Development and tests
 
-The release version is **1.3.4**. The package output is `bin/zpluse-language-1.3.4.vsix`; tests and development files are excluded from the VSIX.
+The extension version is managed independently in `package.json`. A packaged VSIX filename uses that version; tests and development files are excluded from the VSIX.
 
 From this directory, run:
 

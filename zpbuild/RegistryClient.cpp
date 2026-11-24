@@ -30,7 +30,10 @@
 #include <vector>
 
 #ifndef ZPM_VERSION
-#define ZPM_VERSION "1.0.0"
+#define ZPM_VERSION "unknown"
+#endif
+#ifndef ZPM_DEFAULT_REGISTRY_URL
+#define ZPM_DEFAULT_REGISTRY_URL ""
 #endif
 
 namespace zbuild {
@@ -436,7 +439,7 @@ std::filesystem::path credentialFile() {
 #endif
     std::string base;
     const std::string configured = environmentVariable("ZPM_REGISTRY_URL");
-    if (configured.empty()) base = "https://zpluse.vercel.app/api/registry";
+    if (configured.empty()) base = ZPM_DEFAULT_REGISTRY_URL;
     else base = configured;
     return root / pathFromUtf8("credentials-" + sha256(base) + ".dat");
 }
@@ -526,7 +529,7 @@ std::string unprotectToken(std::string_view value) {
 
 std::string registryApiBaseUrl() {
     std::string base = environmentVariable("ZPM_REGISTRY_URL");
-    if (base.empty()) base = "https://zpluse.vercel.app/api/registry";
+    if (base.empty()) base = ZPM_DEFAULT_REGISTRY_URL;
     while (!base.empty() && base.back() == '/') base.pop_back();
     const UrlParts parsed = parseUrl(base);
     if (parsed.resource != "/api/registry") {

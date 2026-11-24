@@ -1,0 +1,30 @@
+use zphysics
+
+start {
+
+    let world = zphysics.createWorld(0, 420)
+    let floor = zphysics.createBody(world, "static", 320, 440)
+    let floorShape = zphysics.createBox(world, floor, 640, 20)
+    zphysics.setFriction(floorShape, 0.9)
+    let puck = zphysics.createBody(world, "dynamic", 100, 120)
+    let puckShape = zphysics.createCircle(world, puck, 18)
+    zphysics.setRestitution(puckShape, 0.55)
+    zphysics.setLinearDamping(puck, 0.08)
+    zphysics.setAngularDamping(puck, 0.12)
+    zphysics.applyImpulse(puck, 120, -40)
+
+    for (let frame: number = 0; frame < 240; frame++) {
+        if frame == 30 {
+            zphysics.applyForce(puck, 80, 0)
+        } else {
+        } end if
+        zphysics.update(world, 1 / 60)
+    } end for
+
+    say("Puck position and velocity:")
+    say(zphysics.getPositionX(puck))
+    say(zphysics.getPositionY(puck))
+    say(zphysics.getVelocityX(puck))
+    say(zphysics.getVelocityY(puck))
+    zphysics.destroyWorld(world)
+} stop

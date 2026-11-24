@@ -2,12 +2,12 @@
 
 Z+ is a statically typed programming language implemented in C++20. The compiler includes a lexer, parser, semantic analyzer, shared intermediate representation, interpreter, and an x86-64 native backend. The compiler and first-party materials in this repository are licensed under Apache License 2.0; third-party components retain their own licenses. See [LICENSE](./LICENSE) and [NOTICE](./NOTICE).
 
-The compiler source version in this checkout is **1.4.0**. The latest stable release metadata may describe an earlier version; consult the official [release page](https://github.com/MiroXdev0/ZPluse-release/releases) before downloading binaries.
+The compiler, ZPM, and ZPBuild versions are declared in `CMakeLists.txt`; the VS Code extension version is declared in its `package.json`. The latest stable compiler release may differ from this checkout; consult the official [release page](https://github.com/MiroXdev0/ZPluse-release/releases) before downloading binaries.
 
 ## Capabilities
 
 - Typed variables, functions, control flow, arrays, classes, visibility modifiers, enums, structs, and constrained generics.
-- Interpreter execution and native x86-64 compilation. Supported features differ by operating system and backend; see [NATIVE_BACKEND.md](./NATIVE_BACKEND.md) and the [language syntax reference](./docs/syntax.md).
+- Interpreter execution and native x86-64 compilation. Supported features differ by operating system and backend; see [backend support](./docs/BACKEND.md) and the [language syntax reference](./docs/syntax.md).
 - File-based `.zh` modules and `use` imports.
 - Standard library modules for text, files, paths, math, time, JSON, HTTP, SQLite, graphics, audio, physics, and other integrations. Availability depends on platform and dependencies.
 - ZPBuild project build orchestration and ZPM package tooling.

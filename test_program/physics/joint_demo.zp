@@ -1,0 +1,28 @@
+use zphysics
+
+start {
+
+    let world = zphysics.createWorld(0, 160)
+    let anchor = zphysics.createBody(world, "static", 140, 100)
+    let first = zphysics.createBody(world, "dynamic", 220, 100)
+    zphysics.createCircle(world, first, 14)
+    let second = zphysics.createBody(world, "dynamic", 300, 100)
+    zphysics.createCircle(world, second, 14)
+    let rope = zphysics.createDistanceJoint(world, anchor, first, 80)
+    let hinge = zphysics.createRevoluteJoint(world, first, second, 260, 100)
+
+    for (let frame: number = 0; frame < 240; frame++) {
+        zphysics.update(world, 1 / 60)
+    } end for
+
+    let dragged = zphysics.createMouseJoint(world, second, 300, 100, 1500)
+    zphysics.setMouseJointTarget(dragged, 330, 80)
+    for (let frame: number = 0; frame < 30; frame++) {
+        zphysics.update(world, 1 / 60)
+    } end for
+    zphysics.destroyJoint(dragged)
+    zphysics.destroyJoint(hinge)
+    zphysics.destroyJoint(rope)
+    say("Distance, revolute, and mouse joints simulated")
+    zphysics.destroyWorld(world)
+} stop

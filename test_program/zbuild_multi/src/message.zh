@@ -1,0 +1,5 @@
+start {
+pub fn text(): string {
+    return "ZBuild integration works\n"
+} end fn
+} stop

@@ -1,0 +1,3 @@
+start {
+    printz("Interpreter target works\n")
+} stop

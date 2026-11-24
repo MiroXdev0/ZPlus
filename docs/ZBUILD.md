@@ -11,7 +11,7 @@ cmake -S . -B build
 cmake --build build --config Release
 ```
 
-The executables are `build\Release\zpbuild.exe` and `build\Release\zbuild.exe` with Visual Studio, or `build\zpbuild` and `build\zbuild` with a single-configuration Linux generator. Release builds copy both to `bin`. `zpbuild --version` reports ZPBuild version `1.0.0`; `zbuild` remains supported.
+The executables are `build\Release\zpbuild.exe` and `build\Release\zbuild.exe` with Visual Studio, or `build\zpbuild` and `build\zbuild` with a single-configuration Linux generator. Release builds copy both to `bin`. `zpbuild --version` reports the ZPBuild version declared in the root `CMakeLists.txt`; `zbuild` remains supported.
 
 ZBuild locates `zp` beside itself, in the project's `bin` directory, in the current directory, or on `PATH`. A project can specify an explicit compiler path with `compiler.path`.
 

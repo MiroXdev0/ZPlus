@@ -31,7 +31,7 @@
 namespace zplus {
 
 #ifndef ZPLUS_VERSION
-#define ZPLUS_VERSION "1.4.0"
+#define ZPLUS_VERSION "unknown"
 #endif
 
 constexpr const char* VERSION = ZPLUS_VERSION;

@@ -26,7 +26,7 @@ test("Z+ 1.3.5 release-note HTML retains its authored document structure", async
   assert.ok(container.querySelector("ul ul li code"));
   assert.equal(container.querySelectorAll("table tbody tr").length, 3);
   assert.equal(container.querySelector('a[href="https://github.com/MiroXdev0/ZPluse-release/releases/tag/v1.3.5"]')?.textContent, "official 1.3.5 release");
-  assert.equal(container.querySelector("img")?.getAttribute("src"), "https://z-plus-flax.vercel.app/assets/zplus-logo-light.png");
+  assert.equal(container.querySelector("img")?.getAttribute("src"), "https://z-plus-lang.vercel.app/assets/zplus-logo-light.png");
   assert.equal(container.querySelector("img")?.getAttribute("alt"), "Z+ logo");
   assert.equal(container.querySelector("pre code")?.textContent, "zp --version\nzp check hello.zp");
   assert.ok(container.querySelector("blockquote p"));

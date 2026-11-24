@@ -6,6 +6,12 @@ project(ZPlus
     LANGUAGES CXX
 )
 
+set(ZPLUS_OFFICIAL_WEBSITE_URL "https://z-plus-lang.vercel.app/")
+set(ZPLUS_PREVIOUS_WEBSITE_URL "https://z-plus-flax.vercel.app/")
+set(ZPLUS_COMPILER_REPOSITORY_URL "https://github.com/MiroXdev0/ZPlus")
+set(ZPLUS_RELEASE_REPOSITORY_URL "https://github.com/MiroXdev0/ZPluse-release")
+set(ZPM_DEFAULT_REGISTRY_URL "${ZPLUS_OFFICIAL_WEBSITE_URL}api/registry")
+
 set(ZBUILD_VERSION "1.0.0")
 set(ZPM_VERSION "1.0.0")
 
@@ -61,6 +67,7 @@ add_library(zbuild_engine STATIC
 )
 target_compile_definitions(zbuild_engine PRIVATE "ZBUILD_VERSION=\"${ZBUILD_VERSION}\"")
 target_compile_definitions(zbuild_engine PRIVATE "ZPM_VERSION=\"${ZPM_VERSION}\"")
+target_compile_definitions(zbuild_engine PRIVATE "ZPM_DEFAULT_REGISTRY_URL=\"${ZPM_DEFAULT_REGISTRY_URL}\"")
 target_include_directories(zbuild_engine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/zpbuild
 )
@@ -121,6 +128,7 @@ add_custom_command(TARGET zpbuild POST_BUILD
 add_executable(zpm zpm/main.cpp)
 target_link_libraries(zpm PRIVATE zbuild_engine)
 target_compile_definitions(zpm PRIVATE "ZPM_VERSION=\"${ZPM_VERSION}\"")
+target_compile_definitions(zpm PRIVATE "ZPM_DEFAULT_REGISTRY_URL=\"${ZPM_DEFAULT_REGISTRY_URL}\"")
 add_custom_command(TARGET zpm POST_BUILD
     COMMAND ${CMAKE_COMMAND}
         "-DCONFIG=$<CONFIG>"

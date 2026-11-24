@@ -93,7 +93,8 @@ and the interpreter resolves installed package imports.
 
 The registry API and browser portal are implemented in the existing website
 project. ZPM's default API is
-`https://zpluse.vercel.app/api/registry`. `ZPM_REGISTRY_URL` may override it
+the `/api/registry` path of the canonical origin recorded in
+`website/ecosystem-metadata.json`. `ZPM_REGISTRY_URL` may override it
 for an HTTPS test registry; plain HTTP is accepted only for localhost
 development. Available CLI commands are `search`, `info`, `login`, `logout`,
 `publish`, `add`, `install`, and `update`. Registry archives are limited to
@@ -120,7 +121,7 @@ each configured Development, Preview, and Production environment:
 | `AWS_SECRET_ACCESS_KEY` | Neon Object Storage branch secret. |
 | `AWS_ENDPOINT_URL_S3` | Neon branch's S3 endpoint. |
 | `AWS_REGION` | Neon region, such as `us-east-2`. |
-| `ZPM_PUBLIC_ORIGIN` | Optional; defaults to `https://zpluse.vercel.app`. |
+| `ZPM_PUBLIC_ORIGIN` | Optional; defaults to the canonical origin in `website/ecosystem-metadata.json`. |
 
 Use the matching Neon branch's environment for each Vercel environment.
 `DATABASE_URL_UNPOOLED` is for schema migrations and should remain in a

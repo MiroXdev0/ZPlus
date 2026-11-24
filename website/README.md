@@ -1,6 +1,6 @@
 # Official Z+ website
 
-The official website is a static single-page application with a local Node development server. It presents the Z+ language, implementation-aware documentation, real release downloads, the learning course, examples, and the live package registry. The toolchain has dedicated compiler, ZPM, ZPBuild, VS Code, and ZGraphics pages. Existing registry, account, package publishing, and course progress workflows remain in the same app. First-party website source is licensed under Apache-2.0; bundled third-party code retains its own notices.
+The official website is a static single-page application with a local Node development server. It presents the Z+ language, implementation-aware documentation, release downloads, the learning course, examples, and the package registry interface. The toolchain has dedicated compiler, ZPM, ZPBuild, VS Code, and ZGraphics pages. Registry, account, and package publishing workflows need the configured Vercel API route and database/storage credentials. First-party website source is licensed under Apache-2.0; bundled third-party code retains its own notices.
 
 The page shell and metadata are in `index.html`; learning/reference content is in `content.js`; product facts are in `ecosystem-content.js`; client routing, release handling, and registry UI live in `app.js`; presentation is in `styles.css`. The package registry API and database migrations remain in `api/`, `lib/`, and `migrations/`.
 
@@ -20,8 +20,10 @@ The shared transparent logo artwork is maintained in the repository's `logo/` di
 
 ## Registry deployment
 
-The existing Vercel project keeps `website/` as its root directory. The
-registry uses Neon PostgreSQL for accounts, sessions, package metadata, and
+The checked-in Vercel configuration expects `website/` as the project root.
+Verify that the existing Vercel project uses this directory and includes the
+`api/registry.js` function; production API availability cannot be inferred
+from the static website response. The registry uses Neon PostgreSQL for accounts, sessions, package metadata, and
 publication state, and the private Neon Object Storage bucket
 `zplus-packages` for package archives. Vercel's API function uses the pooled
 `DATABASE_URL` and branch-scoped S3 credentials; it does not expose storage
@@ -38,7 +40,7 @@ branch intended for each environment:
 | `AWS_SECRET_ACCESS_KEY` | Neon Object Storage branch secret. |
 | `AWS_ENDPOINT_URL_S3` | Branch's S3-compatible endpoint. |
 | `AWS_REGION` | Branch region, for example `us-east-2`. |
-| `ZPM_PUBLIC_ORIGIN` | Optional website origin; defaults to `https://z-plus-flax.vercel.app`. |
+| `ZPM_PUBLIC_ORIGIN` | Optional website origin; defaults to the generated canonical origin in `ecosystem-metadata.json`. |
 
 Keep `DATABASE_URL_UNPOOLED` in a secure local migration environment only; it
 is not needed by the running API. For local development, link or check out a
@@ -65,7 +67,7 @@ validated and production rollout is approved.
 The Vercel rewrite in `vercel.json` sends `/api/registry/*` requests to
 `api/registry.js`; all other deep links continue to fall back to `index.html`.
 The browser account and publish UI uses same-origin requests. ZPM's default
-registry URL is `https://z-plus-flax.vercel.app/api/registry`; set
+registry URL is the generated canonical website URL plus `/api/registry`; set
 `ZPM_REGISTRY_URL` to an HTTPS registry when testing another deployment.
 
 The registry API supports account registration, browser and CLI login/logout,

@@ -1,0 +1,63 @@
+use zhttp as http
+use zjson as json
+
+start {
+
+    let server = http.serverCreate("127.0.0.1", 8081)
+    http.serverConfigure(server, 1048576, 30000)
+    http.configureCors(server, "*", "GET, POST, PUT, PATCH, DELETE, OPTIONS", "Content-Type, Authorization")
+    let serving = false
+    if http.serverStart(server) {
+        serving = true
+        printz("REST API listening on http://127.0.0.1:8081\n")
+    } else {
+        printz("Could not start REST API\n")
+    } end if
+    while serving {
+        let request = http.serverNext(server, 250)
+        if request != "" {
+            let method = json.getString(request, "/method")
+            let path = json.getString(request, "/path")
+            let requestId = json.getNumber(request, "/id")
+            let status = 404
+            let body = "{\"error\":\"route not found\"}"
+
+            if method == "GET" and path == "/health" {
+                status = 200
+                body = "{\"status\":\"ok\"}"
+            } else {
+                if method == "POST" and path == "/users" {
+                    let requestBody = json.getString(request, "/body")
+                    if json.valid(requestBody) {
+                        let name = json.getString(requestBody, "/name")
+                        status = 201
+                        body = "{\"created\":true,\"name\":" + json.quote(name) + "}"
+                    } else {
+                        status = 400
+                        body = "{\"error\":\"invalid JSON body\"}"
+                    } end if
+                } else {
+                    let route = http.routeParams(path, "/users/{id}")
+                    if method == "GET" and route != "" {
+                        let userId = json.getString(route, "/id")
+                        status = 200
+                        body = "{\"user\":{\"id\":" + json.quote(userId) + "}}"
+                    } else {
+                        if method == "POST" and path == "/__stop" {
+                            status = 200
+                            body = "{\"status\":\"stopping\"}"
+                            serving = false
+                        } else {
+                            printz("")
+                        } end if
+                    } end if
+                } end if
+            } end if
+            http.serverRespond(server, requestId, status, "{\"content-type\":\"application/json; charset=utf-8\"}", body)
+        } else {
+            printz("")
+        } end if
+    } end while
+
+    http.serverStop(server)
+} stop

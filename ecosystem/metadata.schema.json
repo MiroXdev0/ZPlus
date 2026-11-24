@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Z+ ecosystem metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "project", "components", "platforms", "installations", "language", "standardLibrary", "compatibility", "releases"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "description", "website", "previousWebsite", "repository", "documentation", "issueTracker", "registryApi", "socialImage"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "website": { "$ref": "#/$defs/httpsUrl" },
+        "previousWebsite": { "$ref": "#/$defs/httpsUrl" },
+        "repository": { "$ref": "#/$defs/httpsUrl" },
+        "documentation": { "$ref": "#/$defs/httpsUrl" },
+        "issueTracker": { "$ref": "#/$defs/httpsUrl" },
+        "registryApi": { "$ref": "#/$defs/httpsUrl" },
+        "socialImage": { "$ref": "#/$defs/httpsUrl" }
+      }
+    },
+    "components": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["compiler", "zpm", "zpbuild", "vscodeExtension"],
+      "properties": {
+        "compiler": { "$ref": "#/$defs/versionedComponent" },
+        "zpm": { "$ref": "#/$defs/versionedComponent" },
+        "zpbuild": { "$ref": "#/$defs/versionedComponent" },
+        "vscodeExtension": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "version", "marketplaceId", "marketplaceUrl", "source"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$" },
+            "marketplaceId": { "type": "string", "pattern": "^[A-Za-z0-9-]+\\.[A-Za-z0-9-]+$" },
+            "marketplaceUrl": { "$ref": "#/$defs/httpsUrl" },
+            "source": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "platforms": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["compilerBuilds", "nativeBackend", "extension"],
+      "properties": {
+        "compilerBuilds": { "type": "array", "items": { "$ref": "#/$defs/platform" }, "minItems": 1 },
+        "nativeBackend": { "type": "array", "items": { "$ref": "#/$defs/platform" }, "minItems": 1 },
+        "extension": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["vscodeEngine", "testedInCi"],
+          "properties": {
+            "vscodeEngine": { "type": "string", "minLength": 1 },
+            "testedInCi": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "installations": { "type": "array", "items": { "$ref": "#/$defs/installation" }, "minItems": 1 },
+    "language": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identifier", "fileExtensions"],
+      "properties": {
+        "identifier": { "type": "string", "minLength": 1 },
+        "fileExtensions": { "type": "array", "items": { "type": "string", "pattern": "^\\.[A-Za-z0-9]+$" }, "minItems": 1 }
+      }
+    },
+    "standardLibrary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "version", "modules", "documentation"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "version": { "type": ["string", "null"] },
+        "modules": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "documentation": { "$ref": "#/$defs/httpsUrl" }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["extensionToCompiler", "compilerToStandardLibrary"],
+      "properties": {
+        "extensionToCompiler": { "$ref": "#/$defs/compatibility" },
+        "compilerToStandardLibrary": { "$ref": "#/$defs/compatibility" }
+      }
+    },
+    "releases": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "page", "api", "downloadPathPrefix", "assetTargets"],
+      "properties": {
+        "repository": { "$ref": "#/$defs/httpsUrl" },
+        "page": { "$ref": "#/$defs/httpsUrl" },
+        "api": { "$ref": "#/$defs/httpsUrl" },
+        "downloadPathPrefix": { "type": "string", "pattern": "^/[^/]+/[^/]+/releases/download/$" },
+        "assetTargets": { "type": "array", "items": { "$ref": "#/$defs/assetTarget" }, "minItems": 1 }
+      }
+    }
+  },
+  "$defs": {
+    "httpsUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
+    "versionedComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "source"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$" },
+        "source": { "type": "string", "minLength": 1 }
+      }
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operatingSystem", "architecture", "status", "evidence"],
+      "properties": {
+        "operatingSystem": { "type": "string", "minLength": 1 },
+        "architecture": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "enum": ["ci-tested", "supported", "partial", "unverified"] },
+        "evidence": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+      }
+    },
+    "installation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "method", "url", "documentation", "platforms"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "method": { "type": "string", "minLength": 1 },
+        "url": { "$ref": "#/$defs/httpsUrl" },
+        "documentation": { "$ref": "#/$defs/httpsUrl" },
+        "platforms": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "compilerRange", "standardLibraryInterface", "evidence"],
+      "properties": {
+        "status": { "type": "string", "enum": ["verified", "assumed", "unverified", "unknown"] },
+        "compilerRange": { "type": ["string", "null"] },
+        "standardLibraryInterface": { "type": ["string", "null"] },
+        "evidence": { "type": "string", "minLength": 1 }
+      }
+    },
+    "assetTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "filePattern", "installerPattern", "platformPattern", "architecturePattern", "conflictPattern"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "filePattern": { "type": "string", "minLength": 1 },
+        "installerPattern": { "type": "string", "minLength": 1 },
+        "platformPattern": { "type": "string", "minLength": 1 },
+        "architecturePattern": { "type": "string", "minLength": 1 },
+        "conflictPattern": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

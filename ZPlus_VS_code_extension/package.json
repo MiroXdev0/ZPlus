@@ -2,10 +2,18 @@
     "name": "zplus-language",
     "displayName": "Z+ Programming Language",
     "description": "Official VS Code developer tools for the Z+ programming language and compiler.",
-    "version": "1.3.4",
-    "publisher": "Miroxdev0",
+    "version": "1.3.5",
+    "publisher": "MiroXdev0",
     "license": "Apache-2.0",
-    "homepage": "https://zpluse.vercel.app/",
+    "homepage": "https://z-plus-lang.vercel.app/",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/MiroXdev0/ZPlus.git",
+        "directory": "ZPlus_VS_code_extension"
+    },
+    "bugs": {
+        "url": "https://github.com/MiroXdev0/ZPlus/issues"
+    },
     "main": "./extension.js",
     "icon": "icons/zplus.icon.png",
     "scripts": {

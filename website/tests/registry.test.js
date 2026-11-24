@@ -5,8 +5,9 @@ import { after, before, beforeEach, test } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { createRegistryHandler, extractArchive } from "../lib/registry.js";
 import { createVercelNodeHandler } from "../lib/vercel-adapter.js";
+import { siteMetadata } from "../lib/site-metadata.js";
 
-const publicOrigin = "https://z-plus-flax.vercel.app";
+const publicOrigin = siteMetadata.project.website.replace(/\/$/, "");
 const baseUrl = `${publicOrigin}/api/registry`;
 const database = new PGlite();
 const pool = {

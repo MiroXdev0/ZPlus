@@ -19,7 +19,7 @@
 namespace {
 
 #ifndef ZBUILD_VERSION
-#define ZBUILD_VERSION "1.0.0"
+#define ZBUILD_VERSION "unknown"
 #endif
 
 constexpr const char* version = ZBUILD_VERSION;

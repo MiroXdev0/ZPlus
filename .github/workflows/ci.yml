@@ -33,6 +33,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Generate and validate ecosystem metadata
+        run: |
+          node scripts/generate-ecosystem-metadata.mjs --check
+          node scripts/check-ecosystem.mjs
+          node --test scripts/ecosystem-metadata.test.mjs
       - name: Check website
         run: |
           npm ci --prefix website
@@ -43,7 +48,8 @@ jobs:
           npm ci --prefix 'ZPlus_VS_code_extension'
           npm run check --prefix 'ZPlus_VS_code_extension'
           npm test --prefix 'ZPlus_VS_code_extension'
+      - name: Package VS Code extension
+        working-directory: ZPlus_VS_code_extension
+        run: npx --yes @vscode/vsce@4.1.1 package --no-dependencies --out "${RUNNER_TEMP}/zplus-language-check.vsix"
       - name: Test web interop tool
         run: npm test --prefix tools/zplus-web-interop
-
-\n

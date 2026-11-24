@@ -2,6 +2,7 @@ import { attachDatabasePool } from "@vercel/functions";
 import { Pool } from "pg";
 import { createRegistryHandler } from "../lib/registry.js";
 import { createNeonPackageStorage } from "../lib/neon-storage.js";
+import { siteMetadata } from "../lib/site-metadata.js";
 import { createVercelNodeHandler } from "../lib/vercel-adapter.js";
 
 const pool = process.env.DATABASE_URL
@@ -24,5 +25,5 @@ const handler = createRegistryHandler({
 
 export default createVercelNodeHandler(
   handler,
-  process.env.ZPM_PUBLIC_ORIGIN || "https://z-plus-flax.vercel.app"
+  process.env.ZPM_PUBLIC_ORIGIN || siteMetadata.project.website
 );

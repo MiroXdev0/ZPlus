@@ -1,0 +1,3 @@
+start {
+    printz("ZBuild tests passed\n")
+} stop

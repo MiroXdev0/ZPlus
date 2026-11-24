@@ -30,7 +30,10 @@
 #endif
 
 #ifndef ZPM_VERSION
-#define ZPM_VERSION "1.0.0"
+#define ZPM_VERSION "unknown"
+#endif
+#ifndef ZPM_DEFAULT_REGISTRY_URL
+#define ZPM_DEFAULT_REGISTRY_URL ""
 #endif
 
 namespace {
@@ -371,7 +374,7 @@ void usage() {
         "  zpm cache info|clean\n"
         "\n"
         "Local .zpm archives use the versioned ZPM1 container format.\n"
-        "The registry defaults to https://zpluse.vercel.app/api/registry; "
+        "The registry defaults to " ZPM_DEFAULT_REGISTRY_URL "; "
         "ZPM_REGISTRY_URL can select an HTTPS test registry.\n";
 }
 
