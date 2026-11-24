@@ -1,15 +1,81 @@
+# Published distributions are intentionally versioned in these directories.
+# Keep ignoring new outputs; existing release assets remain tracked explicitly.
 release/
 bin/
+
+# CMake, Ninja, Visual Studio, and other local build trees.
 build/
-build-zbuild/
-build-release-1.3.0/
-build-release-1.3.1/
-build-release-1.3.2/
-build-release-1.3.3/
-*.vscode/
+build-*/
+cmake-build-*/
+out/
+dist/
+obj/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+build.ninja
+compile_commands.json
+CMakeUserPresets.json
+
+# Installer staging and output directories.
+/installer/inno/output/
+
+# Installed package dependencies and generated caches.
+z+_packages/
+.cache/
+.pytest_cache/
+.nyc_output/
+__pycache__/
+venv/
+.venv/
+coverage/
+TestResults/
+
+# IDE-local state. Shared VS Code settings remain trackable.
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# OS and editor temporary files.
+.DS_Store
+Thumbs.db
+Desktop.ini
+*~
+*.swp
+*.swo
+*.tmp
+*.temp
+*.bak
+*.log
+*.dmp
+*.core
+core
+
+# Compiled outputs. Release binaries already tracked under bin/ or release/
+# remain available; this prevents new compiler/build outputs from being added.
 *.dll
-node_modules/
 *.exe
+*.so
+*.so.*
+*.dylib
+*.o
+*.obj
+*.a
+*.lib
+*.pdb
+*.ilk
+*.pch
+*.class
+*.py[cod]
+
+# JavaScript dependencies and logs.
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
 
 # Local Neon project links and credentials.
 .neon
