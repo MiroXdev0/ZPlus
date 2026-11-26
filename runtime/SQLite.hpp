@@ -19,5 +19,6 @@ std::string query(
     const std::string& parametersJson
 );
 std::int64_t changes(std::int64_t handle);
+std::string runtimeLibraryPath();
 
 } // namespace zplus::sqlite
