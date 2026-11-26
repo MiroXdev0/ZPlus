@@ -26,7 +26,7 @@ if(NOT run_status EQUAL 0 OR NOT run_output STREQUAL "75\n4\n4\n")
     message(FATAL_ERROR "visibility interpreter result mismatch (${run_status})\n${run_output}${run_error}")
 endif()
 
-if(WIN32 OR CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+if(WIN32)
     set(native_executable "${WORK_DIR}/visibility-native")
     if(WIN32)
         set(native_executable "${native_executable}.exe")

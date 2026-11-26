@@ -113,6 +113,8 @@ function Run-Client {
 function Test-Hello {
     param([bool]$Native)
     $name = if ($Native) { "hello-native" } else { "hello-interpreter" }
+    [Console]::Error.WriteLine("starting $name")
+    $testStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
     $serverExecutable = if ($Native) {
         Join-Path $WorkDir "hello_server.exe"
     } else {
@@ -145,11 +147,14 @@ function Test-Hello {
             Stop-Server $process "http://127.0.0.1:8080" $name
         }
     }
+    [Console]::Error.WriteLine("finished $name in $([int]$testStopwatch.ElapsedMilliseconds) ms")
 }
 
 function Test-Rest {
     param([bool]$Native)
     $name = if ($Native) { "rest-native" } else { "rest-interpreter" }
+    [Console]::Error.WriteLine("starting $name")
+    $testStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
     $serverExecutable = if ($Native) {
         Join-Path $WorkDir "rest_api.exe"
     } else {
@@ -178,11 +183,14 @@ function Test-Rest {
             Stop-Server $process $base $name
         }
     }
+    [Console]::Error.WriteLine("finished $name in $([int]$testStopwatch.ElapsedMilliseconds) ms")
 }
 
 function Test-MultiClient {
     param([bool]$Native)
     $name = if ($Native) { "multi-native" } else { "multi-interpreter" }
+    [Console]::Error.WriteLine("starting $name")
+    $testStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
     $serverExecutable = if ($Native) {
         Join-Path $WorkDir "multi_client_server.exe"
     } else {
@@ -209,6 +217,7 @@ function Test-MultiClient {
         $client.Timeout = [TimeSpan]::FromSeconds(5)
         $requests = @()
         $tasks = @()
+        $concurrentStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
         try {
             for ($index = 0; $index -lt 4; $index++) {
                 $clientId = "$name-concurrent-$index"
@@ -222,8 +231,17 @@ function Test-MultiClient {
                 $requests += $request
                 $tasks += $client.SendAsync($request)
             }
-            [System.Threading.Tasks.Task]::WaitAll(
-                [System.Threading.Tasks.Task[]]$tasks)
+            try {
+                [System.Threading.Tasks.Task]::WaitAll(
+                    [System.Threading.Tasks.Task[]]$tasks)
+            } catch {
+                $details = foreach ($task in $tasks) {
+                    "task $($task.Id): $($task.Status) $(if ($task.Exception) { $task.Exception.InnerException.Message })"
+                }
+                throw ("$name concurrent echo requests failed after " +
+                    "$([int]$concurrentStopwatch.ElapsedMilliseconds) ms:`n" +
+                    ($details -join "`n"))
+            }
             for ($index = 0; $index -lt $tasks.Count; $index++) {
                 $response = $tasks[$index].Result
                 $responseBody = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
@@ -243,12 +261,11 @@ function Test-MultiClient {
             Stop-Server $process $base $name
         }
     }
+    [Console]::Error.WriteLine("finished $name in $([int]$testStopwatch.ElapsedMilliseconds) ms")
 }
 
-Test-Hello $false
-Test-Rest $false
-Test-MultiClient $false
-Test-Hello $true
-Test-Rest $true
-Test-MultiClient $true
+foreach ($testCase in @({ Test-Hello $false }, { Test-Rest $false }, { Test-MultiClient $false },
+        { Test-Hello $true }, { Test-Rest $true }, { Test-MultiClient $true })) {
+    & $testCase
+}
 Write-Output "Live Z+ HTTP program tests passed"

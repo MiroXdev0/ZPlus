@@ -8,6 +8,9 @@ function(run_case name expected_exit expected_output)
     set(source "${SOURCE_DIR}/tests/native/${name}.zp")
     set(executable "${WORK_DIR}/${name}.native")
 
+    if(NOT HOST_WINDOWS)
+        return()
+    endif()
     execute_process(
         COMMAND "${ZP}" build "${source}" -o "${executable}"
         RESULT_VARIABLE build_result
@@ -68,6 +71,10 @@ function(run_native_interpreter_parity name expected_output)
             "${name}: interpreter result mismatch (${interpreter_result})\n"
             "expected: [${expected_output}]\nactual: [${interpreter_output}]\n"
             "${interpreter_error}")
+    endif()
+
+    if(NOT HOST_WINDOWS)
+        return()
     endif()
 
     execute_process(
@@ -179,6 +186,10 @@ function(run_input_case name input_text expected_output)
             "${interpreter_error}")
     endif()
 
+    if(NOT HOST_WINDOWS)
+        return()
+    endif()
+
     execute_process(
         COMMAND "${ZP}" build "${source}" -o "${executable}"
         RESULT_VARIABLE build_result
@@ -249,6 +260,10 @@ function(run_input_failure name input_text expected_message)
         message(FATAL_ERROR
             "${name}: interpreter did not report [${expected_message}]\n"
             "${interpreter_output}${interpreter_error}")
+    endif()
+
+    if(NOT HOST_WINDOWS)
+        return()
     endif()
 
     execute_process(
@@ -483,7 +498,9 @@ run_interpreter_case(
     string_comparison
     "string equality passed\nstring inequality passed\ndynamic string equality passed\ndynamic string inequality passed\ndynamic conjunction passed\n"
 )
-run_native_build_error(unsupported_say_type "unsupported_say_type.zp:3:8")
+if(HOST_WINDOWS)
+    run_native_build_error(unsupported_say_type "unsupported_say_type.zp:3:8")
+endif()
 run_native_build_error(
     unknown_dynamic_operation
     "native backend: operations on unknown values are unsupported")
@@ -682,7 +699,7 @@ else()
     )
     if(dynamic_arrays_unsupported_result EQUAL 0 OR
        NOT "${dynamic_arrays_unsupported_stdout}${dynamic_arrays_unsupported_stderr}" MATCHES
-           "dynamic array operations require the Windows x64 managed runtime")
+           "builtin '__zmemory_heapUsed' requires the Windows x64 runtime")
         message(FATAL_ERROR "unsupported native dynamic-array target was not diagnosed\n${dynamic_arrays_unsupported_stdout}${dynamic_arrays_unsupported_stderr}")
     endif()
 

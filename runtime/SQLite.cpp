@@ -81,6 +81,12 @@ public:
             library_ = LoadLibraryA(name);
             if (library_) break;
         }
+        if (library_) {
+            char path[MAX_PATH];
+            if (GetModuleFileNameA(library_, path, MAX_PATH) > 0) {
+                libraryPath_ = path;
+            }
+        }
 #else
         for (const char* name : {"libsqlite3.so.0", "libsqlite3.so"}) {
             library_ = dlopen(name, RTLD_NOW | RTLD_LOCAL);
@@ -112,6 +118,12 @@ public:
         changes = load<Changes>("sqlite3_changes");
         errorMessage = load<ErrorMessage>("sqlite3_errmsg");
         busyTimeout = load<BusyTimeout>("sqlite3_busy_timeout");
+#ifndef _WIN32
+        Dl_info info{};
+        if (dladdr(reinterpret_cast<void*>(openV2), &info) != 0 && info.dli_fname) {
+            libraryPath_ = info.dli_fname;
+        }
+#endif
     }
 
     template<typename Function>
@@ -122,7 +134,11 @@ public:
         const auto address = dlsym(library_, name);
 #endif
         if (!address) {
-            throw std::runtime_error(std::string("SQLite runtime is missing ") + name);
+            std::string detail = std::string("SQLite runtime is missing ") + name;
+            if (!libraryPath_.empty()) {
+                detail += " (loaded from " + libraryPath_ + ")";
+            }
+            throw std::runtime_error(detail);
         }
         return reinterpret_cast<Function>(address);
     }
@@ -148,6 +164,7 @@ public:
     Changes changes = nullptr;
     ErrorMessage errorMessage = nullptr;
     BusyTimeout busyTimeout = nullptr;
+    std::string libraryPath_;
 
 private:
     SqliteLibrary library_{};
@@ -317,6 +334,10 @@ std::string uniqueColumnName(
 }
 
 } // namespace
+
+std::string runtimeLibraryPath() {
+    return api().libraryPath_;
+}
 
 std::int64_t openDatabase(const std::string& path) {
     if (path.empty()) throw std::invalid_argument("SQLite database path must not be empty");

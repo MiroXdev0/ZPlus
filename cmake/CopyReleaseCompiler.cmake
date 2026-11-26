@@ -26,8 +26,11 @@ function(install_release_file source destination label)
     set(temporary "${destination}.release-tmp")
     configure_file("${source}" "${temporary}" COPYONLY)
     if(UNIX)
-        file(GET_PERMISSIONS "${source}" source_permissions)
-        file(CHMOD "${temporary}" PERMISSIONS ${source_permissions})
+        file(CHMOD "${temporary}"
+            PERMISSIONS
+                OWNER_READ OWNER_WRITE OWNER_EXECUTE
+                GROUP_READ GROUP_EXECUTE
+                WORLD_READ WORLD_EXECUTE)
     endif()
     file(RENAME "${temporary}" "${destination}" RESULT rename_result)
 

@@ -20,12 +20,25 @@ void refreshDevices(AudioState& audio) {
     if (!audio.contextInitialized) return;
     ma_device_info* playbackDevices = nullptr;
     ma_uint32 playbackCount = 0;
-    checkResult(ma_context_get_devices(
-        &audio.context, &playbackDevices, &playbackCount, nullptr, nullptr),
-        "enumerate audio playback devices");
+    if (ma_context_get_devices(
+            &audio.context, &playbackDevices, &playbackCount, nullptr, nullptr) != MA_SUCCESS) {
+        audio.devices.clear();
+        return;
+    }
 
     std::deque<Device> refreshed;
     for (ma_uint32 index = 0; index < playbackCount; ++index) {
+        ma_device probe;
+        ma_device_config probeConfig = ma_device_config_init(ma_device_type_playback);
+        probeConfig.playback.pDeviceID = &playbackDevices[index].id;
+        probeConfig.playback.format = ma_format_unknown;
+        probeConfig.playback.channels = 0;
+        probeConfig.sampleRate = 0;
+        if (ma_device_init(&audio.context, &probeConfig, &probe) != MA_SUCCESS) {
+            continue;
+        }
+        ma_device_uninit(&probe);
+
         Device device;
         device.id = playbackDevices[index].id;
         device.name = playbackDevices[index].name;

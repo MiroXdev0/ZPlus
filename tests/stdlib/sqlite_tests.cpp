@@ -26,11 +26,15 @@ void requireThrows(Operation&& operation, const char* message) {
 
 int main() {
     try {
+        std::cerr << "[sqlite-unit] loading SQLite runtime\n";
         const auto database = zplus::sqlite::openDatabase(":memory:");
+        std::cerr << "[sqlite-unit] opened database (runtime: "
+            << zplus::sqlite::runtimeLibraryPath() << ")\n";
         require(zplus::sqlite::execute(database,
             "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, age INTEGER, "
             "active BOOLEAN, note TEXT, payload BLOB)", "[]") == 0,
             "SQLite schema creation failed");
+        std::cerr << "[sqlite-unit] schema created\n";
 
         const std::string hostileText = "Alice'); DROP TABLE users; --";
         require(zplus::sqlite::execute(database,
@@ -53,6 +57,7 @@ int main() {
             "SQLite NULL was not preserved");
         require(zplus::json::getString(rows, "/0/payload/$blob") == "AP8Q",
             "SQLite BLOB did not use base64 JSON encoding");
+        std::cerr << "[sqlite-unit] parameterized insert/query verified\n";
 
         zplus::sqlite::execute(database, "BEGIN", "[]");
         zplus::sqlite::execute(database,
@@ -61,6 +66,7 @@ int main() {
         require(zplus::sqlite::query(database,
             "SELECT id FROM users WHERE name = ?", R"(["rolled back"])") == "[]",
             "SQLite rollback failed");
+        std::cerr << "[sqlite-unit] rollback verified\n";
 
         zplus::sqlite::execute(database, "BEGIN", "[]");
         zplus::sqlite::execute(database,
@@ -90,6 +96,7 @@ int main() {
         requireThrows<std::runtime_error>([&] {
             (void)zplus::sqlite::execute(database, "SELECT * FROM missing_table", "[]");
         }, "SQLite did not report an invalid table");
+        std::cerr << "[sqlite-unit] commit and error handling verified\n";
 
         zplus::sqlite::closeDatabase(database);
         requireThrows<std::invalid_argument>([&] {

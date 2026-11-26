@@ -335,8 +335,9 @@ PlatformApplication::~PlatformApplication() {
     }
     for (const auto& [key, pixel] : impl_->colors) {
         (void)key;
+        unsigned long color = pixel;
         XFreeColors(impl_->display, DefaultColormap(impl_->display, impl_->screen),
-                    &pixel, 1, 0);
+                    &color, 1, 0);
     }
     if (impl_->display) XCloseDisplay(impl_->display);
 }

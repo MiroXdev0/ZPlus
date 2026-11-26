@@ -38,6 +38,7 @@ constexpr NativeSocket invalidSocket = INVALID_SOCKET;
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <sys/select.h>
 #include <sys/socket.h>
@@ -883,6 +884,11 @@ std::string performClientRequest(
         throw std::runtime_error("could not configure HTTP client socket timeouts");
     }
 #endif
+    {
+        const int noDelay = 1;
+        setsockopt(connection, IPPROTO_TCP, TCP_NODELAY,
+            reinterpret_cast<const char*>(&noDelay), sizeof(noDelay));
+    }
     std::string request = method + " " + target + " HTTP/1.1\r\nHost: " +
         authority + "\r\nConnection: close\r\nContent-Length: " +
         std::to_string(body.size()) + "\r\n";
@@ -1389,6 +1395,9 @@ private:
             setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
             setsockopt(client, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
 #endif
+            const int noDelay = 1;
+            setsockopt(client, IPPROTO_TCP, TCP_NODELAY,
+                reinterpret_cast<const char*>(&noDelay), sizeof(noDelay));
             std::unique_lock lock(clientsMutex_);
             if (clients_.size() >= maximumQueuedClients || !running_) {
                 lock.unlock();
