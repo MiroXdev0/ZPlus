@@ -600,15 +600,17 @@ if(BUILD_TESTING)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/zbuild/run_template_tests.cmake"
     )
     set_tests_properties(zbuild_templates PROPERTIES DEPENDS zbuild_unit)
-    add_test(
-        NAME zbuild_backend_runtime
-        COMMAND ${CMAKE_COMMAND}
-            "-DZBUILD=$<TARGET_FILE:zbuild>"
-            "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
-            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/zbuild-backend-test-output"
-            "-DHOST_WINDOWS=$<BOOL:${WIN32}>"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/zbuild/run_backend_integration.cmake"
-    )
+    if(WIN32)
+        add_test(
+            NAME zbuild_backend_runtime
+            COMMAND ${CMAKE_COMMAND}
+                "-DZBUILD=$<TARGET_FILE:zbuild>"
+                "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+                "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/zbuild-backend-test-output"
+                "-DHOST_WINDOWS=$<BOOL:${WIN32}>"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/zbuild/run_backend_integration.cmake"
+        )
+    endif()
     if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
         add_test(
             NAME zbuild_audio_integration

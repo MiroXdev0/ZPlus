@@ -1135,13 +1135,19 @@ test("imported module diagnostics target the reported .zh source file", () => {
 test("compiler path resolution preserves explicit paths and finds PATH executables", () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "zplus compiler path "));
     try {
-        const executable = path.join(directory, "zp.exe");
+        const executable = path.join(directory, "zp.EXE");
         fs.writeFileSync(executable, "");
         assert.equal(resolveCompilerPath(executable), executable);
         assert.equal(resolveCompilerPath("", process.env, process.platform, [executable]), executable);
         assert.equal(
             resolveCompilerPath("zp", { PATH: directory, PATHEXT: ".EXE" }, "win32").toLowerCase(),
             executable.toLowerCase()
+        );
+        const posixExecutable = path.join(directory, "zp");
+        fs.writeFileSync(posixExecutable, "");
+        assert.equal(
+            resolveCompilerPath("zp", { PATH: directory }, "linux"),
+            posixExecutable
         );
     } finally {
         fs.rmSync(directory, { recursive: true, force: true });

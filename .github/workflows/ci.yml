@@ -25,6 +25,17 @@ jobs:
         run: cmake --build build --config Release --parallel 1
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
+      - name: Publish Windows test diagnostics
+        if: failure() && runner.os == 'Windows'
+        permissions:
+          issues: write
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ctest --test-dir build -C Release --output-on-failure > ctest-diagnostics.txt 2>&1
+          "Windows CTest diagnostics for run $env:GITHUB_RUN_ID (commit $env:GITHUB_SHA):" | Out-File -FilePath diagnostics-body.md -Encoding utf8
+          Get-Content ctest-diagnostics.txt -Tail 350 | Out-File -FilePath diagnostics-body.md -Append -Encoding utf8
+          gh issue create --repo "${{ github.repository }}" --title "Windows CI diagnostics (run $env:GITHUB_RUN_ID)" --body-file diagnostics-body.md
 
   ecosystem-checks:
     runs-on: ubuntu-latest

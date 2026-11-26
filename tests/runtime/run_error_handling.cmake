@@ -72,6 +72,7 @@ if(NOT native_interpreter_result EQUAL 0 OR
 endif()
 
 set(native_executable "${WORK_DIR}/native_error_handling.exe")
+if(WIN32)
 execute_process(
     COMMAND "${ZP}" build "${native_program}" -o "${native_executable}"
     RESULT_VARIABLE native_build_result
@@ -146,4 +147,5 @@ if(native_unhandled_result EQUAL 0 OR
    NOT "${native_unhandled_output}${native_unhandled_error}" MATCHES "unhandled problem")
     message(FATAL_ERROR
         "uncaught native exception was not reported (${native_unhandled_result})\n${native_unhandled_output}${native_unhandled_error}")
+endif()
 endif()

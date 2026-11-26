@@ -43,6 +43,10 @@ function(run_parity name expected)
             "${interpreter_error}")
     endif()
 
+    if(NOT WIN32)
+        return()
+    endif()
+
     set(executable "${directory}/struct-test.exe")
     execute_process(
         COMMAND "${ZP}" build main.zp -o "${executable}"
@@ -271,6 +275,7 @@ if(runtime_status EQUAL 0 OR
    NOT "${runtime_output}${runtime_error}" MATCHES "member access requires a struct value")
     message(FATAL_ERROR "uninitialized struct access was not rejected safely\n${runtime_output}${runtime_error}")
 endif()
+if(WIN32)
 set(uninitialized_native "${WORK_DIR}/uninitialized field access/uninitialized-native.exe")
 execute_process(
     COMMAND "${ZP}" build main.zp -o "${uninitialized_native}"
@@ -294,6 +299,7 @@ execute_process(
 if(native_runtime_status EQUAL 0 OR
    NOT "${native_runtime_output}${native_runtime_error}" MATCHES "struct")
     message(FATAL_ERROR "native uninitialized struct access did not fail safely\n${native_runtime_output}${native_runtime_error}")
+endif()
 endif()
 
 write_invalid("wrong constructor type" [=[

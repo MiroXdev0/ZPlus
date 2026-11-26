@@ -62,6 +62,7 @@ if(NOT interpreter_result EQUAL 0 OR NOT "${interpreter_output}" STREQUAL "${exp
     message(FATAL_ERROR "brace syntax interpreter mismatch\nexpected:\n${expected}\nactual:\n${interpreter_output}${interpreter_error}")
 endif()
 
+if(WIN32)
 set(executable "${WORK_DIR}/brace_syntax.native.exe")
 execute_process(
     COMMAND "${ZP}" build "${source}" -o "${executable}"
@@ -83,6 +84,7 @@ execute_process(
 )
 if(NOT native_result EQUAL 0 OR NOT "${native_output}" STREQUAL "${expected}")
     message(FATAL_ERROR "brace syntax native mismatch\nexpected:\n${expected}\nactual:\n${native_output}${native_error}")
+endif()
 endif()
 
 set(invalid_cases

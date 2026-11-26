@@ -1427,37 +1427,25 @@ private:
                 loadValue(instruction.operands[i + 1], registers[i]);
             }
         } else {
-            std::vector<bool> floatingPointArguments;
-            floatingPointArguments.reserve(count);
-            for (std::size_t i = 0; i < count; ++i) {
-                floatingPointArguments.push_back(
-                    isNumericArgument(instruction.operands[i + 1]));
-            }
-            const auto locations =
-                systemVArgumentLocations(floatingPointArguments);
+            // Runtime-import calls receive every argument as a 64-bit
+            // integer: handles and numeric values travel as encoded raw
+            // bits and strings as pointers, matching the runtime API
+            // signatures on the System V ABI.
             for (std::size_t i = 0; i < count; ++i) {
                 const Value& value = instruction.operands[i + 1];
-                const auto& location = locations[i];
-                if (location.onStack) {
-                    const std::size_t displacement =
-                        location.stackIndex * sizeof(std::uint64_t);
-                    if (displacement > static_cast<std::size_t>(
-                            std::numeric_limits<std::int32_t>::max())) {
-                        throw std::runtime_error(
-                            "native backend: System V outgoing argument area is too large");
-                    }
-                    if (location.floatingPoint) {
-                        loadXmmValue(value, 15);
-                        gprMoveFromXmm(RAX, 15);
-                    } else {
-                        loadValue(value, RAX);
-                    }
-                    movStoreRspDisp(static_cast<std::int32_t>(displacement), RAX);
-                } else if (location.floatingPoint) {
-                    loadXmmValue(value, location.registerIndex);
-                } else {
-                    loadValue(value, registers[location.registerIndex]);
+                if (i < registers.size()) {
+                    loadValue(value, registers[i]);
+                    continue;
                 }
+                const std::size_t displacement =
+                    (i - registers.size()) * sizeof(std::uint64_t);
+                if (displacement > static_cast<std::size_t>(
+                        std::numeric_limits<std::int32_t>::max())) {
+                    throw std::runtime_error(
+                        "native backend: System V outgoing argument area is too large");
+                }
+                loadValue(value, RAX);
+                movStoreRspDisp(static_cast<std::int32_t>(displacement), RAX);
             }
         }
     }
@@ -3471,8 +3459,8 @@ private:
         movStore(-8, RDI);
         movStore(-16, RSI);
         movReg(RSI, RDI);
-        localLabels_[loop] = code_.size();
         movImm(RAX, 0);
+        localLabels_[loop] = code_.size();
         emit8(0x80);
         emit8(0x3C);
         emit8(0x07);

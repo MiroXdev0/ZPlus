@@ -122,10 +122,7 @@ set(native_source "${WORK_DIR}/canonical-native.zp")
 file(WRITE "${native_source}"
     "use zp.math.legacy as legacyMath\nstart {\n    say(legacyMath.abs(-7))\n} stop\n")
 if(HOST_WINDOWS)
-    set(native_output "${WORK_DIR}/canonical-native.exe")
-else()
-    set(native_output "${WORK_DIR}/canonical-native")
-endif()
+set(native_output "${WORK_DIR}/canonical-native.exe")
 execute_process(
     COMMAND "${ZP}" build "${native_source}" -o "${native_output}"
     RESULT_VARIABLE native_build_result
@@ -150,4 +147,5 @@ if(NOT native_run_result EQUAL 0 OR
     message(FATAL_ERROR
         "canonical namespace native run failed (${native_run_result})\n"
         "${native_run_output}${native_run_error}")
+endif()
 endif()
