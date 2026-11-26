@@ -26,15 +26,20 @@ jobs:
         run: cmake --build build --config Release --parallel 1
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
-      - name: Publish Windows test diagnostics
-        if: failure() && runner.os == 'Windows'
+      - name: Publish CI diagnostics
+        if: failure()
+        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          cmake --build build --config Release --parallel 1 > build-diagnostics.txt 2>&1
           ctest --test-dir build -C Release --output-on-failure > ctest-diagnostics.txt 2>&1
-          "Windows CTest diagnostics for run $env:GITHUB_RUN_ID (commit $env:GITHUB_SHA):" | Out-File -FilePath diagnostics-body.md -Encoding utf8
-          Get-Content ctest-diagnostics.txt -Tail 350 | Out-File -FilePath diagnostics-body.md -Append -Encoding utf8
-          gh issue create --repo "${{ github.repository }}" --title "Windows CI diagnostics (run $env:GITHUB_RUN_ID)" --body-file diagnostics-body.md
+          "CI diagnostics for run $env:GITHUB_RUN_ID (commit $env:GITHUB_SHA):" | Out-File -FilePath diagnostics-body.md -Encoding utf8
+          "--- build ---" | Out-File -FilePath diagnostics-body.md -Append -Encoding utf8
+          Get-Content build-diagnostics.txt -Tail 150 | Out-File -FilePath diagnostics-body.md -Append -Encoding utf8
+          "--- ctest ---" | Out-File -FilePath diagnostics-body.md -Append -Encoding utf8
+          Get-Content ctest-diagnostics.txt -Tail 200 | Out-File -FilePath diagnostics-body.md -Append -Encoding utf8
+          gh issue create --repo "${{ github.repository }}" --title "CI diagnostics (run $env:GITHUB_RUN_ID, $env:RUNNER_OS)" --body-file diagnostics-body.md
 
   ecosystem-checks:
     runs-on: ubuntu-latest
